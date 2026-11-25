@@ -1,6 +1,8 @@
 import { RETCODE_MESSAGE, serverForUid, type HoyolabRaw } from "@/lib/connectors/hoyolab";
 import { cookieFromEnv, dynamicSecret, HOYOLAB_BASE } from "@/lib/connectors/hoyolab-server";
 
+import { forbidden, isSameOrigin } from "@/lib/security";
+
 /**
  * Read-only proxy for HoYoLAB Battle Chronicle (HSR, global servers).
  * Cookies are read from server environment variables (.env.local) and never sent to the browser.
@@ -10,7 +12,8 @@ export const dynamic = "force-dynamic";
 
 const cache = new Map<string, { until: number; body: HoyolabRaw }>();
 
-export function GET() {
+export function GET(req: Request) {
+  if (!isSameOrigin(req)) return forbidden();
   return Response.json({ configured: cookieFromEnv() !== null });
 }
 
@@ -37,6 +40,7 @@ async function call(path: string, cookie: string): Promise<{ data?: unknown; err
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) return forbidden();
   const cookie = cookieFromEnv();
   if (!cookie) return Response.json({ error: "HoYoLAB isn't configured. Add HOYOLAB_LTUID_V2 and HOYOLAB_LTOKEN_V2 to .env.local and restart." }, { status: 503 });
   const body = (await req.json().catch(() => null)) as { uid?: string } | null;

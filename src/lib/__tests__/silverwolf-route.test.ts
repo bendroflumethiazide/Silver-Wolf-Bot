@@ -39,9 +39,9 @@ describe("/api/silverwolf", () => {
   afterEach(() => { delete process.env.ANTHROPIC_API_KEY; });
 
   it("reports configuration without exposing the key", async () => {
-    expect(await (GET()).json()).toEqual({ configured: false, model: "claude-opus-5-5" });
+    expect(await (GET(new Request("http://x/api/silverwolf"))).json()).toEqual({ configured: false, model: "claude-opus-5-5" });
     process.env.ANTHROPIC_API_KEY = "sk-test";
-    const j = await GET().json();
+    const j = await GET(new Request("http://x/api/silverwolf")).json();
     expect(j.configured).toBe(true);
     expect(JSON.stringify(j)).not.toContain("sk-test");
   });

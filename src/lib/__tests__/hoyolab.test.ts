@@ -75,11 +75,11 @@ describe("/api/hoyolab", () => {
 
   it("needs cookies and a valid UID, and never leaks them", async () => {
     const { GET, POST } = await import("../../app/api/hoyolab/route");
-    expect(await GET().json()).toEqual({ configured: false });
+    expect(await GET(new Request("http://x/api/hoyolab")).json()).toEqual({ configured: false });
     expect((await POST(post("600000001"))).status).toBe(503);
     process.env.HOYOLAB_LTUID_V2 = "1"; process.env.HOYOLAB_LTOKEN_V2 = "secret-token";
     expect((await POST(post("123"))).status).toBe(400);
-    expect(JSON.stringify(await GET().json())).not.toContain("secret");
+    expect(JSON.stringify(await GET(new Request("http://x/api/hoyolab")).json())).not.toContain("secret");
   });
 
   it("stops at a verification challenge instead of retrying", async () => {

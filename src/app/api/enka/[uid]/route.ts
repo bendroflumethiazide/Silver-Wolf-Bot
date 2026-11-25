@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { forbidden, isSameOrigin } from "@/lib/security";
+
 /**
  * Local proxy for the Enka.Network HSR showcase API (browser CORS + required User-Agent).
  * Only a UID is forwarded. Responses are cached in memory for the `ttl` Enka returns, as Enka asks.
@@ -7,7 +9,8 @@ import { NextResponse } from "next/server";
 const cache = new Map<string, { until: number; body: unknown }>();
 const UA = "AstralCompanion/0.1 (personal local app)";
 
-export async function GET(_req: Request, { params }: { params: Promise<{ uid: string }> }) {
+export async function GET(req: Request, { params }: { params: Promise<{ uid: string }> }) {
+  if (!isSameOrigin(req)) return forbidden();
   const { uid } = await params;
   if (!/^\d{9,10}$/.test(uid)) return NextResponse.json({ error: "UID must be 9–10 digits." }, { status: 400 });
   const hit = cache.get(uid);

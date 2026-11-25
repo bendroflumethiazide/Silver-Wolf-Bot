@@ -2,6 +2,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { SILVER_WOLF_SYSTEM } from "@/lib/companion/persona";
 
+import { forbidden, isSameOrigin } from "@/lib/security";
+
 /**
  * Silver Wolf chat through the Claude API.
  * - The API key stays on this local server (ANTHROPIC_API_KEY in .env.local); the browser never sees it.
@@ -21,12 +23,14 @@ const Body = z.object({
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().min(1).max(2000) })).min(1).max(24),
 });
 
-export function GET() {
+export function GET(req: Request) {
+  if (!isSameOrigin(req)) return forbidden();
   const configured = Boolean(process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN);
   return Response.json({ configured, model: MODEL });
 }
 
 export async function POST(req: Request) {
+  if (!isSameOrigin(req)) return forbidden();
   if (!process.env.ANTHROPIC_API_KEY && !process.env.ANTHROPIC_AUTH_TOKEN)
     return Response.json({ error: "Claude isn't configured. Add ANTHROPIC_API_KEY to .env.local and restart the app." }, { status: 503 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
