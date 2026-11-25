@@ -76,30 +76,27 @@ test("HSR Scanner import: preview, apply, rollback", async ({ page }) => {
   await expect(page.getByText("No relics")).toBeVisible();
 });
 
-test("warp: SRGF import → pity, planner, deterministic simulator", async ({ page }) => {
+test("warp: tracker button, entered pity drives planner, deterministic simulator", async ({ page }) => {
   await installGameData(page);
-  const list = Array.from({ length: 80 }, (_, i) => ({ gacha_id: "2001", gacha_type: "11", item_id: i === 9 ? "1903" : "20000", count: "1", time: `2026-01-01 10:${String(Math.floor(i / 60)).padStart(2, "0")}:${String(i % 60).padStart(2, "0")}`, name: i === 9 ? "Test Striker" : "Arrows", item_type: "", rank_type: i === 9 ? "5" : "3", id: String(1700000000000000000n + BigInt(i)) }));
-  await page.goto("/import");
-  await page.locator('input[type="file"]').nth(1).setInputFiles({ name: "warps.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify({ info: { uid: "1", lang: "en-us", srgf_version: "v1.0", region_time_zone: 8 }, list })) });
-  await expect(page.getByRole("button", { name: "Import 80 record(s)" })).toBeVisible();
-  await page.getByRole("button", { name: "Import 80 record(s)" }).click();
-  await expect(page.getByText("80 new Warp record(s) imported")).toBeVisible();
   await page.goto("/warp");
-  await expect(page.getByText("70/90")).toBeVisible(); // 80 pulls, 5★ at pull 10 → pity 70
+  const tracker = page.getByRole("link", { name: /Open Warp Tracker/ }).first();
+  await expect(tracker).toHaveAttribute("href", "https://starrailstation.com/en/warp#import");
+  await expect(tracker).toHaveAttribute("target", "_blank");
+  await page.getByRole("spinbutton", { name: "Character Event Warp pity" }).fill("70");
   await expect(page.getByText(/Pity 70|Counter's at 70/).first()).toBeVisible();
   await page.goto("/warp?tab=planner");
-  await page.getByRole("button", { name: "Use pity from my Warp history" }).click();
+  await expect(page.getByLabel(/Current pity/)).toHaveValue("70");
   await page.getByLabel("Special Passes").fill("200");
   await expect(page.getByText("100.0%")).toBeVisible();
   await page.goto("/warp?tab=simulator");
   await page.getByLabel("Seed").fill("e2e-seed");
   await page.getByRole("button", { name: "×50" }).click();
   const first = await page.getByText(/Simulated pulls/).locator("..").innerText();
-  const log1 = await page.locator("main").innerText();
   await page.getByRole("button", { name: "Reset" }).click();
   await page.getByRole("button", { name: "×50" }).click();
   expect(await page.getByText(/Simulated pulls/).locator("..").innerText()).toBe(first);
-  expect((await page.locator("main").innerText()).includes("5★ obtained")).toBe(log1.includes("5★ obtained"));
+  await page.goto("/import");
+  await expect(page.getByRole("link", { name: /Open Warp Tracker/ })).toBeVisible();
 });
 
 test("journal persists, backup → delete → restore round-trip", async ({ page }) => {
@@ -153,7 +150,7 @@ test("map: create zone, place marker, complete it", async ({ page }) => {
   await expect(page.getByText("1/1 · 100%")).toBeVisible();
 });
 
-test("Silver Wolf terminal answers from data and admits gaps", async ({ page }) => {
+test("Silver Wolf full chat answers from data and admits gaps", async ({ page }) => {
   await installGameData(page);
   await page.goto("/");
   await page.getByLabel("Stellar Jade").fill("1600");
@@ -165,6 +162,33 @@ test("Silver Wolf terminal answers from data and admits gaps", async ({ page }) 
   await page.getByLabel("Message Silver Wolf").fill("how do I beat the moon boss");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText(/not inventing mechanics/)).toBeVisible();
-  await expect(page.getByText("Don't make a game if you don't know how to")).toBeVisible();
+  await expect(page.getByText(/Don't make a game if you don't know how to/)).toBeVisible();
+  await page.getByRole("button", { name: "Chat settings" }).click();
   await expect(page.getByRole("radio", { name: "Claude" })).toBeDisabled(); // no API key in tests
+});
+
+test("phone chat: floating button, small talk, family settings, history persists", async ({ page }) => {
+  await installGameData(page);
+  await page.goto("/characters");
+  await page.getByRole("button", { name: /Text Silver Wolf/ }).click();
+  const phone = page.getByRole("dialog", { name: "Phone chat with Silver Wolf" });
+  await expect(phone).toBeVisible();
+  await expect(phone.getByText("Silver Wolf").first()).toBeVisible();
+  await phone.getByRole("button", { name: "Chat settings" }).click();
+  await phone.getByLabel("She calls you").fill("Dad");
+  await phone.locator("select").first().selectOption("daughter");
+  await phone.getByRole("button", { name: "Chat settings" }).click();
+  await phone.getByLabel("Message Silver Wolf").fill("love you");
+  await phone.getByLabel("Message Silver Wolf").press("Enter");
+  await expect(phone.getByText(/Love u (too Dad|more)/)).toBeVisible();
+  await phone.getByRole("button", { name: "What should I do today?" }).click();
+  await expect(phone.getByText(/Ok here's the plan|Nothing urgent/)).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(phone).toBeHidden();
+  await page.reload();
+  await page.getByRole("button", { name: /Text Silver Wolf/ }).click();
+  await expect(page.getByRole("dialog", { name: "Phone chat with Silver Wolf" }).getByText("love you")).toBeVisible();
+  await page.goto("/terminal");
+  await expect(page.getByText("love you")).toBeVisible(); // same history as the phone
+  await expect(page.getByRole("button", { name: /Text Silver Wolf/ })).toHaveCount(0);
 });

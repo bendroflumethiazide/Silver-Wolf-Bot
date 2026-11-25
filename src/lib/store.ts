@@ -5,6 +5,7 @@ import { getDb, kvGet, kvSet, newId, nowIso } from "./db";
 import { loadActiveGameData } from "./gamedata/source";
 import type { GameData } from "./gamedata/types";
 import type { Profile } from "./types";
+import type { Relationship } from "./companion/casual";
 
 export type Server = "America" | "Europe" | "Asia" | "TW/HK/MO";
 /** Server UTC offsets in hours (daily reset is 04:00 server time). */
@@ -19,6 +20,8 @@ export interface Settings {
   enkaEnabled: boolean;
   hoyolabEnabled: boolean;
   aiChat: boolean;
+  companionRelationship: Relationship;
+  companionCallsYou: string;
   reducedMotion: boolean;
   sidebarCollapsed: boolean;
   hiddenNav: string[];
@@ -35,6 +38,8 @@ export const DEFAULT_SETTINGS: Settings = {
   enkaEnabled: false,
   hoyolabEnabled: false,
   aiChat: false,
+  companionRelationship: "little-sister",
+  companionCallsYou: "",
   reducedMotion: false,
   sidebarCollapsed: false,
   hiddenNav: [],

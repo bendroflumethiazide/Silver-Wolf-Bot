@@ -66,6 +66,14 @@ describe("/api/silverwolf", () => {
     expect(p.system[0].text).toMatch(/Silver Wolf/);
   });
 
+  it("passes the family relationship and nickname, sanitised", async () => {
+    process.env.ANTHROPIC_API_KEY = "sk-test";
+    await (await POST(req({ context: "x", persona: { relationship: "daughter", callsYou: "Dad<>" }, messages: [{ role: "user", text: "hi" }] }))).text();
+    const p = calls[0] as { messages: { content: string }[] };
+    expect(p.messages.at(-1)!.content).toContain(`<relationship>You are the user's daughter. You call them "Dad".</relationship>`);
+    expect((await POST(req({ context: "x", persona: { relationship: "girlfriend", callsYou: "x" }, messages: [{ role: "user", text: "hi" }] }))).status).toBe(400);
+  });
+
   it("marks refusals", async () => {
     process.env.ANTHROPIC_API_KEY = "sk-test";
     stopReason = "refusal";

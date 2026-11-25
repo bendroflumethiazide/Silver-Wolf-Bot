@@ -13,8 +13,11 @@ export const dynamic = "force-dynamic";
 
 const MODEL = process.env.SILVER_WOLF_MODEL || "claude-opus-5-5";
 
+const RELATION_TEXT = { "little-sister": "the user's little sister", "big-sister": "the user's big sister", daughter: "the user's daughter" } as const;
+
 const Body = z.object({
   context: z.string().max(16000),
+  persona: z.object({ relationship: z.enum(["little-sister", "big-sister", "daughter"]), callsYou: z.string().max(24) }).optional(),
   messages: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().min(1).max(2000) })).min(1).max(24),
 });
 
@@ -28,7 +31,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "Claude isn't configured. Add ANTHROPIC_API_KEY to .env.local and restart the app." }, { status: 503 });
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: "Invalid chat request." }, { status: 400 });
-  const { context, messages } = parsed.data;
+  const { context, messages, persona } = parsed.data;
+  const name = persona?.callsYou.replace(/[<>\n]/g, "").trim() || "Trailblazer";
+  const relationship = `<relationship>You are ${RELATION_TEXT[persona?.relationship ?? "little-sister"]}. You call them "${name}".</relationship>`;
   if (messages[messages.length - 1].role !== "user") return Response.json({ error: "Last message must be from the user." }, { status: 400 });
 
   // History first, then the fresh facts with the newest question (keeps the cached prefix stable).
@@ -36,7 +41,7 @@ export async function POST(req: Request) {
   const last = messages[messages.length - 1].text;
   const apiMessages: Anthropic.Beta.BetaMessageParam[] = [
     ...history,
-    { role: "user", content: `<account_data>\n${context}\n</account_data>\n\n${last}` },
+    { role: "user", content: `${relationship}\n<account_data>\n${context}\n</account_data>\n\n${last}` },
   ];
 
   const client = new Anthropic();

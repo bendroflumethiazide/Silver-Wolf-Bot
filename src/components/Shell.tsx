@@ -11,6 +11,7 @@ import { useApp } from "@/lib/store";
 import { WolfAvatar } from "./SilverWolf";
 import { cx, ErrorBox, Loading } from "./ui";
 import { NotificationCenter } from "./NotificationCenter";
+import { PhoneChat } from "./chat/PhoneChat";
 
 function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
@@ -131,11 +132,12 @@ export function Shell({ children }: { children: ReactNode }) {
         <main className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 lg:px-8">
           {!ready ? <Loading label="Booting terminal" /> : error ? <ErrorBox>Local database failed to open: {error}. Private browsing or blocked site data can prevent storage.</ErrorBox> : children}
         </main>
-        <footer className="border-t border-line px-4 py-3 text-center text-[11px] text-faint lg:px-8">
+        <footer className="border-t border-line px-4 py-3 pr-24 text-center text-[11px] text-faint lg:px-8 lg:pr-24">
           Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHERE / HoYoverse. Your data stays on this device.
         </footer>
       </div>
       <NotificationCenter open={bellOpen} onClose={() => setBellOpen(false)} />
+      {ready && !error && <PhoneChat />}
     </div>
   );
 }

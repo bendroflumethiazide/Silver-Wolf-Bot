@@ -29,10 +29,10 @@ export function WolfAvatar({ mood = "neutral", size = 44 }: { mood?: Mood; size?
 }
 
 /** One in-game-Messages-style bubble. */
-export function Bubble({ children, mine, typing }: { children?: ReactNode; mine?: boolean; typing?: boolean }) {
+export function Bubble({ children, mine, typing, light }: { children?: ReactNode; mine?: boolean; typing?: boolean; light?: boolean }) {
   return (
     <div className={cx("w-fit max-w-full rounded-[14px] px-3.5 py-2 text-[15px] font-medium leading-snug shadow-sm",
-      mine ? "ml-auto bg-[#d3b98a] text-[#1d1a14]" : "bg-[#ececf1] text-[#141418]")}>
+      mine ? "ml-auto bg-[#d3b98a] text-[#1d1a14]" : light ? "bg-[#f7f7f9] text-[#141418]" : "bg-[#ececf1] text-[#141418]")}>
       {typing ? <span className="inline-flex gap-1 py-1" aria-label="typing"><Dot d={0} /><Dot d={0.15} /><Dot d={0.3} /></span> : children}
     </div>
   );
@@ -57,18 +57,18 @@ export function useBurst(parts: string[], animate: boolean) {
 }
 
 /** A burst of Silver Wolf messages (avatar + name on the first bubble, like the in-game chat). */
-export function WolfMessages({ parts, mood = "neutral", animate = true }: { parts: string[]; mood?: Mood; animate?: boolean }) {
+export function WolfMessages({ parts, mood = "neutral", animate = true, light }: { parts: string[]; mood?: Mood; animate?: boolean; light?: boolean }) {
   const reduced = useApp((s) => s.settings.reducedMotion);
   const shown = useBurst(parts, animate && !reduced);
   return (
     <div className="flex gap-3">
       <WolfAvatar mood={mood} size={42} />
       <div className="min-w-0 flex-1 space-y-1.5">
-        <div className="text-xs font-medium text-muted">Silver Wolf</div>
+        <div className={cx("text-xs font-medium", light ? "text-[#55555f]" : "text-muted")}>Silver Wolf</div>
         {parts.slice(0, shown).map((p, i) => (
-          <motion.div key={i} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}><Bubble>{p}</Bubble></motion.div>
+          <motion.div key={i} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}><Bubble light={light}>{p}</Bubble></motion.div>
         ))}
-        {shown < parts.length && <Bubble typing />}
+        {shown < parts.length && <Bubble typing light={light} />}
       </div>
     </div>
   );

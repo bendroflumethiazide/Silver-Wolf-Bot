@@ -54,6 +54,7 @@ export const SUGGESTIONS = [
   "What am I missing on the map?",
   "What events are expiring?",
   "Rate my builds",
+  "What should I do today?",
 ];
 
 export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
@@ -68,6 +69,17 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
       line: "Yo|I read ur save data and tell u what's broken|Only stuff that's actually on disk. no guessing|Ask me something",
       facts: [`Local mode: answers come from this device's database${ctx.game ? ` and game data v${ctx.game.version}` : ""}.`],
       sources: ["Local database"], links: [], };
+  }
+
+  if (has(q, "what should i do", "what to do", "what do i do", "todo", "to do", "plan for today", "priorit", "what now", "what next")) {
+    const top = ctx.summary.objectives.slice(0, 3);
+    if (!top.length) return { intent: "todo", line: "Nothing urgent|Import a scan or track some events and I'll find stuff|Or just pull ;)", facts: [], sources: ["Objectives engine"], links: [{ label: "Import Center", href: "/import" }] };
+    return {
+      intent: "todo",
+      line: [`Ok here's the plan`, ...top.map((o, i) => `${i + 1}. ${o.title}`), "Do the first one now"].join("|"),
+      facts: top.map((o) => `${o.title}: ${o.reason}`), sources: ["Your data → objectives engine"],
+      links: top.slice(0, 2).map((o) => ({ label: o.title, href: o.href })),
+    };
   }
 
   if (has(q, "rate", "rating", "grade") || (has(q, "build") && (ctx.builds ?? []).some((b) => q.includes(b.name.toLowerCase())))) {
