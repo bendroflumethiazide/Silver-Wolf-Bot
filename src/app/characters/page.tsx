@@ -13,6 +13,7 @@ import { getDb } from "@/lib/db";
 import { characterDisplayName, elementName, pathName } from "@/lib/gamedata/types";
 import { useApp } from "@/lib/store";
 import { playableCharacters } from "@/lib/summary";
+import { charHref } from "@/lib/links";
 
 type Own = "all" | "owned" | "missing";
 
@@ -80,7 +81,7 @@ export default function CharactersPage() {
             const o = ownedMap.get(c.id);
             return (
               <li key={c.id} className={cx("glass group relative overflow-hidden rarity-border", `rarity-${c.rarity}`, !o && "opacity-70 hover:opacity-100")}>
-                <Link href={`/characters/${c.id}`} className="block">
+                <Link href={charHref(c.id)} className="block">
                   <GameImage path={c.icon} alt={characterDisplayName(c)} className="aspect-square w-full bg-gradient-to-b from-violet-950/40 to-black/40" rounded="rounded-t-[13px]" />
                   <div className="p-2.5">
                     <div className="truncate text-sm font-medium">{characterDisplayName(c)}</div>

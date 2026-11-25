@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { collectErrors, installGameData, mockGameData } from "./fixtures";
 
-const ROUTES = ["/", "/terminal", "/account", "/characters", "/characters/1006", "/light-cones", "/relics", "/bosses", "/npcs", "/map", "/warp", "/warp?tab=planner", "/warp?tab=simulator", "/warp?tab=banners", "/teams", "/materials", "/game-modes", "/universe", "/story", "/events", "/achievements", "/journal", "/import", "/status", "/settings"];
+const ROUTES = ["/", "/terminal", "/account", "/characters", "/characters/view?id=1006", "/light-cones", "/relics", "/bosses", "/npcs", "/map", "/warp", "/warp?tab=planner", "/warp?tab=simulator", "/warp?tab=banners", "/teams", "/materials", "/game-modes", "/universe", "/story", "/events", "/achievements", "/journal", "/import", "/status", "/settings"];
 
 test("every page renders without errors, before and after game data", async ({ page }) => {
   const errors = collectErrors(page);
@@ -31,7 +31,7 @@ test("characters: mark owned, validation, edit progress, dashboard reflects it",
   await installGameData(page);
   await page.goto("/characters");
   await expect(page.getByText("Test Striker")).toBeVisible();
-  await page.goto("/characters/1903");
+  await page.goto("/characters/view?id=1903");
   await page.getByRole("button", { name: "Mark owned" }).click();
   await page.getByRole("button", { name: "Edit progress" }).click();
   const dialog = page.getByRole("dialog");
@@ -42,7 +42,7 @@ test("characters: mark owned, validation, edit progress, dashboard reflects it",
   await dialog.getByLabel("Ascension").fill("6");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("75/80")).toBeVisible();
-  await page.goto("/characters/1006");
+  await page.goto("/characters/view?id=1006");
   await expect(page.getByText(/Oh\. me|My page/)).toBeVisible(); // Silver Wolf comments on herself
   await page.goto("/");
   await expect(page.getByText("1/5")).toBeVisible();
@@ -63,7 +63,7 @@ test("HSR Scanner import: preview, apply, rollback", async ({ page }) => {
   await expect(page.getByText("3 written, 0 removed")).toBeVisible();
   await page.goto("/relics");
   await expect(page.locator("main li").getByText("Set of Testing")).toBeVisible();
-  await page.goto("/characters/1901");
+  await page.goto("/characters/view?id=1901");
   await expect(page.getByText("Silver Wolf rating")).toBeVisible();
   await expect(page.getByText("What this build lacks")).toBeVisible();
   await expect(page.getByText(/No Hands, Body, Feet, Planar Sphere, Link Rope equipped/)).toBeVisible();

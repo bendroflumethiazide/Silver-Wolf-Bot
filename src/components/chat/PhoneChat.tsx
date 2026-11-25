@@ -8,6 +8,7 @@ import { useEffect, useState } from "react";
 import { SIGNATURE } from "@/lib/companion/voice";
 import { useApp } from "@/lib/store";
 import { WolfAvatar } from "../SilverWolf";
+import { cx } from "../ui";
 import { ChatComposer, ChatSettings, ChatThread } from "./ChatParts";
 import { useWolfChat } from "./useWolfChat";
 
@@ -26,7 +27,7 @@ export function PhoneChat() {
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
 
-  if (pathname === "/terminal") return null;
+  if (pathname.replace(/\/$/, "") === "/terminal") return null;
   return (
     <>
       <AnimatePresence>
@@ -55,7 +56,7 @@ export function PhoneChat() {
       <button
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close Silver Wolf's chat" : `Text Silver Wolf${chat.hasPing ? " (new message)" : ""}`}
-        className="fixed bottom-5 right-5 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 p-[3px] shadow-[0_8px_30px_rgba(167,139,250,.45)] transition hover:scale-105"
+        className={cx("fixed bottom-5 right-5 z-50 h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 p-[3px] shadow-[0_8px_30px_rgba(167,139,250,.45)] transition hover:scale-105", open ? "hidden sm:flex" : "flex")}
       >
         <span className="relative flex h-full w-full items-center justify-center rounded-full bg-[#0b0a18]">
           {open ? <X size={22} className="text-white" /> : <WolfAvatar size={46} />}

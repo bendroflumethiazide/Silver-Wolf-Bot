@@ -8,6 +8,7 @@ import { HOYOLAB_CAPABILITIES, parseHoyolab, serverForUid, type HoyolabParsed, t
 import { useApp } from "@/lib/store";
 import type { ImportHistoryEntry, Profile } from "@/lib/types";
 import { Badge, Button, ErrorBox, Notice, Panel } from "./ui";
+import { WEB_EDITION, WEB_EDITION_NOTE } from "@/lib/edition";
 
 /** Apply a parsed HoYoLAB sync. Manual character edits are never overwritten. Returns a summary. */
 export async function applyHoyolab(p: HoyolabParsed, profile: Profile): Promise<string> {
@@ -45,7 +46,10 @@ export function HoyolabSync({ profile }: { profile: Profile }) {
   const [err, setErr] = useState<string | null>(null);
   const [preview, setPreview] = useState<HoyolabParsed | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
-  useEffect(() => { fetch("/api/hoyolab").then((r) => r.json()).then((j) => setConfigured(!!j.configured)).catch(() => setConfigured(false)); }, []);
+  useEffect(() => {
+    if (WEB_EDITION) { setConfigured(false); return; }
+    fetch("/api/hoyolab").then((r) => r.json()).then((j) => setConfigured(!!j.configured)).catch(() => setConfigured(false));
+  }, []);
 
   const fetchIt = async () => {
     setBusy(true); setErr(null); setMsg(null); setPreview(null);
@@ -64,7 +68,7 @@ export function HoyolabSync({ profile }: { profile: Profile }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="space-y-3 text-sm">
           <div className="flex flex-wrap items-center gap-2"><Badge tone="ok">read-only</Badge><Badge tone="warn">unofficial endpoints</Badge>{configured === false && <Badge tone="bad">not configured</Badge>}{configured && <Badge tone="cyan">cookies set on server</Badge>}</div>
-          {configured === false && (
+          {WEB_EDITION ? <Notice>{WEB_EDITION_NOTE}</Notice> : configured === false && (
             <Notice>
               Put your HoYoLAB cookies in <code>.env.local</code> next to the app (never in the browser):<br />
               <code>HOYOLAB_LTUID_V2=…</code> and <code>HOYOLAB_LTOKEN_V2=…</code>, then restart. See README → HoYoLAB.

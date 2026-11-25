@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Send, Settings2, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { RELATIONSHIP_LABEL, type Relationship } from "@/lib/companion/casual";
+import { WEB_EDITION } from "@/lib/edition";
 import { BRAIN_LABEL, LOCAL_MODEL_NAME, LOCAL_MODEL_SIZE, type Brain } from "@/lib/ai/brain";
 import { SUGGESTIONS } from "@/lib/companion/terminal";
 import { bubbles } from "@/lib/companion/voice";
@@ -111,6 +112,7 @@ export function ChatSettings({ chat, light }: { chat: Chat; light?: boolean }) {
             <select className="mt-1 w-full" value={chat.brainPref} onChange={(e) => chat.setBrain(e.target.value as Brain)} aria-label="Her brain">
               {(Object.keys(BRAIN_LABEL) as Brain[]).map((b) => <option key={b} value={b} disabled={b === "claude" && !chat.ai?.configured}>{BRAIN_LABEL[b]}{b === "claude" && !chat.ai?.configured ? " (needs key)" : ""}</option>)}
             </select>
+            {WEB_EDITION && <span className="mt-1 block text-[11px] text-faint">Claude needs the desktop app (the web version has no server).</span>}
             <span className="mt-1 block text-[11px] text-faint">Using now: {chat.brain === "claude" ? "Claude" : chat.brain === "local-ai" ? "built-in AI" : "quick replies"}</span>
           </label>
           <LocalAiStatus chat={chat} />

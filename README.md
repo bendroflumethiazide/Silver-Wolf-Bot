@@ -48,7 +48,11 @@ pnpm desktop:prepare && pnpm dist:win
 
 `pnpm desktop` runs it without packaging, `pnpm dist:linux` makes an AppImage. The NSIS installer needs Windows (or Wine); running **Desktop release (Windows)** from the Actions tab (or pushing a tag such as `v1.0.0`) builds both Windows files on a Windows runner and attaches them to a Release (`.github/workflows/desktop-release.yml`). A macOS build has to be made on a Mac.
 
-## Run it in a browser
+## Web version (phone or any browser, nothing to install)
+
+**https://bendroflumethiazide.github.io/Silver-Wolf-Bot/** is the same app as a plain website (`pnpm build:web`, published by `.github/workflows/pages.yml`). Your data stays in that browser. No server, so Claude chat, HoYoLAB sync and the Enka fetch are switched off there (import an HSR Scanner file instead). The built-in AI works in desktop Chrome/Edge with a decent graphics card; on phones it never downloads by itself (it's 1 GB), and most phones are too weak for it anyway, so she uses quick replies.
+
+## Run it in a browser (from source)
 
 Requirements: Node 20+ and pnpm (npm works too).
 

@@ -16,6 +16,7 @@ import { relicFingerprint, lightConeFingerprint } from "@/lib/importers/hsrScann
 import { useApp } from "@/lib/store";
 import { formatDuration } from "@/lib/time";
 import type { ImportHistoryEntry, Profile } from "@/lib/types";
+import { WEB_EDITION, WEB_EDITION_NOTE } from "@/lib/edition";
 
 const SERVERS: NonNullable<Profile["server"]>[] = ["America", "Europe", "Asia", "TW/HK/MO", "China"];
 
@@ -82,7 +83,7 @@ function SyncPanel({ profile }: { profile: Profile }) {
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2"><span className="font-medium">{ENKA_CAPABILITIES.name}</span><Badge tone="ok">read-only</Badge><Badge>no login</Badge></div>
-          {!settings.enkaEnabled ? (
+          {WEB_EDITION ? <Notice>{WEB_EDITION_NOTE} Tip: import an HSR Scanner file in the Import Center instead.</Notice> : !settings.enkaEnabled ? (
             <Notice>Disabled. Enable it under <Link href="/settings" className="underline">Settings → Privacy</Link>. Only your UID is sent.</Notice>
           ) : (
             <>

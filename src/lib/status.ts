@@ -55,6 +55,7 @@ export const FEATURES: FeatureStatus[] = [
   { area: "Desktop", feature: "Windows / Linux desktop app (Electron, local server on 127.0.0.1)", status: "tested", note: "Packaged build smoke-tested; macOS build needs a Mac" },
   { area: "Desktop", feature: "API key and HoYoLAB cookies stored with OS encryption (safeStorage)", status: "tested" },
   { area: "Desktop", feature: "Windows installer built by GitHub Actions, server smoke-tested on Windows", status: "tested" },
+  { area: "Desktop", feature: "Web edition on GitHub Pages (static, phone-friendly; no server features)", status: "tested", note: "E2E suite passes against the static build" },
   { area: "Desktop", feature: "Update check on launch + one-click update (checksum-verified)", status: "tested", note: "Portable exe and Linux open the download page instead" },
   { area: "Simulated Universe", feature: "Blessings, Curios, Occurrences + collection tracking", status: "implemented" },
 ];

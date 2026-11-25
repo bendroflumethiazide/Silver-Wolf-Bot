@@ -13,6 +13,7 @@ import { planWarps, pullsFromResources } from "../warp/planner";
 import { POOLS, WARP_TRACKER_URL } from "../warp/rules";
 import { pityKnown } from "../warp/pity";
 import { pick } from "./voice";
+import { charHref } from "@/lib/links";
 
 export interface TerminalContext {
   game: GameData | null;
@@ -90,7 +91,7 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
       line: `${one.name}: ${one.grade}|${one.best ? `${one.best} is carrying` : "Nothing's carrying tbh"}|${one.lacks[0] ?? "No notes"}${one.lacks[1] ? `|Also ${one.lacks[1].charAt(0).toLowerCase()}${one.lacks[1].slice(1)}` : ""}`,
       facts: [`${one.name}: ${one.grade} (${one.score.toFixed(1)}/100), ${one.equipped}/6 relics.`, ...one.lacks.map((l) => `Lacks: ${l}`)],
       sources: ["Your relics", "Character scoring profile", "Game data stat tables"],
-      links: [{ label: `Open ${one.name}`, href: `/characters/${one.charId}` }],
+      links: [{ label: `Open ${one.name}`, href: charHref(one.charId) }],
     };
     if (!builds.length) return { intent: "rate", line: "Nothing to rate|No one has relics equipped in my data|Import a scan first", facts: [], sources: [], links: [{ label: "Import Center", href: "/import" }] };
     const sorted = [...builds].sort((a, b) => b.score - a.score);
@@ -98,7 +99,7 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
       intent: "rate",
       line: `Best: ${sorted[0].name} (${sorted[0].grade})|Worst: ${sorted[sorted.length - 1].name} (${sorted[sorted.length - 1].grade})|Fix the bottom one first`,
       facts: sorted.map((b) => `${b.name}: ${b.grade} (${b.score.toFixed(1)})`), sources: ["Your relics", "Character scoring profiles"],
-      links: [{ label: `Open ${sorted[sorted.length - 1].name}`, href: `/characters/${sorted[sorted.length - 1].charId}` }],
+      links: [{ label: `Open ${sorted[sorted.length - 1].name}`, href: charHref(sorted[sorted.length - 1].charId) }],
     };
   }
 

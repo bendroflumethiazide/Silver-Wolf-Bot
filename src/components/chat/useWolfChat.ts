@@ -15,6 +15,7 @@ import { useAccount, useProfile, useRelicProfiles } from "@/lib/hooks";
 import { mergeTotals } from "@/lib/materials/calculator";
 import { FULL_TARGET, planCharacter, planLightCone, type CharacterTarget } from "@/lib/materials/plan";
 import { useApp } from "@/lib/store";
+import { isMobileDevice, WEB_EDITION } from "@/lib/edition";
 import { profileFor } from "@/lib/summary";
 
 export interface ChatMsg {
@@ -97,7 +98,10 @@ export function useWolfChat() {
   const greeted = useRef(false);
 
   const localAi = useLocalAi((st) => st.status);
-  useEffect(() => { fetch("/api/silverwolf").then((r) => r.json()).then(setAi).catch(() => setAi({ configured: false })); }, []);
+  useEffect(() => {
+    if (WEB_EDITION) { setAi({ configured: false }); return; }
+    fetch("/api/silverwolf").then((r) => r.json()).then(setAi).catch(() => setAi({ configured: false }));
+  }, []);
   useEffect(() => { void probeLocalAi(); }, []);
 
   const materialNeeds = useMemo(() => {
@@ -128,7 +132,9 @@ export function useWolfChat() {
   const brain = resolveBrain(settings.chatBrain, { claude: !!ai?.configured, local: localAi.state !== "unsupported" });
   const useClaude = brain === "claude";
   // The built-in AI downloads itself the first time it's needed (Auto or Built-in AI).
-  useEffect(() => { if (brain === "local-ai" && localAi.state === "idle") void ensureLocalAi(); }, [brain, localAi.state]);
+  // On phones it waits for "Download now" (1 GB on mobile data is a bad surprise).
+  const autoDownload = brain === "local-ai" && localAi.state === "idle" && (localAi.cached || !isMobileDevice());
+  useEffect(() => { if (autoDownload) void ensureLocalAi(); }, [autoDownload]);
   const urgent = summary?.objectives.find((o) => URGENT.has(o.category)) ?? null;
   const hasPing = !!urgent && seen !== undefined && seen !== urgent.id;
 
@@ -169,6 +175,10 @@ export function useWolfChat() {
       if (direct) return put(direct);
       const st = useLocalAi.getState().status;
       if (st.state !== "ready") {
+        if (st.state === "idle" && !st.cached && isMobileDevice()) {
+          const q = localReply(text, ctx, persona, new Date(), salt, null);
+          return put({ ...q, text: `${q.text}|(my AI brain isn't on this phone yet: tap the gear → Download now, about 1 GB, use Wi-Fi)` });
+        }
         void ensureLocalAi();
         const q = localReply(text, ctx, persona, new Date(), salt, null);
         const note = st.state === "downloading" ? `(downloading my brain: ${Math.round(st.progress * 100)}%, real chat soon)`
@@ -220,7 +230,7 @@ export function useWolfChat() {
   return {
     ready: !!ctx, messages, streaming, busy, ask, open, clear, hasPing,
     ai, useClaude, brain, brainPref: settings.chatBrain, setBrain: (b: Brain) => updateSettings({ chatBrain: b }),
-    localAi, startLocalAi: () => void ensureLocalAi(), deleteLocalAi,
+    localAi, startLocalAi: () => void ensureLocalAi(true), deleteLocalAi,
     persona, setPersona: (p: Partial<Persona>) => updateSettings({ ...(p.relationship ? { companionRelationship: p.relationship } : {}), ...(p.callsYou !== undefined ? { companionCallsYou: p.callsYou.slice(0, 24) } : {}) }),
     youName: profile?.name ?? "You",
   };

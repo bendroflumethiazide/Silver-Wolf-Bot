@@ -5,6 +5,7 @@ import { PROFILE_TEMPLATES, scoreRelic, suggestTemplate, type ScoringProfile } f
 import { SLOT_LABEL } from "./relics/stats";
 import type { AchievementProgress, BannerEntry, EventEntry, MapMarker, OwnedCharacter, OwnedLightCone, Relic } from "./types";
 import { EMPTY_PITY, type PityStore } from "./warp/pity";
+import { charHref } from "./links";
 
 export interface Objective {
   id: string;
@@ -85,7 +86,7 @@ export function summarizeAccount(i: AccountInput): AccountSummary {
     if (c.level >= cap && c.ascension < 6)
       objectives.push({ id: `asc-${c.charId}`, title: `Ascend ${name(c.charId)}`, reason: `Level ${c.level} is at the cap for Ascension ${c.ascension}.`, href: `/materials?char=${c.charId}`, priority: 60 + rarity(c.charId), category: "character" });
     else if (c.level < 80 && (c.favorite || rarity(c.charId) === 5))
-      objectives.push({ id: `lvl-${c.charId}`, title: `Level up ${name(c.charId)}`, reason: `Level ${c.level}/80${c.favorite ? " · favourite" : ""}.`, href: `/characters/${c.charId}`, priority: 40 + rarity(c.charId) + (c.favorite ? 10 : 0), category: "character" });
+      objectives.push({ id: `lvl-${c.charId}`, title: `Level up ${name(c.charId)}`, reason: `Level ${c.level}/80${c.favorite ? " · favourite" : ""}.`, href: charHref(c.charId), priority: 40 + rarity(c.charId) + (c.favorite ? 10 : 0), category: "character" });
     const abilities = ["ability_1", "ability_2", "ability_3"].filter((k) => k in c.traces);
     const missing = abilities.filter((k) => !c.traces[k]);
     if (c.ascension >= 6 && missing.length)
