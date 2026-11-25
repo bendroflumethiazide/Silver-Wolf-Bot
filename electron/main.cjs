@@ -9,7 +9,7 @@
 const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu } = require("electron");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
-const http = require("node:http");
+const net = require("node:net");
 const path = require("node:path");
 
 const PORT = Number(process.env.SILVER_WOLF_PORT || 47923);
@@ -21,6 +21,9 @@ const isWebUrl = (u) => { try { return ["http:", "https:"].includes(new URL(u).p
 
 let server = null;
 let win = null;
+let splash = null;
+let log = null;
+let serverExit = null; // set when the server process ends: { code, signal, error }
 
 if (!app.requestSingleInstanceLock()) {
   app.quit();
@@ -65,18 +68,37 @@ function serverDir() {
   return isDev ? path.join(__dirname, "..", "dist-desktop", "server") : path.join(process.resourcesPath, "server");
 }
 
-function portInUse() {
+const logFile = () => path.join(app.getPath("userData"), "server.log");
+
+function openLog() {
+  if (log) return log;
+  fs.mkdirSync(app.getPath("userData"), { recursive: true });
+  // Start fresh when the log grows past 1 MB.
+  try { if (fs.statSync(logFile()).size > 1e6) fs.rmSync(logFile()); } catch {}
+  log = fs.createWriteStream(logFile(), { flags: "a" });
+  return log;
+}
+const note = (msg) => openLog().write(`[${new Date().toISOString()}] ${msg}\n`);
+
+function logTail(lines = 12) {
+  try { return fs.readFileSync(logFile(), "utf8").trimEnd().split(/\r?\n/).slice(-lines).join("\n"); } catch { return ""; }
+}
+
+/** True when something accepts TCP connections on the app port. Next only listens once it's ready. */
+function portOpen(timeout = 1000) {
   return new Promise((resolve) => {
-    const req = http.get({ host: HOST, port: PORT, path: "/", timeout: 1000 }, (res) => { res.resume(); resolve(true); });
-    req.on("error", () => resolve(false));
-    req.on("timeout", () => { req.destroy(); resolve(false); });
+    const sock = net.connect({ host: HOST, port: PORT });
+    const done = (v) => { sock.destroy(); resolve(v); };
+    sock.setTimeout(timeout, () => done(false));
+    sock.once("connect", () => done(true));
+    sock.once("error", () => done(false));
   });
 }
 
 function startServer() {
   const dir = serverDir();
   const entry = path.join(dir, "server.js");
-  if (!fs.existsSync(entry)) throw new Error(`App server not found at ${entry}. Run "npm run desktop:prepare" first.`);
+  if (!fs.existsSync(entry)) throw new Error(`App server not found at ${entry}. Reinstall the app.`);
   const env = {
     ...process.env,
     ...readSecrets(),
@@ -87,32 +109,61 @@ function startServer() {
     ASTRAL_LOCAL_ONLY: "1",
     NEXT_TELEMETRY_DISABLED: "1",
   };
+  note(`starting v${app.getVersion()} server: ${process.execPath} ${entry}`);
+  serverExit = null;
   server = spawn(process.execPath, [entry], { cwd: dir, env, stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
-  const log = fs.createWriteStream(path.join(app.getPath("userData"), "server.log"), { flags: "a" });
-  server.stdout.pipe(log);
-  server.stderr.pipe(log);
-  server.on("exit", (code) => { if (code && code !== 0 && !app.isQuitting) console.error(`server exited with ${code}`); });
+  server.stdout.on("data", (d) => openLog().write(d));
+  server.stderr.on("data", (d) => openLog().write(d));
+  server.on("error", (err) => { serverExit = { error: err.message }; note(`server failed to launch: ${err.message}`); });
+  server.on("exit", (code, signal) => { serverExit = { code, signal }; note(`server exited (code ${code}, signal ${signal})`); });
 }
 
 function stopServer() {
   return new Promise((resolve) => {
-    if (!server || server.exitCode !== null) return resolve();
+    if (!server || server.exitCode !== null || serverExit) return resolve();
     server.once("exit", () => resolve());
     server.kill();
     setTimeout(resolve, 3000);
   });
 }
 
-async function waitForServer(ms = 30000) {
+/** Waits until the server listens. Gives up early if it crashes. Windows Defender can make the first launch slow. */
+async function waitForServer(ms = 120000) {
   const start = Date.now();
   while (Date.now() - start < ms) {
-    if (await portInUse()) return true;
-    await new Promise((r) => setTimeout(r, 250));
+    if (serverExit) return false;
+    if (await portOpen()) { note(`server ready after ${((Date.now() - start) / 1000).toFixed(1)}s`); return true; }
+    await new Promise((r) => setTimeout(r, 300));
   }
+  note(`server not ready after ${ms / 1000}s`);
   return false;
 }
 
+function fail(message) {
+  if (splash && !splash.isDestroyed()) splash.destroy();
+  const tail = logTail();
+  dialog.showErrorBox("Silver Wolf Bot", `${message}\n\nLog: ${logFile()}${tail ? `\n\nLast lines:\n${tail}` : ""}`);
+  app.quit();
+}
+
 // ---------------------------------------------------------------- window
+
+const SPLASH_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+html,body{margin:0;height:100%;background:#05050b;color:#e6e6f0;font:14px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;-webkit-app-region:drag}
+.box{text-align:center}.t{font-weight:700;letter-spacing:.2em;color:#a78bfa}.s{margin-top:10px;color:#8b8ba7}
+.bar{margin:16px auto 0;width:180px;height:3px;background:#1a1a2e;overflow:hidden;border-radius:2px}
+.bar i{display:block;width:40%;height:100%;background:#22d3ee;animation:m 1.1s ease-in-out infinite}
+@keyframes m{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}</style></head>
+<body><div class="box"><div class="t">SILVER WOLF BOT</div><div class="s">Booting up... first launch can take a minute.</div><div class="bar"><i></i></div></div></body></html>`;
+
+function createSplash() {
+  splash = new BrowserWindow({
+    width: 420, height: 220, frame: false, resizable: false, show: true, backgroundColor: "#05050b",
+    icon: path.join(__dirname, "..", "build", "icon.png"),
+    webPreferences: { sandbox: true, contextIsolation: true, javascript: false },
+  });
+  splash.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(SPLASH_HTML)}`);
+}
 
 function createWindow() {
   win = new BrowserWindow({
@@ -133,7 +184,7 @@ function createWindow() {
       spellcheck: true,
     },
   });
-  win.once("ready-to-show", () => win.show());
+  win.once("ready-to-show", () => { win.show(); if (splash && !splash.isDestroyed()) splash.destroy(); splash = null; });
 
   // External links (Star Rail Station, guides, sources) open in the user's normal browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -189,21 +240,20 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   // Test-only escape hatch for headless Linux CI without a keyring. Never used on Windows/macOS.
   if (process.platform === "linux" && process.env.SILVER_WOLF_TEST_PLAINTEXT_SECRETS === "1" && safeStorage.setUsePlainTextEncryption) safeStorage.setUsePlainTextEncryption(true);
-  if (await portInUse()) {
-    dialog.showErrorBox("Silver Wolf Bot", `Port ${PORT} is already in use by another program, so the app can't start. Close that program and try again.`);
+  if (await portOpen()) {
+    dialog.showErrorBox("Silver Wolf Bot", `Port ${PORT} is already in use, so the app can't start.\n\nIf Silver Wolf Bot crashed earlier, end "Silver Wolf Bot" in Task Manager (Ctrl+Shift+Esc) and try again.`);
     app.quit();
     return;
   }
+  createSplash();
   try {
     startServer();
   } catch (err) {
-    dialog.showErrorBox("Silver Wolf Bot", String(err && err.message ? err.message : err));
-    app.quit();
+    fail(String(err && err.message ? err.message : err));
     return;
   }
   if (!(await waitForServer())) {
-    dialog.showErrorBox("Silver Wolf Bot", `The app server didn't start. Details are in ${path.join(app.getPath("userData"), "server.log")}.`);
-    app.quit();
+    fail(serverExit ? "The app server stopped while starting." : "The app server didn't start within 2 minutes.");
     return;
   }
   createWindow();
@@ -211,5 +261,5 @@ app.whenReady().then(async () => {
 });
 
 app.on("before-quit", () => { app.isQuitting = true; });
-app.on("window-all-closed", async () => { await stopServer(); app.quit(); });
+app.on("window-all-closed", async () => { if (splash) return; await stopServer(); app.quit(); });
 app.on("will-quit", () => { if (server && server.exitCode === null) server.kill(); });
