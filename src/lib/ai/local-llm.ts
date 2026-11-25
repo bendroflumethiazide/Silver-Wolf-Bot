@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * Silver Wolf's built-in AI: a small open model (Qwen3 1.7B) running on this PC's GPU through WebGPU,
+ * Silver Wolf's built-in AI: a small open model (Qwen3 1.7B) running on this device's GPU through WebGPU (Qwen2.5 0.5B on phones),
  * via WebLLM in a Web Worker. Downloaded once (about 1 GB) into the app's browser storage, then works
  * offline. Nothing you type leaves your PC in this mode.
  */
 import type { ChatCompletionMessageParam, MLCEngineInterface } from "@mlc-ai/web-llm";
 import { create } from "zustand";
-import { LOCAL_MODELS } from "./brain";
+import { LOCAL_MODELS, PHONE_MODELS } from "./brain";
+import { isMobileDevice } from "../edition";
 
 export type LocalAiState =
   | { state: "checking" }
@@ -24,6 +25,14 @@ const set = (status: LocalAiState) => useLocalAi.setState({ status });
 let engine: MLCEngineInterface | null = null;
 let worker: Worker | null = null;
 let failures = 0;
+
+// Crash guard: set while the model loads or answers. If the page dies (out of memory: phones), the mark
+// survives the reload and the AI stays off until "Try again", instead of crashing in a loop.
+const BUSY_KEY = "silverwolf:aiBusy";
+const mark = () => { try { localStorage.setItem(BUSY_KEY, String(Date.now())); } catch {} };
+const unmark = () => { try { localStorage.removeItem(BUSY_KEY); } catch {} };
+const crashedLastTime = () => { try { return !!localStorage.getItem(BUSY_KEY); } catch { return false; } };
+export const CRASH_MESSAGE = "Her AI crashed this page last time (not enough memory on this device), so it's switched off. Try again if you like, or delete it to free space.";
 let loading: Promise<MLCEngineInterface | null> | null = null;
 let probed: Promise<void> | null = null;
 
@@ -40,10 +49,22 @@ export function probeLocalAi(): Promise<void> {
       // Test hook: CI swaps in a tiny model to check the whole pipeline quickly.
       let override: string | null = null;
       try { override = localStorage.getItem("silverwolf:aiModel"); } catch {}
+      const phone = isMobileDevice();
+      const family = phone ? PHONE_MODELS : LOCAL_MODELS;
       const model = override && prebuiltAppConfig.model_list.some((m) => m.model_id === override) ? override
-        : adapter.features.has("shader-f16") ? LOCAL_MODELS.f16 : LOCAL_MODELS.f32;
+        : adapter.features.has("shader-f16") ? family.f16 : family.f32;
       useLocalAi.setState({ model });
-      set({ state: "idle", cached: await hasModelInCache(model).catch(() => false) });
+      if (phone) {
+        // Free the space if the big computer model was downloaded on this phone earlier.
+        const { deleteModelAllInfoInCache } = await import("@mlc-ai/web-llm");
+        for (const big of Object.values(LOCAL_MODELS)) if (big !== model && (await hasModelInCache(big).catch(() => false))) await deleteModelAllInfoInCache(big).catch(() => {});
+      }
+      const cached = await hasModelInCache(model).catch(() => false);
+      if (crashedLastTime()) {
+        failures = 2;
+        return set({ state: "error", message: CRASH_MESSAGE });
+      }
+      set({ state: "idle", cached });
     } catch (e) {
       set({ state: "unsupported", reason: e instanceof Error ? e.message : String(e) });
     }
@@ -61,15 +82,18 @@ export function ensureLocalAi(force = false): Promise<MLCEngineInterface | null>
   if (!force && failures >= 2) return Promise.resolve(null);
   loading = (async () => {
     await probeLocalAi();
+    if (!force && failures >= 2) return null;
     const { status, model } = useLocalAi.getState();
     if (status.state === "unsupported" || !model) return null;
     try {
       const webllm = await import("@mlc-ai/web-llm");
       set({ state: "downloading", progress: 0, text: "Starting…" });
+      mark();
       worker = new Worker(new URL("./llm.worker.ts", import.meta.url), { type: "module" });
       engine = await webllm.CreateWebWorkerMLCEngine(worker, model, {
         initProgressCallback: (r) => set({ state: "downloading", progress: Math.max(0, Math.min(1, r.progress)), text: r.text }),
       });
+      unmark();
       set({ state: "ready" });
       return engine;
     } catch (e) {
@@ -84,6 +108,7 @@ export function ensureLocalAi(force = false): Promise<MLCEngineInterface | null>
 
 /** Drop a broken engine (GPU lost, crash) so the next message reloads it from the download cache. */
 function reset(e: unknown) {
+  unmark();
   failures += 1;
   try { worker?.terminate(); } catch {}
   worker = null;
@@ -105,8 +130,9 @@ function within<T>(p: Promise<T>, ms: number): Promise<T> {
 /** Stream a reply. Calls onText with the full text so far. Throws (and recovers the engine) on stalls or GPU loss. */
 export async function generateLocal(messages: ChatCompletionMessageParam[], onText: (text: string) => void): Promise<string> {
   const eng = await ensureLocalAi();
-  if (!eng) throw new Error("Built-in AI isn't available on this PC.");
+  if (!eng) throw new Error("Built-in AI isn't available on this device.");
   let acc = "";
+  mark();
   try {
     const stream = await within(eng.chat.completions.create({
       messages,
@@ -124,6 +150,7 @@ export async function generateLocal(messages: ChatCompletionMessageParam[], onTe
       onText(acc);
     }
     failures = 0;
+    unmark();
     return acc;
   } catch (e) {
     try { await eng.interruptGenerate(); } catch {}
@@ -140,6 +167,8 @@ export async function deleteLocalAi(): Promise<void> {
   try { worker?.terminate(); } catch {}
   worker = null;
   engine = null;
+  unmark();
+  failures = 0;
   if (model) {
     const { deleteModelAllInfoInCache } = await import("@mlc-ai/web-llm");
     await deleteModelAllInfoInCache(model).catch(() => {});

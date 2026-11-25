@@ -9,7 +9,7 @@ export type ActiveBrain = Exclude<Brain, "auto">;
 
 export const BRAIN_LABEL: Record<Brain, string> = {
   auto: "Auto (best available)",
-  "local-ai": "Built-in AI (on this PC)",
+  "local-ai": "Built-in AI (on this device)",
   claude: "Claude (your API key)",
   quick: "Quick replies only",
 };
@@ -22,10 +22,19 @@ export function resolveBrain(pref: Brain, can: { claude: boolean; local: boolean
   return can.claude ? "claude" : can.local ? "local-ai" : "quick";
 }
 
-/** Qwen3 1.7B (Apache-2.0). f16 build when the GPU supports 16-bit shaders, otherwise the f32 build. */
+/** Qwen3 1.7B (Apache-2.0) on computers. f16 build when the GPU supports 16-bit shaders, otherwise f32. */
 export const LOCAL_MODELS = { f16: "Qwen3-1.7B-q4f16_1-MLC", f32: "Qwen3-1.7B-q4f32_1-MLC" } as const;
+/** Phones get a much smaller model (Qwen2.5 0.5B, Apache-2.0): browser tabs there have little GPU memory. */
+export const PHONE_MODELS = { f16: "Qwen2.5-0.5B-Instruct-q4f16_1-MLC", f32: "Qwen2.5-0.5B-Instruct-q4f32_1-MLC" } as const;
 export const LOCAL_MODEL_NAME = "Qwen3 1.7B";
 export const LOCAL_MODEL_SIZE = "about 1 GB";
+
+/** Display name and download size for a model id. */
+export function modelInfo(id: string | null): { name: string; size: string } {
+  if (id?.startsWith("Qwen2.5-0.5B")) return { name: "Qwen2.5 0.5B (phone size)", size: "about 300 MB" };
+  if (id?.startsWith("Qwen3-1.7B") || !id) return { name: LOCAL_MODEL_NAME, size: LOCAL_MODEL_SIZE };
+  return { name: id, size: "small" };
+}
 
 export function localSystemPrompt(p: Persona, facts: string, now = new Date()): string {
   const rel = RELATIONSHIP_LABEL[p.relationship as Relationship].toLowerCase();

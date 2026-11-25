@@ -68,3 +68,22 @@ describe("what never goes to the small model", () => {
     expect(routeLocalAi("claude", ctx(), sis, { configured: false })?.text).toMatch(/built-in brain/);
   });
 });
+
+describe("phone-size model", () => {
+  it("labels models with their size", async () => {
+    const { modelInfo, PHONE_MODELS, LOCAL_MODELS } = await import("../ai/brain");
+    expect(modelInfo(PHONE_MODELS.f16).size).toBe("about 300 MB");
+    expect(modelInfo(LOCAL_MODELS.f16).size).toBe("about 1 GB");
+    expect(modelInfo(null).name).toBe("Qwen3 1.7B");
+  });
+  it("recognises phones and tablets", async () => {
+    const { isMobileDevice } = await import("../edition");
+    const ua = Object.getOwnPropertyDescriptor(globalThis.navigator, "userAgent");
+    const set = (v: string) => Object.defineProperty(globalThis.navigator, "userAgent", { value: v, configurable: true });
+    set("Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) AppleWebKit/605.1.15 Version/26.1 Mobile/15E148 Safari/604.1");
+    expect(isMobileDevice()).toBe(true);
+    set("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/141.0 Safari/537.36");
+    expect(isMobileDevice()).toBe(false);
+    if (ua) Object.defineProperty(globalThis.navigator, "userAgent", ua);
+  });
+});

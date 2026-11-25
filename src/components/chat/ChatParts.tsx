@@ -5,7 +5,8 @@ import { Send, Settings2, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { RELATIONSHIP_LABEL, type Relationship } from "@/lib/companion/casual";
 import { WEB_EDITION } from "@/lib/edition";
-import { BRAIN_LABEL, LOCAL_MODEL_NAME, LOCAL_MODEL_SIZE, type Brain } from "@/lib/ai/brain";
+import { BRAIN_LABEL, modelInfo, type Brain } from "@/lib/ai/brain";
+import { useLocalAi } from "@/lib/ai/local-llm";
 import { SUGGESTIONS } from "@/lib/companion/terminal";
 import { bubbles } from "@/lib/companion/voice";
 import { Badge, confirmAction, cx } from "../ui";
@@ -128,10 +129,11 @@ function pct(p: number) { return `${Math.round(p * 100)}%`; }
 /** Download progress (first time only) shown above the messages. */
 function BrainBanner({ chat, light }: { chat: Chat; light?: boolean }) {
   const st = chat.localAi;
+  const info = modelInfo(useLocalAi((x) => x.model));
   if (chat.brain !== "local-ai" || st.state !== "downloading") return null;
   return (
     <div className={cx("sticky top-0 z-[1] rounded-lg border px-3 py-2 text-xs", light ? "border-[#c4c4cc] bg-white/90 text-[#2d2d35]" : "border-line bg-panel/90 text-muted")} role="status">
-      <div className="flex justify-between gap-2"><span>Downloading Silver Wolf&apos;s brain (one time, {LOCAL_MODEL_SIZE})</span><span className="font-mono">{pct(st.progress)}</span></div>
+      <div className="flex justify-between gap-2"><span>Downloading Silver Wolf&apos;s brain (one time, {info.size})</span><span className="font-mono">{pct(st.progress)}</span></div>
       <div className={cx("mt-1.5 h-1 overflow-hidden rounded", light ? "bg-[#d6d6dc]" : "bg-white/10")}><div className="h-full bg-gradient-to-r from-violet-500 to-cyan-400 transition-[width]" style={{ width: pct(st.progress) }} /></div>
       <div className="mt-1 opacity-70">She answers with quick replies until it&apos;s done.</div>
     </div>
@@ -141,19 +143,20 @@ function BrainBanner({ chat, light }: { chat: Chat; light?: boolean }) {
 /** Built-in AI state, with download / delete. */
 export function LocalAiStatus({ chat }: { chat: Chat }) {
   const st = chat.localAi;
-  const text = st.state === "checking" ? "Checking this PC…"
-    : st.state === "unsupported" ? `Not available on this PC: ${st.reason}`
-    : st.state === "idle" ? (st.cached ? "Downloaded, loads when needed." : `Not downloaded yet (${LOCAL_MODEL_SIZE}).`)
+  const info = modelInfo(useLocalAi((x) => x.model));
+  const text = st.state === "checking" ? "Checking this device…"
+    : st.state === "unsupported" ? `Not available on this device: ${st.reason}`
+    : st.state === "idle" ? (st.cached ? "Downloaded, loads when needed." : `Not downloaded yet (${info.size}).`)
     : st.state === "downloading" ? `Downloading… ${pct(st.progress)}`
-    : st.state === "ready" ? "Ready, running on this PC."
+    : st.state === "ready" ? "Ready, running on this device."
     : `Error: ${st.message}`;
   return (
     <div className="text-xs text-muted">
-      <div>Built-in AI ({LOCAL_MODEL_NAME})</div>
+      <div>Built-in AI ({info.name})</div>
       <p className="mt-0.5 text-[11px] text-faint">{text}</p>
       <div className="mt-1 flex gap-3">
         {(st.state === "idle" || st.state === "error") && <button onClick={chat.startLocalAi} className="text-[11px] text-cyan hover:underline">{st.state === "error" ? "Try again" : st.cached ? "Load now" : "Download now"}</button>}
-        {(st.state === "ready" || (st.state === "idle" && st.cached)) && <button onClick={async () => { if (confirmAction("Delete the built-in AI model? It downloads again next time it's needed.")) await chat.deleteLocalAi(); }} className="text-[11px] text-bad hover:underline">Delete model</button>}
+        {(st.state === "ready" || st.state === "error" || (st.state === "idle" && st.cached)) && <button onClick={async () => { if (confirmAction("Delete the built-in AI model? It downloads again next time it's needed.")) await chat.deleteLocalAi(); }} className="text-[11px] text-bad hover:underline">Delete model</button>}
       </div>
     </div>
   );

@@ -5,7 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AI_REQUEST, aiSetupLine, casualFallback, casualReply, openingLine, type Persona } from "@/lib/companion/casual";
 import { answer, buildAiContext, type BuildSummary, type TerminalContext } from "@/lib/companion/terminal";
 import { cleanLocal, crisisLine, CRISIS, crossesLine, deflectLine, localSystemPrompt, resolveBrain, type Brain } from "@/lib/ai/brain";
-import { deleteLocalAi, ensureLocalAi, generateLocal, probeLocalAi, useLocalAi } from "@/lib/ai/local-llm";
+import { CRASH_MESSAGE, deleteLocalAi, ensureLocalAi, generateLocal, probeLocalAi, useLocalAi } from "@/lib/ai/local-llm";
 import { bubbles } from "@/lib/companion/voice";
 import { evaluateBuild } from "@/lib/builds/evaluate";
 import { computeStats } from "@/lib/builds/stats";
@@ -133,7 +133,7 @@ export function useWolfChat() {
   const useClaude = brain === "claude";
   // The built-in AI downloads itself the first time it's needed (Auto or Built-in AI).
   // On phones it waits for "Download now" (1 GB on mobile data is a bad surprise).
-  const autoDownload = brain === "local-ai" && localAi.state === "idle" && (localAi.cached || !isMobileDevice());
+  const autoDownload = brain === "local-ai" && localAi.state === "idle" && !isMobileDevice();
   useEffect(() => { if (autoDownload) void ensureLocalAi(); }, [autoDownload]);
   const urgent = summary?.objectives.find((o) => URGENT.has(o.category)) ?? null;
   const hasPing = !!urgent && seen !== undefined && seen !== urgent.id;
@@ -177,7 +177,11 @@ export function useWolfChat() {
       if (st.state !== "ready") {
         if (st.state === "idle" && !st.cached && isMobileDevice()) {
           const q = localReply(text, ctx, persona, new Date(), salt, null);
-          return put({ ...q, text: `${q.text}|(my AI brain isn't on this phone yet: tap the gear → Download now, about 1 GB, use Wi-Fi)` });
+          return put({ ...q, text: `${q.text}|(my AI brain isn't on this phone yet: tap the sliders icon up top → Download now, about 300 MB, use Wi-Fi)` });
+        }
+        if (st.state === "error" && st.message === CRASH_MESSAGE) {
+          const q = localReply(text, ctx, persona, new Date(), salt, null);
+          return put({ ...q, text: `${q.text}|(my AI brain crashed this page last time, so it's off. Quick replies for now)` });
         }
         void ensureLocalAi();
         const q = localReply(text, ctx, persona, new Date(), salt, null);

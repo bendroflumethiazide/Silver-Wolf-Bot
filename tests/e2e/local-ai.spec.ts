@@ -16,7 +16,7 @@ for (const model of (process.env.E2E_LOCAL_AI_MODELS ?? "SmolLM2-360M-Instruct-q
     await page.getByRole("button", { name: "Chat settings" }).click();
     await expect(page.getByText("Using now: built-in AI")).toBeVisible({ timeout: 60_000 });
     // Auto mode starts the download by itself.
-    await expect(page.getByText("Ready, running on this PC.")).toBeVisible({ timeout: 40 * 60_000 });
+    await expect(page.getByText("Ready, running on this device.")).toBeVisible({ timeout: 40 * 60_000 });
     await page.getByRole("button", { name: "Chat settings" }).click();
     await page.getByLabel("Message Silver Wolf").fill("hey, how was ur day?");
     await page.getByRole("button", { name: "Send" }).click();

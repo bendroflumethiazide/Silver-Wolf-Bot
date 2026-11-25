@@ -50,7 +50,7 @@ pnpm desktop:prepare && pnpm dist:win
 
 ## Web version (phone or any browser, nothing to install)
 
-**https://bendroflumethiazide.github.io/Silver-Wolf-Bot/** is the same app as a plain website (`pnpm build:web`, published by `.github/workflows/pages.yml`). Your data stays in that browser. No server, so Claude chat, HoYoLAB sync and the Enka fetch are switched off there (import an HSR Scanner file instead). The built-in AI works in desktop Chrome/Edge with a decent graphics card; on phones it never downloads by itself (it's 1 GB), and most phones are too weak for it anyway, so she uses quick replies.
+**https://bendroflumethiazide.github.io/Silver-Wolf-Bot/** is the same app as a plain website (`pnpm build:web`, published by `.github/workflows/pages.yml`). Your data stays in that browser. No server, so Claude chat, HoYoLAB sync and the Enka fetch are switched off there (import an HSR Scanner file instead). The built-in AI works in desktop Chrome/Edge with a decent graphics card. Phones get a smaller model (Qwen2.5 0.5B, about 300 MB) that only downloads when you tap Download now; if loading it ever crashes the page, it switches itself off instead of crashing again.
 
 ## Run it in a browser (from source)
 
