@@ -33,3 +33,18 @@ See docs/08-roadmap.md → "Cannot currently be implemented".
 
 ### Next
 See docs/08-roadmap.md → "Next tasks".
+
+## 2026-11-25 · Session 1, part 2 (your feedback)
+
+### Completed
+- **Silver Wolf's voice rewritten** to match her in-game texts (your screenshots): short bursts as separate Messages-style bubbles, shorthand, "just pull" streak. Bubbles type in one by one on every page; terminal redesigned as her Messages window with her signature.
+- **Build ratings (D → WTF with −/+)** on the character page: total stats (verified against your in-game build card within rounding), a graded card per relic with roll markers, overall rating, "what this build lacks", her stat-match recommended build, and saved guide builds checked ✓/✗ against your gear. Relic Database cards show the same letter grades. Terminal: "rate my builds".
+- **Claude chat** (your choice "use whatever fits"): `claude-opus-5-5`, streaming, low effort for snappy texts, server-side refusal fallbacks, prompt-cached persona, API key server-side only, minimal facts block.
+- **HoYoLAB Battle Chronicle sync** (your choice "add it"): read-only; stats, real-time note (Trailblaze Power, Daily Training, SU weekly, Echo of War, assignments) shown on the dashboard, Memory of Chaos / Pure Fiction / Apocalyptic Shadow into Endgame history; cookies only in `.env.local`; CAPTCHA never bypassed.
+- **MIT licence** (your choice "whatever you like"), `.env.example`, docs 04/05/06/08/09 updated, new doc 11.
+
+### Test results
+- typecheck ✓ · lint ✓ · build ✓ · unit **87/87** · E2E **9/9** (repeat runs stable)
+
+### Blocked
+- Push: `bendroflumethiazide/Silver-Wolf-Bot` doesn't exist on GitHub yet, and this session can't create repos.
