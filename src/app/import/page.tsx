@@ -64,7 +64,7 @@ function ScannerImport() {
   const apply = async () => {
     if (!plan) return;
     const r = await applyScanPlan(plan, { categories: cats, approvedConflicts: approved, fileName: file });
-    setDone(fill(pick(SW.importDone, r.historyId), { applied: r.written + r.removed }) + ` (${r.written} written, ${r.removed} removed)`);
+    setDone(fill(pick(SW.importDone, r.historyId), { applied: r.written + r.removed }) + `|${r.written} written, ${r.removed} removed`);
     setPlan(null); setParsed(null);
   };
 
@@ -85,7 +85,7 @@ function ScannerImport() {
       </p>
       {!plan && <FilePick accept=".json,application/json" onFile={load} label="Choose scan file" />}
       {err && <div className="mt-3"><ErrorBox>{err}</ErrorBox></div>}
-      {done && <div className="mt-3"><Notice tone="ok">{done}</Notice></div>}
+      {done && <WolfComment comment={{ mood: "smug", line: done, facts: ["Recorded in Import history below, with rollback."] }} className="mt-3" />}
       {plan && parsed && totals && (
         <div className="space-y-4">
           <WolfComment comment={importComment(totals)} />

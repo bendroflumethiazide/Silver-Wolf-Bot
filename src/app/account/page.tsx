@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useLiveQuery } from "dexie-react-hooks";
 import { CheckCircle2, Plus, RefreshCw, Trash2, XCircle } from "lucide-react";
 import { useState } from "react";
+import { HoyolabSync } from "@/components/HoyolabSync";
 import { WolfComment } from "@/components/SilverWolf";
 import { Badge, Button, confirmAction, ErrorBox, Field, Notice, NumberInput, PageHeader, Panel, SourceBadge, Stat } from "@/components/ui";
 import { fill, pick, SW } from "@/lib/companion/voice";
@@ -111,7 +112,6 @@ function SyncPanel({ profile }: { profile: Profile }) {
           <div><div className="mb-1 font-mono uppercase tracking-wider text-bad">Cannot provide</div><ul className="space-y-1">{ENKA_CAPABILITIES.doesNotProvide.map((p) => <li key={p} className="flex gap-1.5"><XCircle size={13} className="mt-0.5 shrink-0 text-bad" />{p}</li>)}</ul></div>
         </div>
       </div>
-      <p className="mt-4 text-xs text-faint">HoYoLAB account integration (battle chronicle, exploration %) is not implemented. It relies on unofficial cookie-based endpoints, and storing those session cookies is a security decision that needs your approval. See docs/04-account-integration.md.</p>
     </Panel>
   );
 }
@@ -172,6 +172,7 @@ export default function AccountPage() {
         </Panel>
       </div>
       <SyncPanel profile={profile} />
+      <HoyolabSync profile={profile} />
     </div>
   );
 }

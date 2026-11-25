@@ -8,7 +8,8 @@ import { Countdown, useNow } from "@/components/Countdown";
 import { WolfComment } from "@/components/SilverWolf";
 import { Badge, Button, Empty, Loading, NumberInput, PageHeader, Panel, Progress, Stat } from "@/components/ui";
 import { dashboardComment } from "@/lib/companion/comments";
-import { getDb, nowIso } from "@/lib/db";
+import { getDb, kvGet, nowIso } from "@/lib/db";
+import type { DailyNote } from "@/lib/connectors/hoyolab";
 import { useAccount, useProfile } from "@/lib/hooks";
 import { useApp } from "@/lib/store";
 import type { AccountSummary } from "@/lib/summary";
@@ -113,12 +114,21 @@ function Resources() {
 
 function Resets() {
   const server = useApp((s) => s.settings.server);
+  const profileId = useApp((s) => s.profileId);
+  const note = useLiveQuery(() => kvGet<DailyNote | null>(`dailyNote:${profileId}`, null), [profileId]);
   const now = useNow(60_000);
   return (
     <div className="grid grid-cols-2 gap-2">
       <Stat label="Daily reset" value={<Countdown to={nextDailyReset(server, now)} />} hint={`04:00 ${server} server`} />
       <Stat label="Weekly reset" value={<Countdown to={nextWeeklyReset(server, now)} />} hint="Monday 04:00" />
-      <div className="col-span-2 text-xs text-muted">Daily Training and weekly objectives are not exposed by any connected source, so they are not tracked automatically. Use the Journal&apos;s reminders for routines.</div>
+      {note ? (
+        <>
+          <Stat label="Daily Training" value={`${note.dailyTraining[0]}/${note.dailyTraining[1]}`} tone={note.dailyTraining[0] >= note.dailyTraining[1] ? "cyan" : undefined} hint="HoYoLAB (verified)" />
+          <Stat label="SU weekly points" value={`${note.universeWeekly[0]}/${note.universeWeekly[1]}`} hint="HoYoLAB (verified)" />
+          <Stat label="Echo of War" value={`${note.echoOfWar[0]}/${note.echoOfWar[1]}`} hint="weekly runs used" />
+          <Stat label="Assignments" value={`${note.assignments[0]}/${note.assignments[1]}`} hint={`synced ${new Date(note.fetchedAt).toLocaleTimeString()}`} />
+        </>
+      ) : <div className="col-span-2 text-xs text-muted">Daily Training, Simulated Universe weekly points and Echo of War runs appear here after a HoYoLAB sync (My Account).</div>}
     </div>
   );
 }

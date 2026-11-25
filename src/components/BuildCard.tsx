@@ -185,7 +185,7 @@ export function BuildCard({ charId, owned }: { charId: string; owned: OwnedChara
           </p>
         </Panel>
 
-        <Panel title="Silver Wolf's recommended build">
+        <Panel title="Silver Wolf's recommended build (stat-match pick)">
           <div className="space-y-3 text-sm">
             <div className="grid grid-cols-2 gap-x-4 gap-y-1">
               {(["BODY", "FOOT", "NECK", "OBJECT"] as const).map((slot) => (

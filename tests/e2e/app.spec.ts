@@ -60,9 +60,14 @@ test("HSR Scanner import: preview, apply, rollback", async ({ page }) => {
   await page.locator('input[type="file"]').first().setInputFiles({ name: "scan.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(scan)) });
   await expect(page.getByText(/3 new, 0 changed, 0 conflicts/)).toBeVisible();
   await page.getByRole("button", { name: "Apply import" }).click();
-  await expect(page.getByText(/Import applied\. 3 records written/)).toBeVisible();
+  await expect(page.getByText("3 written, 0 removed")).toBeVisible();
   await page.goto("/relics");
   await expect(page.locator("main li").getByText("Set of Testing")).toBeVisible();
+  await page.goto("/characters/1901");
+  await expect(page.getByText("Silver Wolf rating")).toBeVisible();
+  await expect(page.getByText("What this build lacks")).toBeVisible();
+  await expect(page.getByText(/No Hands, Body, Feet, Planar Sphere, Link Rope equipped/)).toBeVisible();
+  await expect(page.getByText(/Silver Wolf's recommended build/)).toBeVisible();
   await page.goto("/import");
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Roll back" }).click();
@@ -160,4 +165,6 @@ test("Silver Wolf terminal answers from data and admits gaps", async ({ page }) 
   await page.getByLabel("Message Silver Wolf").fill("how do I beat the moon boss");
   await page.getByRole("button", { name: "Send" }).click();
   await expect(page.getByText(/not inventing mechanics/)).toBeVisible();
+  await expect(page.getByText("Don't make a game if you don't know how to")).toBeVisible();
+  await expect(page.getByRole("radio", { name: "Claude" })).toBeDisabled(); // no API key in tests
 });

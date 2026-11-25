@@ -1,6 +1,6 @@
-# Astral Companion
+# Silver Wolf Bot · Astral Companion
 
-**Your entire Trailblazing journey, in one place.** A personal, local-first Honkai: Star Rail command center, with **Silver Wolf** as your companion.
+**Your entire Trailblazing journey, in one place.** A personal, local-first Honkai: Star Rail command center, with **Silver Wolf** as your companion. She texts you like she does in-game, rates your builds from D to WTF, and can chat through Claude.
 
 Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHERE / HoYoverse.
 
@@ -9,8 +9,9 @@ Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHE
 | Area | Highlights |
 | --- | --- |
 | Express Terminal | Customisable dashboard, objectives derived from your data, resources, server-aware daily/weekly reset countdowns |
-| Silver Wolf | Comments on every page in her voice, built from your real numbers (a "data" toggle shows the facts behind each line), plus a local terminal that answers questions with sources |
-| Account | Multiple profiles; optional read-only public showcase sync via Enka.Network (UID only, no login); connector capability registry |
+| Silver Wolf | Texts you on every page in short Messages-style bursts built from your real numbers (a "data" toggle shows the facts behind each line); a terminal that answers locally, or through Claude if you add an API key |
+| Build ratings | Total stats, a D→WTF (−/+) grade for every relic and for the whole build, what it lacks, her recommended build, and saved guide builds checked against your gear |
+| Account | Multiple profiles; read-only sync from Enka.Network (public showcase, UID only) and the HoYoLAB Battle Chronicle (stats, Trailblaze Power, daily progress, Memory of Chaos / Pure Fiction / Apocalyptic Shadow); connector capability registry |
 | Archives | 94 characters, 172 Light Cones, 64 relic sets from game data; stats at any level; abilities; traces (original and enhanced kits); Eidolons |
 | Relics | Inventory, per-character scoring profiles with transparent maths, best-in-slot per slot, 2pc/4pc database |
 | Import Center | HSR Scanner JSON (the format Fribbels imports), UIGF v4 / SRGF v1 / CSV Warp history; preview → conflicts → approve → apply → rollback |
@@ -38,6 +39,13 @@ Open http://localhost:3000, go to **Settings → Game data**, tick the notice an
 
 For development: `pnpm dev`.
 
+### Optional: Claude chat and HoYoLAB sync
+
+Copy `.env.example` to `.env.local` (git-ignored) and fill in what you want, then restart the app:
+
+- `ANTHROPIC_API_KEY`: turns on Claude mode in Silver Wolf's terminal (model `claude-opus-5-5`, with server-side refusal fallbacks). The key stays on the local server; the browser only sends your question and a compact facts block (roster, pity, resources, build grades; never your UID or name).
+- `HOYOLAB_LTUID_V2` and `HOYOLAB_LTOKEN_V2`: cookies from hoyolab.com (dev tools → Application → Cookies). Then enable the sync in Settings → Privacy and press **Sync from HoYoLAB** on My Account. Read-only GET requests only; if HoYoLAB asks for a verification check, you complete it on hoyolab.com yourself. These cookies give access to your HoYoLAB account, so keep `.env.local` private.
+
 ## Quality checks
 
 ```bash
@@ -48,12 +56,12 @@ pnpm typecheck && pnpm lint && pnpm test
 pnpm build && pnpm test:e2e
 ```
 
-- **Unit tests (Vitest):** 70 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity/50-50 history, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping.
+- **Unit tests (Vitest):** 87 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity/50-50 history, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping, build grading and total stats, Claude route (mocked SDK), HoYoLAB connector (mocked fetch).
 - **End-to-end (Playwright):** 9 scenarios on desktop and mobile, using a synthetic dataset (no HoYoverse content in the repo).
 
 ## Privacy in one paragraph
 
-Everything lives in your browser's IndexedDB. The app never asks for a HoYoverse password, stores no credentials and never automates the game. It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com) and **Fetch showcase** (enka.network, sends only your UID, off by default). Backup, restore, and "delete all personal data" are in Settings.
+Everything lives in your browser's IndexedDB. The app never asks for a HoYoverse password, stores no credentials and never automates the game. It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com), **Fetch showcase** (enka.network, UID only), **Sync from HoYoLAB** (cookies read from `.env.local` on the server), and Claude chat (api.anthropic.com). The syncs are off by default and Claude needs your key. Backup, restore, and "delete all personal data" are in Settings.
 
 ## Documentation
 
@@ -69,4 +77,9 @@ Everything lives in your browser's IndexedDB. The app never asks for a HoYoverse
 | [08 Roadmap](docs/08-roadmap.md) | Phases, status, limitations, next tasks |
 | [09 Silver Wolf voice](docs/09-silver-wolf-voice.md) | Character brief and writing rules for her lines |
 | [10 Warp maths](docs/10-warp-math.md) | Rates, soft-pity model, verification |
+| [11 Build ratings](docs/11-build-ratings.md) | Grade scale, scoring, total stats (verified), recommended builds |
 | [PROGRESS.md](PROGRESS.md) | Development log and phase reports |
+
+## Licence
+
+MIT for the code (see `LICENSE`). Game content belongs to HoYoverse and is not part of this repository.

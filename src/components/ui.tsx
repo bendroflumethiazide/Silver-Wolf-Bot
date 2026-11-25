@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { X } from "lucide-react";
 import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
-import { SOURCE_LABEL, type DataSource } from "@/lib/types";
+import { SOURCE_LABEL, VERIFIED_SOURCES, type DataSource } from "@/lib/types";
 
 export const cx = clsx;
 
@@ -73,8 +73,9 @@ export function Badge({ children, tone = "default", className, title }: { childr
 }
 
 export function SourceBadge({ source }: { source: DataSource }) {
-  const tone = source === "enka" ? "ok" : source === "manual" ? "default" : "cyan";
-  const label = source === "enka" ? "Verified" : source === "manual" ? "Manual" : "Imported";
+  const verified = VERIFIED_SOURCES.includes(source);
+  const tone = verified ? "ok" : source === "manual" ? "default" : "cyan";
+  const label = verified ? "Verified" : source === "manual" ? "Manual" : "Imported";
   return <Badge tone={tone} title={SOURCE_LABEL[source]}>{label}</Badge>;
 }
 

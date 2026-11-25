@@ -2,13 +2,14 @@ import type { MainStatKey, RelicSlot } from "./relics/stats";
 import type { RelicSubstat } from "./relics/scoring";
 
 /** Where a personal record came from. "verified" sources were read from the game/account, not typed. */
-export type DataSource = "manual" | "hsr-scanner" | "enka" | "uigf" | "srgf" | "csv" | "backup";
+export type DataSource = "manual" | "hsr-scanner" | "enka" | "hoyolab" | "uigf" | "srgf" | "csv" | "backup";
 
-export const VERIFIED_SOURCES: DataSource[] = ["enka"];
+export const VERIFIED_SOURCES: DataSource[] = ["enka", "hoyolab"];
 export const SOURCE_LABEL: Record<DataSource, string> = {
   manual: "Manual entry",
   "hsr-scanner": "HSR Scanner import (OCR)",
   enka: "Verified: public showcase (Enka.Network)",
+  hoyolab: "Verified: HoYoLAB Battle Chronicle",
   uigf: "UIGF import",
   srgf: "SRGF import",
   csv: "CSV import",
@@ -25,6 +26,8 @@ export interface Profile {
   signature?: string;
   /** Statistics as reported by a verified source. */
   stats?: {
+    activeDays?: number;
+    chests?: number;
     achievements?: number;
     characters?: number;
     lightCones?: number;
@@ -221,7 +224,7 @@ export interface EventEntry {
 
 export interface ImportHistoryEntry {
   id: string;
-  kind: "hsr-scanner" | "uigf" | "srgf" | "csv" | "backup" | "enka";
+  kind: "hsr-scanner" | "uigf" | "srgf" | "csv" | "backup" | "enka" | "hoyolab";
   fileName?: string;
   importedAt: string;
   summary: string;

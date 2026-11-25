@@ -116,7 +116,17 @@ export default function TerminalPage() {
     if (useClaude) void askClaude(text, ctx, history);
     else askLocal(text, ctx);
   };
-  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [log]);
+  const scroller = useRef<HTMLDivElement>(null);
+  // Follow her bubbles as they arrive (they reveal one by one), not only when a message is added.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => { el.scrollTop = el.scrollHeight; });
+    for (const child of Array.from(el.children)) ro.observe(child);
+    const mo = new MutationObserver(() => { el.scrollTop = el.scrollHeight; });
+    mo.observe(el, { childList: true, subtree: true });
+    return () => { ro.disconnect(); mo.disconnect(); };
+  });
 
   if (!ctx) return <Loading label="Connecting to SW// terminal" />;
   return (
@@ -133,7 +143,7 @@ export default function TerminalPage() {
             <button role="radio" aria-checked={useClaude} disabled={!ai?.configured} onClick={() => updateSettings({ aiChat: true })} className={cx("rounded-md px-2.5 py-1 disabled:opacity-40", useClaude ? "bg-violet/25 text-text" : "text-muted")} title={ai?.configured ? `Claude (${ai.model})` : "Add ANTHROPIC_API_KEY to .env.local to enable"}>Claude</button>
           </div>
         </header>
-        <div className="flex-1 space-y-5 overflow-y-auto bg-[rgba(236,236,241,0.04)] p-4" aria-live="polite">
+        <div ref={scroller} className="flex-1 space-y-5 overflow-y-auto bg-[rgba(236,236,241,0.04)] p-4" aria-live="polite">
           {shown.map((m, i) => m.from === "you" ? (
             <div key={i} className="ml-auto flex max-w-[85%] flex-col items-end gap-1">
               <div className="text-xs font-medium text-muted">{profile?.name ?? "You"}</div>

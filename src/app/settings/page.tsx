@@ -194,7 +194,15 @@ function PrivacyPanel() {
           It is read-only and needs no login. Only characters you put in your in-game showcase are visible.
         </span>
       </label>
-      <p className="mt-3 text-xs text-muted">{fill("This app never asks for your HoYoverse password, never stores credentials, and never automates the game client. AI chat with an external provider is not configured.", {})}</p>
+      <label className="mt-3 flex items-start gap-2 text-sm">
+        <input type="checkbox" className="mt-1" checked={settings.hoyolabEnabled} onChange={(e) => updateSettings({ hoyolabEnabled: e.target.checked })} />
+        <span>
+          Enable HoYoLAB Battle Chronicle sync (read-only). Your cookies stay in <code>.env.local</code> on the machine running this app; the browser never sees them.
+          Only your UID is sent from the browser to the local server, which asks HoYoLAB.
+        </span>
+      </label>
+      <p className="mt-3 text-xs text-muted">Claude chat for Silver Wolf: uses <code>ANTHROPIC_API_KEY</code> from <code>.env.local</code> on the local server, and sends only your question plus a compact facts block (no UID or name).</p>
+      <p className="mt-3 text-xs text-muted">{fill("This app never asks for your HoYoverse password, never stores credentials in the browser, and never automates the game client.", {})}</p>
     </Panel>
   );
 }
