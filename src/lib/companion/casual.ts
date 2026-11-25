@@ -125,9 +125,9 @@ const L = {
     daughter: ["Bye {you}!|Come back soon ok?"],
   },
   fallback: {
-    "little-sister": ["Hm|Not sure what u mean|Ask me abt ur builds, pulls or what to do", "...|U lost me|Try one of the buttons"],
-    "big-sister": ["Didn't catch that {you}|Ask me what to do 2day, or abt ur builds"],
-    daughter: ["Huh?|I don't get it|Ask me something abt the game!"],
+    "little-sister": ["Hm|Not sure what u mean|Ask me abt ur builds, pulls or what to do", "...|U lost me|Try one of the buttons", "Error 404: meaning not found|Try again ;)", "Huh|My parser just gave up on that one"],
+    "big-sister": ["Didn't catch that {you}|Ask me what to do 2day, or abt ur builds", "Hm, say that another way?|I'm better w/ game stuff", "Not following, {you}|Try one of the buttons"],
+    daughter: ["Huh?|I don't get it|Ask me something abt the game!", "Wait what?|Say it again pls", "Umm|I'm confused {you}|Try the buttons!"],
   },
 } satisfies Record<string, Lines>;
 
@@ -168,6 +168,14 @@ export function casualReply(raw: string, p: Persona, now = new Date(), salt = 0)
 
 export function casualFallback(p: Persona, now = new Date(), salt = 0): string {
   return fill(by(p, L.fallback, "fallback", salt), p, now);
+}
+
+/** Asking for "Claude", "real chat", "talk like a human"... */
+export const AI_REQUEST = /\b(claude|ai (mode|chat)|real (chat|convo|conversation|talk)|talk (like|as) an? (human|person|real person|npc)|talk normally|actually (talk|chat))\b/i;
+
+export function aiSetupLine(p: Persona, configured: boolean): string {
+  if (configured) return pick(["Say less|Switched to Claude mode|Now I can actually talk", "Ok ok|Claude mode on|Go ahead, say anything"], "ai-on", p.relationship);
+  return "Rn I only do quick replies|Wanna actually talk? I need an Anthropic API key|Get one at console.anthropic.com (it's pay-as-u-go, few cents a chat)|Then Settings → Desktop app → paste it|Then tap ⚙ in here → Claude";
 }
 
 /** Opening message when the phone opens: time-aware, plus one urgent thing if there is one. */

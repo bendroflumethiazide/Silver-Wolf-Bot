@@ -59,3 +59,24 @@ describe("variety", () => {
     expect(a).not.toBe(b);
   });
 });
+
+describe("Silver Wolf chat modes", () => {
+  it("explains how to turn on Claude when asked, or switches when a key is set", () => {
+    const off = localReply("Claude Chat", ctx(), sis, noon, 1, { configured: false });
+    expect(off.intent).toBe("ai");
+    expect(off.enableClaude).toBe(false);
+    expect(off.text).toMatch(/API key/);
+    expect(off.links?.[0].href).toBe("/settings#desktop");
+    const on = localReply("can u talk like a human", ctx(), sis, noon, 1, { configured: true });
+    expect(on.enableClaude).toBe(true);
+    expect(on.text).toMatch(/Claude mode/);
+  });
+  it("doesn't repeat the same fallback on consecutive messages", () => {
+    const a = localReply("wheres kafka", ctx(), sis, noon, 1).text;
+    const b = localReply("qwerty asdf", ctx(), sis, noon, 2).text;
+    expect(a).not.toBe(b);
+  });
+  it("hints at Claude mode when she doesn't understand", () => {
+    expect(localReply("qwerty asdf", ctx(), sis, noon, 1, { configured: false }).text).toMatch(/claude/i);
+  });
+});

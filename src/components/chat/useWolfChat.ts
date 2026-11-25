@@ -2,7 +2,7 @@
 
 import { useLiveQuery } from "dexie-react-hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { casualFallback, casualReply, openingLine, type Persona } from "@/lib/companion/casual";
+import { AI_REQUEST, aiSetupLine, casualFallback, casualReply, openingLine, type Persona } from "@/lib/companion/casual";
 import { answer, buildAiContext, type BuildSummary, type TerminalContext } from "@/lib/companion/terminal";
 import { bubbles } from "@/lib/companion/voice";
 import { evaluateBuild } from "@/lib/builds/evaluate";
@@ -35,12 +35,17 @@ const seenKey = (profileId: string) => `phoneSeen:${profileId}`;
 const URGENT = new Set(["event", "banner", "warp"]);
 
 /** Decide how to answer locally: data intents first, then small talk, then a fallback. */
-export function localReply(text: string, ctx: TerminalContext, persona: Persona, now = new Date(), salt = 0): Omit<ChatMsg, "id" | "at" | "from"> {
+export function localReply(text: string, ctx: TerminalContext, persona: Persona, now = new Date(), salt = 0, ai: { configured: boolean } | null = null): Omit<ChatMsg, "id" | "at" | "from"> & { enableClaude?: boolean } {
+  if (AI_REQUEST.test(text)) {
+    const configured = !!ai?.configured;
+    return { text: aiSetupLine(persona, configured), via: "local", status: "done", intent: "ai", enableClaude: configured, links: configured ? undefined : [{ label: "Open Settings", href: "/settings#desktop" }] };
+  }
   const a = answer(text, ctx);
   if (a.intent !== "unknown" && a.intent !== "help") return { text: a.line, via: "local", status: "done", intent: a.intent, facts: a.facts, sources: a.sources, links: a.links };
   const c = casualReply(text, persona, now, salt);
   if (c) return { text: c.line, via: "local", status: "done", intent: c.intent };
-  return { text: casualFallback(persona, now, salt), via: "local", status: "done", intent: "fallback" };
+  const hint = ai && !ai.configured ? "|(type \"claude\" if u want me to actually talk)" : ai?.configured ? "|(type \"claude\" to switch me to real convo mode)" : "";
+  return { text: casualFallback(persona, now, salt) + hint, via: "local", status: "done", intent: "fallback" };
 }
 
 export function useWolfChat() {
@@ -122,7 +127,10 @@ export function useWolfChat() {
     const withMine = [...history, mine];
     await save(withMine);
     if (!useClaude) {
-      await save([...withMine, { id: newId("m"), from: "wolf", at: new Date().toISOString(), ...localReply(text, ctx, persona, new Date(), withMine.length) }]);
+      // Salt = how many messages you've sent, so consecutive replies rotate through her lines.
+      const { enableClaude, ...reply } = localReply(text, ctx, persona, new Date(), withMine.filter((m) => m.from === "you").length, ai);
+      await save([...withMine, { id: newId("m"), from: "wolf", at: new Date().toISOString(), ...reply }]);
+      if (enableClaude) updateSettings({ aiChat: true });
       return;
     }
     setBusy(true);
@@ -148,7 +156,7 @@ export function useWolfChat() {
     } catch (e) {
       await save([...withMine, { id: newId("m"), from: "wolf", at: new Date().toISOString(), text: `Connection's dead|${e instanceof Error ? e.message : String(e)}|Local mode still works tho`, via: "claude", status: "error" }]);
     } finally { setBusy(false); setStreaming(null); }
-  }, [ctx, busy, profileId, save, useClaude, persona]);
+  }, [ctx, busy, profileId, save, useClaude, persona, ai, updateSettings]);
 
   const clear = useCallback(async () => { await kvSet(chatKey(profileId), []); greeted.current = false; }, [profileId]);
 
