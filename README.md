@@ -44,7 +44,7 @@ pnpm install
 pnpm desktop:prepare && pnpm dist:win
 ```
 
-`pnpm desktop` runs it without packaging, `pnpm dist:linux` makes an AppImage. The NSIS installer needs Windows (or Wine); pushing a tag such as `v1.0.0` makes GitHub Actions build both Windows files on a Windows runner and attach them to a Release (`.github/workflows/desktop-release.yml`). A macOS build has to be made on a Mac.
+`pnpm desktop` runs it without packaging, `pnpm dist:linux` makes an AppImage. The NSIS installer needs Windows (or Wine); running **Desktop release (Windows)** from the Actions tab (or pushing a tag such as `v1.0.0`) builds both Windows files on a Windows runner and attaches them to a Release (`.github/workflows/desktop-release.yml`). A macOS build has to be made on a Mac.
 
 ## Run it in a browser
 

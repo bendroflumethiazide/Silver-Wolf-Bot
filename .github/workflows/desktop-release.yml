@@ -1,7 +1,7 @@
 name: Desktop release (Windows)
 
 # Builds the Windows installer + portable exe on a real Windows runner (icon embedded).
-# Run it manually from the Actions tab, or push a tag like v1.0.0 to also publish a GitHub Release.
+# Run it from the Actions tab (publishes v<package.json version>) or push a tag like v1.0.0.
 on:
   workflow_dispatch:
   push:
@@ -37,11 +37,16 @@ jobs:
             release/*.exe
           if-no-files-found: error
       - name: Publish GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release create "$GITHUB_REF_NAME" release/*.exe \
-            --title "Silver Wolf Bot $GITHUB_REF_NAME" \
-            --notes "Windows installer (Silver-Wolf-Bot-Setup-*.exe) and portable exe. Unsigned build: Windows SmartScreen may warn — choose More info → Run anyway."
+          # Tag pushes use their own name; manual runs use the version in package.json.
+          if [[ "$GITHUB_REF" == refs/tags/v* ]]; then TAG="$GITHUB_REF_NAME"; else TAG="v$(node -p "require('./package.json').version")"; fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" release/*.exe --clobber
+          else
+            gh release create "$TAG" release/*.exe --target "$GITHUB_SHA" \
+              --title "Silver Wolf Bot $TAG" \
+              --notes "Windows installer (Silver-Wolf-Bot-Setup-*.exe) and portable exe (no install). Unsigned build: Windows SmartScreen may warn, choose More info, then Run anyway. Your data is kept in %APPDATA%\\silver-wolf-bot."
+          fi
