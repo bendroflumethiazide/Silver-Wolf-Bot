@@ -45,3 +45,8 @@ next-env.d.ts
 /playwright-report/
 
 !.env.example
+
+# desktop build output
+/dist-desktop/
+/dist-server/
+/release/

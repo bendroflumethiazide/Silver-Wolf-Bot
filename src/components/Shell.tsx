@@ -59,8 +59,8 @@ function Brand({ collapsed }: { collapsed: boolean }) {
       <WolfAvatar size={34} />
       {!collapsed && (
         <div className="leading-tight">
-          <div className="text-sm font-semibold tracking-wide text-gradient">ASTRAL COMPANION</div>
-          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">SW// terminal</div>
+          <div className="text-sm font-semibold tracking-wide text-gradient">SILVER WOLF BOT</div>
+          <div className="font-mono text-[10px] uppercase tracking-[0.2em] text-faint">Astral Companion</div>
         </div>
       )}
     </Link>

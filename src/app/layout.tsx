@@ -3,7 +3,7 @@ import "./globals.css";
 import { Shell } from "@/components/Shell";
 
 export const metadata: Metadata = {
-  title: { default: "Astral Companion", template: "%s · Astral Companion" },
+  title: { default: "Silver Wolf Bot", template: "%s · Silver Wolf Bot" },
   description: "Personal Honkai: Star Rail command center with Silver Wolf as your companion. Local-first.",
 };
 

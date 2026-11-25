@@ -23,7 +23,7 @@ Empty working directory, Node 22.23, pnpm 10.28, Chromium + Playwright 1.63 pre-
 
 **ADR-2 · Game data is downloaded on demand, never bundled (approved by you).** StarRailRes (AGPL-3.0, HoYoverse content) is fetched by the browser into a `gameSnapshots` table. The repository contains no game data or art. Snapshots are versioned; the three newest are kept for rollback.
 
-**ADR-3 · Personality is separate from facts.** Silver Wolf's lines are templates filled only with values computed from data. Every comment carries a `facts[]` list. The terminal answers through deterministic intents over local data and returns `sources[]`. An external LLM is optional future work that needs your approval.
+**ADR-3 · Personality is separate from facts.** Silver Wolf's lines are templates filled only with values computed from data. Every comment carries a `facts[]` list. The terminal answers through deterministic intents over local data and returns `sources[]`. Claude chat is optional (your API key; the server sends a compact facts block, never your UID or name).
 
 **ADR-4 · Honest modules over fabricated ones.** Where no licensed or reachable source exists (bosses, missions, banners, map markers, community builds), the module is a structured manual system with source links and confirmed/speculation/leak status instead of invented data.
 
@@ -48,7 +48,7 @@ src/
     warp/                 rules, exact probability, simulator + Monte Carlo, history, planner
     relics/               stat vocabulary, roll tables, scoring profiles
     materials/            cost calculator, character/Light Cone plans
-    importers/            HSR Scanner, UIGF/SRGF/CSV, keyed diff, apply + rollback
+    importers/            HSR Scanner, keyed diff, apply + rollback
     connectors/enka.ts    capability registry + showcase parser
     companion/            voice (line banks), comments (data → line), terminal (intents)
     teams.ts map.ts time.ts markdown.ts backup.ts status.ts types.ts
@@ -64,7 +64,6 @@ flowchart LR
   SRR[(StarRailRes<br/>raw.githubusercontent)] -- on demand --> SNAP[gameSnapshots]
   SNAP --> GD[GameData in memory]
   SCAN[HSR Scanner JSON] --> DIFF{diff + conflicts}
-  UIGF[UIGF / SRGF / CSV] --> DIFF
   ENKA[Enka proxy] --> DIFF
   MANUAL[Manual entry] --> DB
   DIFF -- approved --> DB[(IndexedDB personal tables)]
@@ -89,9 +88,13 @@ flowchart TD
   RS --> RELOPT
   INV --> MATPLAN[Material plans]
   MAT --> MATPLAN
-  WH[Warp history] --> PITY[Pity tracker] --> PLAN[Warp planner]
+  SRS[Star Rail Station] -. you read it .-> PITY[Your pity per pool] --> PLAN[Warp planner]
   RES[Resources] --> PLAN
   MAP[Map markers] --> COMP[Completion]
   EV[Events / banners] --> NOTIF[Notifications]
   INV & PITY & PLAN & MATPLAN & COMP & EV & RELOPT --> OBJ[Objectives engine] --> SW[Silver Wolf]
 ```
+
+## Desktop app (ADR-7)
+
+**Electron around the Next.js standalone server.** `electron/main.cjs` starts `server.js` with Electron's own Node (`ELECTRON_RUN_AS_NODE`) on `127.0.0.1:47923` and opens a window on it. The port is fixed so the window's IndexedDB origin, and with it your data, is the same on every launch. `ASTRAL_LOCAL_ONLY=1` makes the API routes refuse any Host other than loopback (DNS-rebinding guard) on top of the same-origin check. The page is sandboxed with context isolation; the preload exposes only `status`, `setSecrets` (write-only) and `openDataFolder`, and IPC answers only frames from the app origin. Links to other origins open in the system browser. Secrets are encrypted with `safeStorage` (DPAPI on Windows, Keychain on macOS, libsecret on Linux) and handed to the server as environment variables; saving them restarts the server. `scripts/prepare-desktop.mjs` assembles `dist-desktop/server` (pnpm `node-linker=hoisted`, so no symlinks; nested one level because electron-builder drops a root `node_modules` from `extraResources`).

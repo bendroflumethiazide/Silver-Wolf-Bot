@@ -21,7 +21,12 @@ export function nameFor(p: Persona): string {
 }
 
 type Lines = Record<Relationship, string[]>;
-const by = (p: Persona, lines: Lines, key: string) => pick(lines[p.relationship], key, String(Math.floor(Date.now() / 60000)));
+/** Pick a line; `salt` (e.g. how many messages so far) keeps repeated questions from getting identical replies. */
+const by = (p: Persona, lines: Lines, key: string, salt = 0) => {
+  const opts = lines[p.relationship];
+  const base = opts.indexOf(pick(opts, key, new Date().toISOString().slice(0, 10)));
+  return opts[(base + salt) % opts.length];
+};
 
 const L = {
   greet: {
@@ -150,19 +155,19 @@ const PATTERNS: [keyof typeof L, RegExp][] = [
 export interface CasualReply { intent: string; line: string }
 
 /** Small talk reply, or null if the message isn't small talk (let the data intents answer). */
-export function casualReply(raw: string, p: Persona, now = new Date()): CasualReply | null {
+export function casualReply(raw: string, p: Persona, now = new Date(), salt = 0): CasualReply | null {
   const q = raw.toLowerCase().trim();
   for (const [intent, re] of PATTERNS) {
     if (!re.test(q)) continue;
     const late = now.getHours() < 5 && (intent === "greet" || intent === "howAreYou" || intent === "wyd" || intent === "bored");
     const key = late ? "lateNight" : intent;
-    return { intent: key, line: fill(by(p, L[key], key), p, now) };
+    return { intent: key, line: fill(by(p, L[key], key, salt), p, now) };
   }
   return null;
 }
 
-export function casualFallback(p: Persona, now = new Date()): string {
-  return fill(by(p, L.fallback, "fallback"), p, now);
+export function casualFallback(p: Persona, now = new Date(), salt = 0): string {
+  return fill(by(p, L.fallback, "fallback", salt), p, now);
 }
 
 /** Opening message when the phone opens: time-aware, plus one urgent thing if there is one. */

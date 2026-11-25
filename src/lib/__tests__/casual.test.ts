@@ -51,3 +51,11 @@ describe("Silver Wolf small talk", () => {
     expect(SILVER_WOLF_SYSTEM).toMatch(/Never romantic/);
   });
 });
+
+describe("variety", () => {
+  it("doesn't repeat the exact same reply to the same message back to back", () => {
+    const a = casualReply("hey", sis, noon, 3)!.line;
+    const b = casualReply("hey", sis, noon, 4)!.line;
+    expect(a).not.toBe(b);
+  });
+});

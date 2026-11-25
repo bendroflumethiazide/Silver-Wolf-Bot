@@ -8,11 +8,11 @@ Live status: the in-app **Dev Status** page (`/status`, source `src/lib/status.t
 | 2 Foundation & UI | Next.js/TS/Tailwind, Dexie, theme, shell, settings, backup, dashboard | Done |
 | 3 Account & inventory | Character/LC/relic databases and inventory, HSR Scanner import, Enka sync, character pages | Done (Enka live-untested) |
 | 4 Exploration | Image map system, markers, completion, achievements, missions (codex), collectibles | Done (manual data) |
-| 5 Warp Observatory | Tracker, history import, pity, planner, simulator, banners | Done |
+| 5 Warp Observatory | Star Rail Station tracker button, your pity per pool, planner, simulator, banners | Done (history tracking handed to Star Rail Station at your request) |
 | 6 Optimisation | Relic scoring + best-in-slot, team builder + optimizer, materials calculator + farming plan | Done (rule-based) |
 | 7 Encyclopedia | Bosses, enemies, NPCs, lore, modes, SU, story, events | Done as codex + game-data directories |
-| 8 Silver Wolf AI | Texting voice, local retrieval terminal, Claude chat, build ratings | Done (Claude needs your API key) |
-| 9 Refinement | Notifications (in-app), responsive, tests | Partly done; PWA offline shell, desktop notifications, Tauri pending |
+| 8 Silver Wolf AI | Texting voice, local retrieval terminal, phone chat with family small talk, Claude chat, build ratings | Done (Claude needs your API key) |
+| 9 Refinement | Notifications (in-app), responsive, tests, desktop app | Windows/Linux desktop app done (Electron); PWA offline shell, OS notifications and a macOS build pending |
 
 ## Cannot currently be implemented (and why)
 

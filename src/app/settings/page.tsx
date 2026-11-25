@@ -3,6 +3,7 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { Download, RefreshCw, RotateCcw, Trash2, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { DesktopSettings } from "@/components/DesktopSettings";
 import { WolfComment } from "@/components/SilverWolf";
 import { Badge, Button, confirmAction, ErrorBox, Field, Notice, PageHeader, Panel, Progress } from "@/components/ui";
 import { createBackup, deleteAllPersonalData, downloadJson, restoreBackup, validateBackup } from "@/lib/backup";
@@ -211,6 +212,7 @@ export default function SettingsPage() {
   return (
     <div className="space-y-5">
       <PageHeader title="Settings & Data" subtitle="Game data, privacy, backups and preferences. Everything is stored locally in this browser." />
+      <DesktopSettings />
       <GameDataPanel />
       <PreferencesPanel />
       <PrivacyPanel />

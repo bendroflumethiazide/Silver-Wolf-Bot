@@ -1,6 +1,6 @@
 # Silver Wolf Bot · Astral Companion
 
-**Your entire Trailblazing journey, in one place.** A personal, local-first Honkai: Star Rail command center, with **Silver Wolf** as your companion. She texts you like she does in-game, rates your builds from D to WTF, and can chat through Claude.
+**Your entire Trailblazing journey, in one place.** A personal, local-first Honkai: Star Rail command center, with **Silver Wolf** as your companion. She texts you like she does in-game, treats you like family, rates your builds from D to WTF, and can chat through Claude. Runs as a desktop app on Windows and Linux, or in your browser.
 
 Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHERE / HoYoverse.
 
@@ -9,13 +9,13 @@ Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHE
 | Area | Highlights |
 | --- | --- |
 | Express Terminal | Customisable dashboard, objectives derived from your data, resources, server-aware daily/weekly reset countdowns |
-| Silver Wolf | Texts you on every page in short Messages-style bursts built from your real numbers (a "data" toggle shows the facts behind each line); a terminal that answers locally, or through Claude if you add an API key |
+| Silver Wolf | Texts you on every page in short Messages-style bursts built from your real numbers (a "data" toggle shows the facts behind each line). A **phone button (bottom right)** opens a chat with her: small talk, "what should I do today?", build ratings, pull advice. Choose whether she's your little sister, big sister or daughter and what she calls you. Answers locally, or through Claude if you add an API key |
 | Build ratings | Total stats, a D→WTF (−/+) grade for every relic and for the whole build, what it lacks, her recommended build, and saved guide builds checked against your gear |
 | Account | Multiple profiles; read-only sync from Enka.Network (public showcase, UID only) and the HoYoLAB Battle Chronicle (stats, Trailblaze Power, daily progress, Memory of Chaos / Pure Fiction / Apocalyptic Shadow); connector capability registry |
 | Archives | 94 characters, 172 Light Cones, 64 relic sets from game data; stats at any level; abilities; traces (original and enhanced kits); Eidolons |
 | Relics | Inventory, per-character scoring profiles with transparent maths, best-in-slot per slot, 2pc/4pc database |
-| Import Center | HSR Scanner JSON (the format Fribbels imports), UIGF v4 / SRGF v1 / CSV Warp history; preview → conflicts → approve → apply → rollback |
-| Warp Observatory | Pity tracking per pool, 50/50 history, exact probability planner, Monte Carlo cross-check, seeded simulator with animations, banner tracker with confirmed/speculation/leak labels |
+| Import Center | HSR Scanner JSON (the format Fribbels imports); preview → conflicts → approve → apply → rollback. Warp history goes to [Star Rail Station](https://starrailstation.com/en/warp#import) via a button |
+| Warp Observatory | **Open Warp Tracker** button (Star Rail Station); your current pity and 50/50 guarantee per pool, which feed an exact probability planner with a Monte Carlo cross-check; seeded simulator with animations; banner tracker with confirmed/speculation/leak labels |
 | Strategy | Team builder, saved teams, comparison, explainable account-wide optimizer, endgame history charts, materials calculator and farming plan |
 | Exploration | Image-based multi-floor map: your screenshots, markers in 25 categories, clustering, filters, completion per zone and planet, map-pack export/import |
 | Log | 1,993 achievements (spoiler-safe), events with expiry alerts, Markdown journal with tags, links, reminders and attachments |
@@ -23,7 +23,30 @@ Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHE
 
 The **Dev Status** page (`/status`) lists every feature as tested, implemented, awaiting integration, blocked or planned, with the reason.
 
-## Run it
+## Desktop app (Windows)
+
+Download from the repository's **Releases** page:
+
+- `Silver-Wolf-Bot-Setup-<version>.exe`: installer with Start-menu and desktop shortcuts.
+- `Silver-Wolf-Bot-<version>-portable.exe`: no install, just double-click.
+
+The builds are not code-signed, so Windows SmartScreen may say "Windows protected your PC": choose **More info → Run anyway**.
+
+Your data lives in `%APPDATA%\silver-wolf-bot` and survives updates. In the app, **Settings → Desktop app** stores your Anthropic API key and HoYoLAB cookies encrypted with Windows' own data protection (they're never shown to the page again), and opens the data folder. The app runs its own small server on `127.0.0.1:47923`, reachable only from your PC; links to other sites open in your normal browser.
+
+Build it yourself:
+
+```bash
+pnpm install
+```
+
+```bash
+pnpm desktop:prepare && pnpm dist:win
+```
+
+`pnpm desktop` runs it without packaging, `pnpm dist:linux` makes an AppImage. The NSIS installer needs Windows (or Wine); pushing a tag such as `v1.0.0` makes GitHub Actions build both Windows files on a Windows runner and attach them to a Release (`.github/workflows/desktop-release.yml`). A macOS build has to be made on a Mac.
+
+## Run it in a browser
 
 Requirements: Node 20+ and pnpm (npm works too).
 
@@ -32,7 +55,7 @@ pnpm install
 ```
 
 ```bash
-pnpm build && pnpm start
+pnpm build && node scripts/prepare-desktop.mjs && node dist-desktop/server/server.js
 ```
 
 Open http://localhost:3000, go to **Settings → Game data**, tick the notice and press **Download game data** (about 5 MB, stored in your browser only).
@@ -41,9 +64,9 @@ For development: `pnpm dev`.
 
 ### Optional: Claude chat and HoYoLAB sync
 
-Copy `.env.example` to `.env.local` (git-ignored) and fill in what you want, then restart the app:
+In the desktop app, use **Settings → Desktop app**. In the browser version, copy `.env.example` to `.env.local` (git-ignored) and fill in what you want, then restart the server:
 
-- `ANTHROPIC_API_KEY`: turns on Claude mode in Silver Wolf's terminal (model `claude-opus-5-5`, with server-side refusal fallbacks). The key stays on the local server; the browser only sends your question and a compact facts block (roster, pity, resources, build grades; never your UID or name).
+- `ANTHROPIC_API_KEY`: turns on Claude mode in Silver Wolf's chats (model `claude-opus-5-5`, with server-side refusal fallbacks). The key stays on the local server; the browser only sends your question and a compact facts block (roster, pity, resources, build grades; never your UID or name).
 - `HOYOLAB_LTUID_V2` and `HOYOLAB_LTOKEN_V2`: cookies from hoyolab.com (dev tools → Application → Cookies). Then enable the sync in Settings → Privacy and press **Sync from HoYoLAB** on My Account. Read-only GET requests only; if HoYoLAB asks for a verification check, you complete it on hoyolab.com yourself. These cookies give access to your HoYoLAB account, so keep `.env.local` private.
 
 ## Quality checks
@@ -56,12 +79,14 @@ pnpm typecheck && pnpm lint && pnpm test
 pnpm build && pnpm test:e2e
 ```
 
-- **Unit tests (Vitest):** 87 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity/50-50 history, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping, build grading and total stats, Claude route (mocked SDK), HoYoLAB connector (mocked fetch).
-- **End-to-end (Playwright):** 9 scenarios on desktop and mobile, using a synthetic dataset (no HoYoverse content in the repo).
+(`test:e2e` runs against the same standalone server the desktop app ships.)
+
+- **Unit tests (Vitest):** 90 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity storage, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping, build grading and total stats, Claude route (mocked SDK), HoYoLAB connector (mocked fetch), Silver Wolf small talk and family settings, same-origin and loopback-only API guards.
+- **End-to-end (Playwright):** 10 scenarios on desktop and mobile, using a synthetic dataset (no HoYoverse content in the repo).
 
 ## Privacy in one paragraph
 
-Everything lives in your browser's IndexedDB. The app never asks for a HoYoverse password, stores no credentials and never automates the game. It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com), **Fetch showcase** (enka.network, UID only), **Sync from HoYoLAB** (cookies read from `.env.local` on the server), and Claude chat (api.anthropic.com). The syncs are off by default and Claude needs your key. Backup, restore, and "delete all personal data" are in Settings.
+Everything lives in IndexedDB on your machine (the app window's storage in the desktop app). The app never asks for a HoYoverse password and never automates the game; the only secrets it keeps are the optional API key and HoYoLAB cookies you give it (encrypted by the OS in the desktop app). It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com), **Fetch showcase** (enka.network, UID only), **Sync from HoYoLAB** (cookies kept by the local server, never sent to the page), and Claude chat (api.anthropic.com). **Open Warp Tracker** opens starrailstation.com in your browser. The syncs are off by default and Claude needs your key. Backup, restore, and "delete all personal data" are in Settings.
 
 ## Documentation
 

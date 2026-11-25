@@ -35,12 +35,12 @@ const seenKey = (profileId: string) => `phoneSeen:${profileId}`;
 const URGENT = new Set(["event", "banner", "warp"]);
 
 /** Decide how to answer locally: data intents first, then small talk, then a fallback. */
-export function localReply(text: string, ctx: TerminalContext, persona: Persona, now = new Date()): Omit<ChatMsg, "id" | "at" | "from"> {
+export function localReply(text: string, ctx: TerminalContext, persona: Persona, now = new Date(), salt = 0): Omit<ChatMsg, "id" | "at" | "from"> {
   const a = answer(text, ctx);
   if (a.intent !== "unknown" && a.intent !== "help") return { text: a.line, via: "local", status: "done", intent: a.intent, facts: a.facts, sources: a.sources, links: a.links };
-  const c = casualReply(text, persona, now);
+  const c = casualReply(text, persona, now, salt);
   if (c) return { text: c.line, via: "local", status: "done", intent: c.intent };
-  return { text: casualFallback(persona, now), via: "local", status: "done", intent: "fallback" };
+  return { text: casualFallback(persona, now, salt), via: "local", status: "done", intent: "fallback" };
 }
 
 export function useWolfChat() {
@@ -122,7 +122,7 @@ export function useWolfChat() {
     const withMine = [...history, mine];
     await save(withMine);
     if (!useClaude) {
-      await save([...withMine, { id: newId("m"), from: "wolf", at: new Date().toISOString(), ...localReply(text, ctx, persona) }]);
+      await save([...withMine, { id: newId("m"), from: "wolf", at: new Date().toISOString(), ...localReply(text, ctx, persona, new Date(), withMine.length) }]);
       return;
     }
     setBusy(true);

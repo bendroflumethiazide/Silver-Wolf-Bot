@@ -48,3 +48,18 @@ See docs/08-roadmap.md → "Next tasks".
 
 ### Blocked
 - Push: `bendroflumethiazide/Silver-Wolf-Bot` doesn't exist on GitHub yet, and this session can't create repos.
+
+## 2026-11-25 · Session 1, part 3 (desktop app)
+
+### Completed
+- **Warp tracker is now a button** (your request): **Open Warp Tracker** opens [Star Rail Station](https://starrailstation.com/en/warp#import) from Warp, Import Center and Dashboard. The internal history tracker and UIGF/SRGF/CSV importer were removed. You enter your current pity and 50/50 guarantee per pool (My pity tab); the planner, dashboard objective and Silver Wolf use it.
+- **Silver Wolf as family** (your request): a phone button at the bottom right opens a chat with her on every page; small talk (greetings, late-night nagging, "I'm tired", jokes, thanks, bye...), "what should I do today?", build ratings, pull advice. Settings in the chat: she's your little sister, big sister or daughter, and what she calls you. Strictly familial in local lines and in the Claude prompt. History is saved per profile; she greets you when you come back after a while or something urgent is up. The full-size chat (/terminal) shares the same thread.
+- **Desktop app**: Electron, Windows installer + portable exe, Linux AppImage; secrets encrypted by the OS; local server on 127.0.0.1 only; external links open in your browser. GitHub Actions workflow builds the Windows installer on a Windows runner.
+- **Bug pass**: API routes reject cross-site requests (and non-loopback Hosts in the desktop app); exact-origin checks for navigation and IPC; repeated small-talk replies varied; packaged-server layout fixed (electron-builder was dropping the server's `node_modules`).
+
+### Test results
+- typecheck ✓ · lint ✓ · build ✓ · unit **90/90** · E2E **10/10** against the standalone server the desktop app ships · packaged Linux app smoke-tested (window opens, tracker button, secrets save/remove, server restarts and exits cleanly).
+
+### Not possible here
+- NSIS installer: needs Windows (Wine crashes in this sandbox), so the release workflow builds it. The portable exe built here has the default Electron icon for the same reason.
+- macOS build: needs a Mac.
