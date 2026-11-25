@@ -97,3 +97,24 @@ export function formatSkillDesc(desc: string, params: number[][] | undefined, le
     return out + pct;
   });
 }
+
+/**
+ * Some characters ship an "enhanced" kit alongside the original. StarRailRes lists both, with the
+ * enhanced ids prefixed by "1" (skills: 1+charId+2 digits, trees: 1+charId+3 digits). Trace
+ * progress and costs belong to one kit, so callers must pick a variant instead of summing both.
+ */
+export type KitVariant = "original" | "enhanced";
+const isEnhancedId = (charId: string, id: string, suffixDigits: number) => id.length === charId.length + 1 + suffixDigits && id.startsWith(`1${charId}`);
+export function hasEnhancedKit(c: SrrCharacter): boolean {
+  return c.skill_trees.some((id) => isEnhancedId(c.id, id, 3));
+}
+export function kitTrees(c: SrrCharacter, v: KitVariant): string[] {
+  const enh = c.skill_trees.filter((id) => isEnhancedId(c.id, id, 3));
+  if (!enh.length) return c.skill_trees;
+  return v === "enhanced" ? enh : c.skill_trees.filter((id) => !enh.includes(id));
+}
+export function kitSkills(c: SrrCharacter, v: KitVariant): string[] {
+  const enh = c.skills.filter((id) => isEnhancedId(c.id, id, 2));
+  if (!enh.length) return c.skills;
+  return v === "enhanced" ? enh : c.skills.filter((id) => !enh.includes(id));
+}
