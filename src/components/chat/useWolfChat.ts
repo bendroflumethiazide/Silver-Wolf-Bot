@@ -4,6 +4,8 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AI_REQUEST, aiSetupLine, casualFallback, casualReply, openingLine, type Persona } from "@/lib/companion/casual";
 import { answer, buildAiContext, type BuildSummary, type TerminalContext } from "@/lib/companion/terminal";
+import { cleanLocal, crisisLine, CRISIS, crossesLine, deflectLine, localSystemPrompt, resolveBrain, type Brain } from "@/lib/ai/brain";
+import { deleteLocalAi, ensureLocalAi, generateLocal, probeLocalAi, useLocalAi } from "@/lib/ai/local-llm";
 import { bubbles } from "@/lib/companion/voice";
 import { evaluateBuild } from "@/lib/builds/evaluate";
 import { computeStats } from "@/lib/builds/stats";
@@ -21,7 +23,7 @@ export interface ChatMsg {
   /** Bubbles separated by "|". */
   text: string;
   at: string;
-  via?: "local" | "claude";
+  via?: "local" | "local-ai" | "claude";
   status?: "done" | "error";
   intent?: string;
   facts?: string[];
@@ -35,17 +37,40 @@ const seenKey = (profileId: string) => `phoneSeen:${profileId}`;
 const URGENT = new Set(["event", "banner", "warp"]);
 
 /** Decide how to answer locally: data intents first, then small talk, then a fallback. */
-export function localReply(text: string, ctx: TerminalContext, persona: Persona, now = new Date(), salt = 0, ai: { configured: boolean } | null = null): Omit<ChatMsg, "id" | "at" | "from"> & { enableClaude?: boolean } {
-  if (AI_REQUEST.test(text)) {
-    const configured = !!ai?.configured;
-    return { text: aiSetupLine(persona, configured), via: "local", status: "done", intent: "ai", enableClaude: configured, links: configured ? undefined : [{ label: "Open Settings", href: "/settings#desktop" }] };
-  }
+export function localReply(text: string, ctx: TerminalContext, persona: Persona, now = new Date(), salt = 0, ai: { configured: boolean } | null = null): Reply {
+  const pre = guardReply(text, persona, ai, false);
+  if (pre) return pre;
   const a = answer(text, ctx);
   if (a.intent !== "unknown" && a.intent !== "help") return { text: a.line, via: "local", status: "done", intent: a.intent, facts: a.facts, sources: a.sources, links: a.links };
   const c = casualReply(text, persona, now, salt);
   if (c) return { text: c.line, via: "local", status: "done", intent: c.intent };
   const hint = ai && !ai.configured ? "|(type \"claude\" if u want me to actually talk)" : ai?.configured ? "|(type \"claude\" to switch me to real convo mode)" : "";
   return { text: casualFallback(persona, now, salt) + hint, via: "local", status: "done", intent: "fallback" };
+}
+
+type Reply = Omit<ChatMsg, "id" | "at" | "from"> & { enableClaude?: boolean };
+
+/** Replies that never go to a model: Claude requests, crisis, lines she won't cross. */
+function guardReply(text: string, persona: Persona, ai: { configured: boolean } | null, onLocalAi: boolean): Reply | null {
+  if (CRISIS.test(text)) return { text: crisisLine(persona), via: "local", status: "done", intent: "care" };
+  if (crossesLine(text)) return { text: deflectLine(persona), via: "local", status: "done", intent: "deflect" };
+  if (AI_REQUEST.test(text)) {
+    const configured = !!ai?.configured;
+    return { text: aiSetupLine(persona, configured, onLocalAi), via: "local", status: "done", intent: "ai", enableClaude: configured, links: configured ? undefined : [{ label: "Open Settings", href: "/settings#desktop" }] };
+  }
+  return null;
+}
+
+/**
+ * With the built-in AI: safety and account questions are answered exactly from your data (a small
+ * model would get numbers wrong); everything else, small talk included, goes to the model (null).
+ */
+export function routeLocalAi(text: string, ctx: TerminalContext, persona: Persona, ai: { configured: boolean } | null): Reply | null {
+  const pre = guardReply(text, persona, ai, true);
+  if (pre) return pre;
+  const a = answer(text, ctx);
+  if (a.intent !== "unknown" && a.intent !== "help") return { text: a.line, via: "local", status: "done", intent: a.intent, facts: a.facts, sources: a.sources, links: a.links };
+  return null;
 }
 
 export function useWolfChat() {
@@ -71,7 +96,9 @@ export function useWolfChat() {
   const [ai, setAi] = useState<{ configured: boolean; model?: string } | null>(null);
   const greeted = useRef(false);
 
+  const localAi = useLocalAi((st) => st.status);
   useEffect(() => { fetch("/api/silverwolf").then((r) => r.json()).then(setAi).catch(() => setAi({ configured: false })); }, []);
+  useEffect(() => { void probeLocalAi(); }, []);
 
   const materialNeeds = useMemo(() => {
     if (!game || !plans?.length || !characters || !lcs) return null;
@@ -98,7 +125,10 @@ export function useWolfChat() {
     ? { game, summary, profile, characters, events, zones, markers, codex, materialNeeds, builds, inventory: Object.fromEntries(invRows.map((r) => [r.itemId, r.count])) }
     : null), [game, summary, profile, characters, events, zones, markers, codex, invRows, materialNeeds, builds]);
   const messages = stored ?? [];
-  const useClaude = !!ai?.configured && settings.aiChat;
+  const brain = resolveBrain(settings.chatBrain, { claude: !!ai?.configured, local: localAi.state !== "unsupported" });
+  const useClaude = brain === "claude";
+  // The built-in AI downloads itself the first time it's needed (Auto or Built-in AI).
+  useEffect(() => { if (brain === "local-ai" && localAi.state === "idle") void ensureLocalAi(); }, [brain, localAi.state]);
   const urgent = summary?.objectives.find((o) => URGENT.has(o.category)) ?? null;
   const hasPing = !!urgent && seen !== undefined && seen !== urgent.id;
 
@@ -126,11 +156,38 @@ export function useWolfChat() {
     const mine: ChatMsg = { id: newId("m"), from: "you", text, at: new Date().toISOString() };
     const withMine = [...history, mine];
     await save(withMine);
-    if (!useClaude) {
-      // Salt = how many messages you've sent, so consecutive replies rotate through her lines.
-      const { enableClaude, ...reply } = localReply(text, ctx, persona, new Date(), withMine.filter((m) => m.from === "you").length, ai);
+    const put = async (r: Reply) => {
+      const { enableClaude, ...reply } = r;
       await save([...withMine, { id: newId("m"), from: "wolf", at: new Date().toISOString(), ...reply }]);
-      if (enableClaude) updateSettings({ aiChat: true });
+      if (enableClaude) await updateSettings({ chatBrain: "claude" });
+    };
+    // Salt = how many messages you've sent, so consecutive quick replies rotate through her lines.
+    const salt = withMine.filter((m) => m.from === "you").length;
+    if (brain === "quick") return put(localReply(text, ctx, persona, new Date(), salt, ai));
+    if (brain === "local-ai") {
+      const direct = routeLocalAi(text, ctx, persona, ai);
+      if (direct) return put(direct);
+      const st = useLocalAi.getState().status;
+      if (st.state !== "ready") {
+        void ensureLocalAi();
+        const q = localReply(text, ctx, persona, new Date(), salt, null);
+        const note = st.state === "downloading" ? `(downloading my brain: ${Math.round(st.progress * 100)}%, real chat soon)`
+          : st.state === "error" ? "(my AI brain crashed, quick replies for now)" : "(booting my brain, gimme a sec)";
+        return put({ ...q, text: `${q.text}|${note}` });
+      }
+      setBusy(true);
+      setStreaming("");
+      try {
+        const hist = withMine.filter((m) => m.status !== "error").slice(-8).map((m) => ({ role: m.from === "you" ? ("user" as const) : ("assistant" as const), content: m.from === "wolf" ? bubbles(m.text).join("\n") : m.text }));
+        const first = hist.findIndex((m) => m.role === "user");
+        const out = await generateLocal([{ role: "system", content: localSystemPrompt(persona, buildAiContext(text, ctx, { compact: true })) }, ...hist.slice(first)], (t) => setStreaming(cleanLocal(t)));
+        let final = cleanLocal(out) || "...|Brain lag|Say that again?";
+        if (crossesLine(final)) final = deflectLine(persona);
+        await put({ text: final, via: "local-ai", status: "done", intent: "chat" });
+      } catch (e) {
+        const q = localReply(text, ctx, persona, new Date(), salt, null);
+        await put({ ...q, text: `${q.text}|(my AI brain glitched: ${e instanceof Error ? e.message : String(e)})`, status: "error" });
+      } finally { setBusy(false); setStreaming(null); }
       return;
     }
     setBusy(true);
@@ -156,13 +213,14 @@ export function useWolfChat() {
     } catch (e) {
       await save([...withMine, { id: newId("m"), from: "wolf", at: new Date().toISOString(), text: `Connection's dead|${e instanceof Error ? e.message : String(e)}|Local mode still works tho`, via: "claude", status: "error" }]);
     } finally { setBusy(false); setStreaming(null); }
-  }, [ctx, busy, profileId, save, useClaude, persona, ai, updateSettings]);
+  }, [ctx, busy, profileId, save, brain, persona, ai, updateSettings]);
 
   const clear = useCallback(async () => { await kvSet(chatKey(profileId), []); greeted.current = false; }, [profileId]);
 
   return {
     ready: !!ctx, messages, streaming, busy, ask, open, clear, hasPing,
-    ai, useClaude, setUseClaude: (v: boolean) => updateSettings({ aiChat: v }),
+    ai, useClaude, brain, brainPref: settings.chatBrain, setBrain: (b: Brain) => updateSettings({ chatBrain: b }),
+    localAi, startLocalAi: () => void ensureLocalAi(), deleteLocalAi,
     persona, setPersona: (p: Partial<Persona>) => updateSettings({ ...(p.relationship ? { companionRelationship: p.relationship } : {}), ...(p.callsYou !== undefined ? { companionCallsYou: p.callsYou.slice(0, 24) } : {}) }),
     youName: profile?.name ?? "You",
   };

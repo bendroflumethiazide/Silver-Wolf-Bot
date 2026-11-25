@@ -164,7 +164,9 @@ test("Silver Wolf full chat answers from data and admits gaps", async ({ page })
   await expect(page.getByText(/not inventing mechanics/)).toBeVisible();
   await expect(page.getByText(/Don't make a game if you don't know how to/)).toBeVisible();
   await page.getByRole("button", { name: "Chat settings" }).click();
-  await expect(page.getByRole("radio", { name: "Claude" })).toBeDisabled(); // no API key in tests
+  await expect(page.getByLabel("Her brain").locator('option[value="claude"]')).toHaveAttribute("disabled", ""); // no API key in tests
+  await expect(page.getByText(/Using now: (quick replies|built-in AI)/)).toBeVisible();
+  await expect(page.getByText(/Built-in AI \(Qwen3 1.7B\)/)).toBeVisible();
 });
 
 test("phone chat: floating button, small talk, family settings, history persists", async ({ page }) => {

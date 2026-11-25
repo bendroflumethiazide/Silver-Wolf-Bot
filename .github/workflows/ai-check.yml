@@ -1,0 +1,33 @@
+name: Built-in AI check
+
+# Downloads a real model and chats with it in Chromium using software WebGPU (no GPU on runners).
+# Run from the Actions tab. "models" can list several WebLLM model ids, comma-separated.
+on:
+  workflow_dispatch:
+    inputs:
+      models:
+        description: Model ids to test
+        default: SmolLM2-360M-Instruct-q4f32_1-MLC
+        required: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: corepack enable && corepack prepare pnpm@10.28.0 --activate
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+      - run: node scripts/prepare-desktop.mjs
+      - name: Chat with the built-in AI
+        run: pnpm exec playwright test --project local-ai --trace off
+        env:
+          E2E_LOCAL_AI: "1"
+          E2E_LOCAL_AI_MODELS: ${{ inputs.models }}

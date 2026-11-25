@@ -6,6 +6,7 @@ import { loadActiveGameData } from "./gamedata/source";
 import type { GameData } from "./gamedata/types";
 import type { Profile } from "./types";
 import type { Relationship } from "./companion/casual";
+import type { Brain } from "./ai/brain";
 
 export type Server = "America" | "Europe" | "Asia" | "TW/HK/MO";
 /** Server UTC offsets in hours (daily reset is 04:00 server time). */
@@ -19,7 +20,10 @@ export interface Settings {
   cacheImages: boolean;
   enkaEnabled: boolean;
   hoyolabEnabled: boolean;
-  aiChat: boolean;
+  /** Which brain answers in the chat. Auto = Claude if a key is set, else the built-in AI, else quick replies. */
+  chatBrain: Brain;
+  /** Check GitHub for a newer desktop version on launch. */
+  updateCheck: boolean;
   companionRelationship: Relationship;
   companionCallsYou: string;
   reducedMotion: boolean;
@@ -37,7 +41,8 @@ export const DEFAULT_SETTINGS: Settings = {
   cacheImages: true,
   enkaEnabled: false,
   hoyolabEnabled: false,
-  aiChat: false,
+  chatBrain: "auto",
+  updateCheck: true,
   companionRelationship: "little-sister",
   companionCallsYou: "",
   reducedMotion: false,

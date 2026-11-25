@@ -173,7 +173,8 @@ export function casualFallback(p: Persona, now = new Date(), salt = 0): string {
 /** Asking for "Claude", "real chat", "talk like a human"... */
 export const AI_REQUEST = /\b(claude|ai (mode|chat)|real (chat|convo|conversation|talk)|talk (like|as) an? (human|person|real person|npc)|talk normally|actually (talk|chat))\b/i;
 
-export function aiSetupLine(p: Persona, configured: boolean): string {
+export function aiSetupLine(p: Persona, configured: boolean, onLocalAi = false): string {
+  if (!configured && onLocalAi) return "Already on my built-in brain, runs right on ur PC|Wanna upgrade me to Claude? Needs an Anthropic API key|Settings → Desktop app → paste it, I'll switch myself";
   if (configured) return pick(["Say less|Switched to Claude mode|Now I can actually talk", "Ok ok|Claude mode on|Go ahead, say anything"], "ai-on", p.relationship);
   return "Rn I only do quick replies|Wanna actually talk? I need an Anthropic API key|Get one at console.anthropic.com (it's pay-as-u-go, few cents a chat)|Then Settings → Desktop app → paste it|Then tap ⚙ in here → Claude";
 }

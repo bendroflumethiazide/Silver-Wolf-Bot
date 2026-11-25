@@ -28,9 +28,9 @@ export default function TerminalPage() {
         <ChatComposer chat={chat} chips="all" />
       </div>
       <div className="mt-3">
-        {chat.useClaude
-          ? <Notice>Claude mode: your message plus a compact facts block (roster, pity, resources, build grades; never your UID or name) goes to the Claude API from this app&apos;s local server.</Notice>
-          : <Notice>Local mode: she answers from data on this device and does small talk offline. {chat.ai?.configured ? "Switch to Claude in the chat settings (gear) for free-form conversation." : "Add an Anthropic API key in Settings for free-form conversation."}</Notice>}
+        {chat.brain === "claude" ? <Notice>Claude mode: your message plus a compact facts block (roster, pity, resources, build grades; never your UID or name) goes to the Claude API from this app&apos;s local server.</Notice>
+          : chat.brain === "local-ai" ? <Notice>Built-in AI: she runs on this PC&apos;s graphics card, so nothing you type leaves your computer. Account questions (builds, pulls, what to do) are answered straight from your data.</Notice>
+          : <Notice>Quick replies: she answers from data on this device and does simple small talk. {chat.localAi.state === "unsupported" ? "This PC can't run the built-in AI." : "Pick Auto or Built-in AI in the chat settings (gear) for real conversation."}</Notice>}
       </div>
     </div>
   );

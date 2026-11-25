@@ -217,7 +217,9 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
  * Compact facts block for the Claude-powered chat. Deliberately minimal: no UID, no nickname, no
  * signature, no notes — only numbers and names the answer may need.
  */
-export function buildAiContext(raw: string, ctx: TerminalContext): string {
+/** Compact facts for the AI. `compact` keeps it small enough for the built-in model's short memory. */
+export function buildAiContext(raw: string, ctx: TerminalContext, opts: { compact?: boolean } = {}): string {
+  const lim = opts.compact ? { roster: 12, builds: 4, objectives: 3, events: 2, max: 2200 } : { roster: 60, builds: 99, objectives: 6, events: 5, max: 15000 };
   const name = (id: string) => (ctx.game?.characters[id] ? characterDisplayName(ctx.game.characters[id]) : `Character ${id}`);
   const r = ctx.profile.resources ?? {};
   const lines: string[] = [];
@@ -228,17 +230,17 @@ export function buildAiContext(raw: string, ctx: TerminalContext): string {
     lines.push(`${POOLS[k].label}: ${pityKnown(p) ? `pity ${p.pity}/${POOLS[k].five.hard}` : "pity not entered"}${POOLS[k].fiveFeaturedChance !== null && pityKnown(p) ? (p.guaranteed ? ", next 5★ guaranteed featured" : ", 50/50 not guaranteed") : ""}`);
   }
   lines.push(`Characters owned: ${ctx.summary.owned}/${ctx.summary.totalPlayable}`);
-  const chars = ctx.characters.slice(0, 60).map((c) => {
+  const chars = ctx.characters.slice(0, lim.roster).map((c) => {
     const g = ctx.game?.characters[c.charId];
     return `${name(c.charId)} (${g ? `${g.rarity}★ ${g.path} ${g.element}` : "?"}) Lv${c.level} E${c.eidolon} skills ${c.skills.basic}/${c.skills.skill}/${c.skills.ult}/${c.skills.talent}`;
   });
   if (chars.length) lines.push(`Roster: ${chars.join("; ")}`);
-  for (const b of ctx.builds ?? []) lines.push(`Build rating ${b.name}: ${b.grade} (${b.score.toFixed(1)}/100), ${b.equipped}/6 relics. Lacks: ${b.lacks.slice(0, 4).join("; ") || "nothing flagged"}`);
+  for (const b of (ctx.builds ?? []).slice(0, lim.builds)) lines.push(`Build rating ${b.name}: ${b.grade} (${b.score.toFixed(1)}/100), ${b.equipped}/6 relics. Lacks: ${b.lacks.slice(0, 4).join("; ") || "nothing flagged"}`);
   lines.push(`Achievements tracked complete: ${ctx.summary.achievementsDone}/${ctx.summary.achievementsTotal}; map markers complete: ${ctx.summary.markersDone}/${ctx.summary.markersTotal}`);
-  for (const o of ctx.summary.objectives.slice(0, 6)) lines.push(`Objective: ${o.title} — ${o.reason}`);
+  for (const o of ctx.summary.objectives.slice(0, lim.objectives)) lines.push(`Objective: ${o.title} — ${o.reason}`);
   const now = ctx.now ?? Date.now();
-  for (const e of ctx.events.filter((e) => e.end && !e.permanent && Date.parse(e.end) > now).slice(0, 5)) lines.push(`Event (${e.status}): ${e.name}, ends ${e.end}, ${e.completion}`);
+  for (const e of ctx.events.filter((e) => e.end && !e.permanent && Date.parse(e.end) > now).slice(0, lim.events)) lines.push(`Event (${e.status}): ${e.name}, ends ${e.end}, ${e.completion}`);
   const local = answer(raw, ctx);
   if (local.intent !== "unknown" && local.intent !== "help") lines.push(`Local lookup (${local.intent}): ${local.facts.join(" | ")}`);
-  return lines.join("\n").slice(0, 15000);
+  return lines.join("\n").slice(0, lim.max);
 }
