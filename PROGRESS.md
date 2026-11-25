@@ -1,0 +1,35 @@
+# Development progress log
+
+## 2026-11-25 · Session 1 (Phases 1–8 foundation)
+
+### Decisions confirmed with you
+- Keep code in a GitHub repo you create (name pending; local commits until then).
+- Game data downloaded on demand from StarRailRes; nothing bundled.
+- IndexedDB-only storage.
+- Enka.Network showcase sync built, opt-in.
+- Companion is **Silver Wolf** (replaces Pom-Pom), commenting everywhere in her voice.
+
+### Completed
+- Research: StarRailRes format and coverage (v4.7.0), HSR Scanner v4 format, UIGF v4/SRGF v1, Enka API rules.
+- Warp engine: published rules, calibrated soft-pity model, exact DP planner, seeded simulator, Monte Carlo, history/pity/50-50 analysis.
+- Relic engine: stat vocabulary, roll tables derived from game data, per-character scoring profiles with templates, potential projection.
+- Materials engine: ascension + trace costs from game tables; original/enhanced kit separation (bug found and fixed on real data: 10 characters would have had doubled costs).
+- Importers with keyed diff, manual-entry conflict protection, undo log and rollback; backup/restore/delete.
+- All 19 navigation areas plus Import Center and Dev Status, functional with empty/loading/error states.
+- Silver Wolf: data-grounded commentary on every page; local retrieval terminal with facts and sources.
+- Docs 01–10.
+
+### Verified against real data
+- Silver Wolf Lv 80 base stats in-app: HP 1048 / ATK 640 / DEF 461 / SPD 107, and Incessant Rain Lv 80: 1058 / 582 / 463. These match the in-game values.
+- Game-data download of 25 files (~5 MB) through the browser with validation: 99 character entries (94 playable), 172 Light Cones, 64 relic sets, 1,993 achievements.
+
+### Test results
+- `pnpm typecheck`: pass · `pnpm lint`: pass · `pnpm build`: pass (25 routes)
+- `pnpm test`: **70/70 passed** (12 files)
+- `pnpm test:e2e`: **9/9 passed** (desktop + mobile), stable over repeated runs
+
+### Known limitations
+See docs/08-roadmap.md → "Cannot currently be implemented".
+
+### Next
+See docs/08-roadmap.md → "Next tasks".
