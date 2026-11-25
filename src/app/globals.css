@@ -1,26 +1,146 @@
 @import "tailwindcss";
 
+/* Astral Companion — Silver Wolf terminal theme. Dark-only by design (in-game aesthetic). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --void: #05050b;
+  --night: #0b0a18;
+  --panel: rgba(18, 16, 36, 0.66);
+  --panel-strong: rgba(24, 21, 48, 0.88);
+  --line: rgba(167, 139, 250, 0.16);
+  --line-strong: rgba(167, 139, 250, 0.36);
+  --text: #e7e6f3;
+  --muted: #9b98b8;
+  --faint: #6c6990;
+  --violet: #a78bfa;
+  --violet-deep: #6d28d9;
+  --cyan: #5ee6f0;
+  --magenta: #f472b6;
+  --gold: #e9c46a;
+  --purple4: #b38cff;
+  --silver: #cfd4e3;
+  --ok: #5eead4;
+  --warn: #fbbf24;
+  --bad: #fb7185;
+  color-scheme: dark;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-void: var(--void);
+  --color-night: var(--night);
+  --color-panel: var(--panel);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-violet: var(--violet);
+  --color-cyan: var(--cyan);
+  --color-magenta: var(--magenta);
+  --color-gold: var(--gold);
+  --color-silver: var(--silver);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html, body { background: var(--void); color: var(--text); }
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, rgba(109, 40, 217, 0.22), transparent 60%),
+    radial-gradient(900px 500px at -10% 110%, rgba(94, 230, 240, 0.10), transparent 60%),
+    var(--void);
+  background-attachment: fixed;
 }
+
+/* Starfield: two layers of tiny dots. */
+.starfield::before, .starfield::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  background-image:
+    radial-gradient(1px 1px at 20px 30px, rgba(255,255,255,.55), transparent 50%),
+    radial-gradient(1px 1px at 140px 80px, rgba(207,212,227,.45), transparent 50%),
+    radial-gradient(1px 1px at 260px 160px, rgba(167,139,250,.55), transparent 50%),
+    radial-gradient(1.5px 1.5px at 330px 40px, rgba(94,230,240,.5), transparent 50%),
+    radial-gradient(1px 1px at 400px 220px, rgba(255,255,255,.4), transparent 50%);
+  background-size: 420px 260px;
+  opacity: .55;
+}
+.starfield::after { background-size: 640px 420px; opacity: .3; transform: translate(90px, 60px); }
+
+/* Scanlines + pixel grid overlay (Silver Wolf's holo-screens). */
+.scanlines::after {
+  content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 60;
+  background: repeating-linear-gradient(to bottom, rgba(255,255,255,0.018) 0 1px, transparent 1px 3px);
+  mix-blend-mode: overlay;
+}
+
+.glass {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+  border-radius: 14px;
+}
+.glass-strong { background: var(--panel-strong); border: 1px solid var(--line-strong); border-radius: 14px; }
+
+/* HUD corner brackets */
+.hud { position: relative; }
+.hud::before, .hud::after {
+  content: ""; position: absolute; width: 12px; height: 12px; pointer-events: none;
+  border-color: var(--cyan); opacity: .55;
+}
+.hud::before { top: -1px; left: -1px; border-top: 2px solid; border-left: 2px solid; border-top-left-radius: 6px; }
+.hud::after { bottom: -1px; right: -1px; border-bottom: 2px solid; border-right: 2px solid; border-bottom-right-radius: 6px; }
+
+.pixel-grid {
+  background-image:
+    linear-gradient(rgba(167,139,250,.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(167,139,250,.06) 1px, transparent 1px);
+  background-size: 8px 8px;
+}
+
+.text-gradient {
+  background: linear-gradient(90deg, var(--silver), var(--violet) 45%, var(--cyan));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* Glitch heading: chromatic offset that twitches occasionally. */
+.glitch { position: relative; display: inline-block; }
+.glitch::before, .glitch::after {
+  content: attr(data-text); position: absolute; inset: 0; pointer-events: none;
+  clip-path: inset(0 0 0 0); opacity: 0;
+}
+.glitch::before { color: var(--magenta); transform: translate(1px, 0); animation: glitch-a 6s infinite steps(1); }
+.glitch::after { color: var(--cyan); transform: translate(-1px, 0); animation: glitch-b 6s infinite steps(1); }
+@keyframes glitch-a { 0%, 92%, 100% { opacity: 0; } 93% { opacity: .8; clip-path: inset(10% 0 60% 0); } 95% { opacity: .8; clip-path: inset(55% 0 20% 0); } }
+@keyframes glitch-b { 0%, 93%, 100% { opacity: 0; } 94% { opacity: .8; clip-path: inset(40% 0 35% 0); } 96% { opacity: .8; clip-path: inset(5% 0 80% 0); } }
+
+.caret::after { content: "▍"; margin-left: 2px; color: var(--cyan); animation: blink 1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+
+.rarity-5 { --r: var(--gold); }
+.rarity-4 { --r: var(--purple4); }
+.rarity-3 { --r: #6aa7ff; }
+.rarity-2 { --r: #6fd19b; }
+.rarity-border { box-shadow: inset 0 -3px 0 var(--r, var(--line)); }
+
+::selection { background: rgba(167, 139, 250, 0.35); }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; border-radius: 6px; }
+* { scrollbar-width: thin; scrollbar-color: rgba(167,139,250,.35) transparent; }
+
+input, select, textarea {
+  background: rgba(10, 9, 22, 0.7); border: 1px solid var(--line); border-radius: 10px;
+  padding: 0.45rem 0.65rem; color: var(--text); font-size: 0.875rem; min-width: 0;
+}
+input:focus, select:focus, textarea:focus { outline: none; border-color: var(--violet); box-shadow: 0 0 0 3px rgba(167,139,250,.15); }
+input[type="checkbox"], input[type="radio"] { padding: 0; width: 1rem; height: 1rem; accent-color: var(--violet); }
+input[type="range"] { padding: 0; accent-color: var(--violet); }
+
+@media (prefers-reduced-motion: reduce) {
+  .glitch::before, .glitch::after, .caret::after { animation: none; }
+  * { scroll-behavior: auto !important; }
+}
+html[data-reduced-motion="true"] .glitch::before,
+html[data-reduced-motion="true"] .glitch::after { animation: none; }

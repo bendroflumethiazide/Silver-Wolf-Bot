@@ -33,7 +33,7 @@ export interface Profile {
     music?: number;
   };
   /** Values the user entered for dashboard widgets. */
-  resources?: { stellarJade?: number; specialPasses?: number; starRailPasses?: number; undyingStarlight?: number; trailblazePower?: number };
+  resources?: { stellarJade?: number; specialPasses?: number; starRailPasses?: number; undyingStarlight?: number; trailblazePower?: number; trailblazePowerRecordedAt?: number };
   source: DataSource;
   syncedAt?: string;
   createdAt: string;
