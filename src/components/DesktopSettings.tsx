@@ -1,15 +1,10 @@
 "use client";
 
-import { FolderOpen, KeyRound } from "lucide-react";
+import { FolderOpen, KeyRound, RefreshCw } from "lucide-react";
+import { type DesktopBridge, useUpdate } from "@/lib/desktop";
+import { useApp } from "@/lib/store";
 import { useEffect, useState } from "react";
 import { Badge, Button, ErrorBox, Field, Notice, Panel } from "./ui";
-
-interface DesktopBridge {
-  status: () => Promise<{ version: string; encryptionAvailable: boolean; anthropic: boolean; hoyolab: boolean; dataPath: string }>;
-  setSecrets: (v: { anthropicKey?: string; hoyolabLtuid?: string; hoyolabLtoken?: string }) => Promise<boolean>;
-  openDataFolder: () => Promise<string>;
-}
-declare global { interface Window { astralDesktop?: DesktopBridge } }
 
 /** Only shown in the desktop app: store the Claude key / HoYoLAB cookies in the OS keychain. */
 export function DesktopSettings() {
@@ -58,8 +53,34 @@ export function DesktopSettings() {
           </div>
         </div>
       </div>
+      <UpdatesSection />
       {busy && <p className="mt-3 text-xs text-muted">Restarting…</p>}
       {err && <div className="mt-3"><ErrorBox>{err}</ErrorBox></div>}
     </Panel>
+  );
+}
+
+function UpdatesSection() {
+  const { info, phase, progress, error, check, install } = useUpdate();
+  const auto = useApp((s) => s.settings.updateCheck);
+  const updateSettings = useApp((s) => s.updateSettings);
+  const busy = phase === "checking" || phase === "downloading" || phase === "installing";
+  return (
+    <div className="mt-5 border-t border-line pt-4">
+      <h3 className="mb-2 text-sm font-semibold">Updates</h3>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => void check()}><RefreshCw size={14} /> Check for updates</Button>
+        {phase === "checking" && <span className="text-xs text-muted">Checking…</span>}
+        {info && !info.newer && phase === "idle" && <Badge tone="ok">Up to date (v{info.current})</Badge>}
+        {info?.newer && <Button size="sm" variant="primary" disabled={busy} onClick={() => void install()}>{info.canInstall ? `Update to v${info.latest}` : `Download v${info.latest}`}</Button>}
+        {phase === "downloading" && <span className="font-mono text-xs text-muted">{Math.round(progress * 100)}%</span>}
+        {phase === "installing" && <span className="text-xs text-muted">Installing… the app restarts by itself.</span>}
+      </div>
+      <label className="mt-2 flex items-center gap-2 text-xs text-muted">
+        <input type="checkbox" checked={auto} onChange={(e) => updateSettings({ updateCheck: e.target.checked })} />
+        Check for updates when the app starts (asks GitHub for the latest release; nothing about you is sent)
+      </label>
+      {error && <p className="mt-2 text-xs text-bad">{error}</p>}
+    </div>
   );
 }

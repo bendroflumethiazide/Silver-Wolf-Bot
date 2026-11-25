@@ -9,7 +9,7 @@ Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHE
 | Area | Highlights |
 | --- | --- |
 | Express Terminal | Customisable dashboard, objectives derived from your data, resources, server-aware daily/weekly reset countdowns |
-| Silver Wolf | Texts you on every page in short Messages-style bursts built from your real numbers (a "data" toggle shows the facts behind each line). A **phone button (bottom right)** opens a chat with her: small talk, "what should I do today?", build ratings, pull advice. Choose whether she's your little sister, big sister or daughter and what she calls you. Answers locally, or through Claude if you add an API key |
+| Silver Wolf | Texts you on every page in short Messages-style bursts built from your real numbers (a "data" toggle shows the facts behind each line). A **phone button (bottom right)** opens a chat with her: small talk, "what should I do today?", build ratings, pull advice. Choose whether she's your little sister, big sister or daughter and what she calls you. **Real conversation with no setup**: a small AI model runs on your PC (downloads itself once, about 1 GB, then works offline); add an Anthropic key and she switches to Claude. Account answers always come straight from your data |
 | Build ratings | Total stats, a D→WTF (−/+) grade for every relic and for the whole build, what it lacks, her recommended build, and saved guide builds checked against your gear |
 | Account | Multiple profiles; read-only sync from Enka.Network (public showcase, UID only) and the HoYoLAB Battle Chronicle (stats, Trailblaze Power, daily progress, Memory of Chaos / Pure Fiction / Apocalyptic Shadow); connector capability registry |
 | Archives | 94 characters, 172 Light Cones, 64 relic sets from game data; stats at any level; abilities; traces (original and enhanced kits); Eidolons |
@@ -31,6 +31,8 @@ Download from the repository's **Releases** page:
 - `Silver-Wolf-Bot-<version>-portable.exe`: no install, just double-click.
 
 The builds are not code-signed, so Windows SmartScreen may say "Windows protected your PC": choose **More info → Run anyway**.
+
+**Updates:** the app checks GitHub when it starts and shows a banner when a newer version is out. Press **Update** and it downloads the installer, checks its SHA-256 against GitHub's, installs silently and reopens. (The portable exe opens the download page instead.) Turn the check off in **Settings → Desktop app → Updates**.
 
 Your data lives in `%APPDATA%\silver-wolf-bot` and survives updates. In the app, **Settings → Desktop app** stores your Anthropic API key and HoYoLAB cookies encrypted with Windows' own data protection (they're never shown to the page again), and opens the data folder. The app runs its own small server on `127.0.0.1:47923`, reachable only from your PC; links to other sites open in your normal browser.
 
@@ -81,12 +83,12 @@ pnpm build && pnpm test:e2e
 
 (`test:e2e` runs against the same standalone server the desktop app ships.)
 
-- **Unit tests (Vitest):** 90 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity storage, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping, build grading and total stats, Claude route (mocked SDK), HoYoLAB connector (mocked fetch), Silver Wolf small talk and family settings, same-origin and loopback-only API guards.
-- **End-to-end (Playwright):** 10 scenarios on desktop and mobile, using a synthetic dataset (no HoYoverse content in the repo).
+- **Unit tests (Vitest):** 106 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity storage, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping, build grading and total stats, Claude route (mocked SDK), HoYoLAB connector (mocked fetch), Silver Wolf small talk and family settings, same-origin and loopback-only API guards, chat brain routing and safety rules, updater (version compare, URL allow-list, checksum).
+- **End-to-end (Playwright):** 10 scenarios on desktop and mobile, using a synthetic dataset (no HoYoverse content in the repo). The **Built-in AI check** workflow downloads a real model and chats with it using software WebGPU.
 
 ## Privacy in one paragraph
 
-Everything lives in IndexedDB on your machine (the app window's storage in the desktop app). The app never asks for a HoYoverse password and never automates the game; the only secrets it keeps are the optional API key and HoYoLAB cookies you give it (encrypted by the OS in the desktop app). It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com), **Fetch showcase** (enka.network, UID only), **Sync from HoYoLAB** (cookies kept by the local server, never sent to the page), and Claude chat (api.anthropic.com). **Open Warp Tracker** opens starrailstation.com in your browser. The syncs are off by default and Claude needs your key. Backup, restore, and "delete all personal data" are in Settings.
+Everything lives in IndexedDB on your machine (the app window's storage in the desktop app). The app never asks for a HoYoverse password and never automates the game; the only secrets it keeps are the optional API key and HoYoLAB cookies you give it (encrypted by the OS in the desktop app). It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com), **Fetch showcase** (enka.network, UID only), **Sync from HoYoLAB** (cookies kept by the local server, never sent to the page), and Claude chat (api.anthropic.com). **Open Warp Tracker** opens starrailstation.com in your browser. The built-in AI downloads its model once from huggingface.co and then runs entirely on your PC. The desktop app asks api.github.com for the latest release on launch (can be turned off). The syncs are off by default and Claude needs your key. Backup, restore, and "delete all personal data" are in Settings.
 
 ## Documentation
 

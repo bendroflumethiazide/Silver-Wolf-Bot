@@ -6,7 +6,8 @@
  * HoYoLAB cookies) are encrypted with the OS keychain via safeStorage and handed to the server as
  * environment variables. They are never exposed to the web page.
  */
-const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, safeStorage, shell, Menu, net: electronNet } = require("electron");
+const updater = require("./updater.cjs");
 const { spawn } = require("node:child_process");
 const fs = require("node:fs");
 const net = require("node:net");
@@ -227,6 +228,56 @@ ipcMain.handle("desktop:setSecrets", async (e, values) => {
   await waitForServer();
   setTimeout(() => win && win.reload(), 100);
   return true;
+});
+
+// ---------------------------------------------------------------- updates
+
+// The portable exe and Linux AppImage can't replace themselves; they get the releases page instead.
+const isPortable = !!process.env.PORTABLE_EXECUTABLE_FILE;
+const canSelfInstall = process.platform === "win32" && app.isPackaged && !isPortable;
+let lastRelease = null;
+let installing = false;
+
+ipcMain.handle("desktop:checkUpdate", async (e) => {
+  if (!fromApp(e)) throw new Error("denied");
+  const r = await updater.fetchLatest((u, o) => electronNet.fetch(u, o));
+  lastRelease = r;
+  return {
+    current: app.getVersion(),
+    latest: r.version,
+    newer: updater.isNewer(r.version, app.getVersion()),
+    notes: r.notes,
+    url: r.url,
+    canInstall: canSelfInstall && !!(r.setup && r.setup.sha256),
+    portable: isPortable,
+  };
+});
+
+ipcMain.handle("desktop:installUpdate", async (e) => {
+  if (!fromApp(e)) throw new Error("denied");
+  if (!canSelfInstall) throw new Error("This copy can't update itself. Download the new version from the releases page.");
+  if (installing) throw new Error("Already updating.");
+  const r = lastRelease || (await updater.fetchLatest((u, o) => electronNet.fetch(u, o)));
+  if (!updater.isNewer(r.version, app.getVersion())) throw new Error("You're already on the latest version.");
+  installing = true;
+  try {
+    const dir = path.join(app.getPath("temp"), "silver-wolf-bot-update");
+    const file = await updater.downloadVerified((u, o) => electronNet.fetch(u, o), r.setup, dir, (p) => { if (!e.sender.isDestroyed()) e.sender.send("desktop:updateProgress", p); });
+    note(`installing update ${r.version} from ${file}`);
+    // Silent install over the current one, then the installer starts the new version.
+    spawn(file, ["/S", "--updated", "--force-run"], { detached: true, stdio: "ignore", windowsHide: true }).unref();
+    setTimeout(() => app.quit(), 400);
+    return true;
+  } catch (err) {
+    installing = false;
+    throw err;
+  }
+});
+
+ipcMain.handle("desktop:openReleasePage", (e) => {
+  if (!fromApp(e)) throw new Error("denied");
+  const url = lastRelease && updater.safeReleaseUrl(lastRelease.url) ? lastRelease.url : updater.RELEASES_PAGE;
+  return shell.openExternal(url);
 });
 
 ipcMain.handle("desktop:openDataFolder", (e) => {

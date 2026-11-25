@@ -13,6 +13,8 @@
 | Prydwen, Star Rail Station, HoYoLAB map | Site content, not licensed for reuse | Not scraped or copied |
 | E2E fixtures | Synthetic data written for tests | Invented names and numbers only |
 | npm dependencies | MIT / Apache-2.0 / ISC | Standard |
+| WebLLM (`@mlc-ai/web-llm`) | Apache-2.0 | npm dependency; runs the built-in AI |
+| Qwen3 1.7B (MLC build) | Apache-2.0 (Alibaba Qwen team; MLC conversion by mlc-ai) | Not bundled; downloaded by the app from Hugging Face on first use |
 
 ## Decisions that need you
 

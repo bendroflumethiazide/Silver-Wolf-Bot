@@ -11,8 +11,8 @@ Live status: the in-app **Dev Status** page (`/status`, source `src/lib/status.t
 | 5 Warp Observatory | Star Rail Station tracker button, your pity per pool, planner, simulator, banners | Done (history tracking handed to Star Rail Station at your request) |
 | 6 Optimisation | Relic scoring + best-in-slot, team builder + optimizer, materials calculator + farming plan | Done (rule-based) |
 | 7 Encyclopedia | Bosses, enemies, NPCs, lore, modes, SU, story, events | Done as codex + game-data directories |
-| 8 Silver Wolf AI | Texting voice, local retrieval terminal, phone chat with family small talk, Claude chat, build ratings | Done (Claude needs your API key) |
-| 9 Refinement | Notifications (in-app), responsive, tests, desktop app | Windows/Linux desktop app done (Electron); PWA offline shell, OS notifications and a macOS build pending |
+| 8 Silver Wolf AI | Texting voice, local retrieval terminal, phone chat with family small talk, built-in on-device AI, Claude chat, build ratings | Done (built-in AI needs a WebGPU-capable GPU; Claude needs your key) |
+| 9 Refinement | Notifications (in-app), responsive, tests, desktop app, updates | Windows/Linux desktop app with one-click updates done; PWA offline shell, OS notifications and a macOS build pending |
 
 ## Cannot currently be implemented (and why)
 

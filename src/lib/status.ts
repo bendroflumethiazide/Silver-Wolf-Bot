@@ -20,6 +20,8 @@ export const FEATURES: FeatureStatus[] = [
   { area: "Silver Wolf", feature: "Build ratings D → WTF with −/+, lacks, recommended builds", status: "tested", note: "Stat engine matched an in-game screenshot within rounding" },
   { area: "Silver Wolf", feature: "Phone chat (bottom-right button): small talk, daily plan, build/pull advice", status: "tested" },
   { area: "Silver Wolf", feature: "Family relationship setting (little sister, big sister, daughter) and nickname", status: "tested", note: "Strictly familial in local lines and in the Claude prompt" },
+  { area: "Silver Wolf", feature: "Built-in AI chat on your PC (Qwen3 1.7B via WebGPU), no setup", status: "tested", note: "Routing and safety unit-tested; real model chat checked in CI with software WebGPU" },
+  { area: "Silver Wolf", feature: "Auto brain: Claude if a key is set, else built-in AI, else quick replies", status: "tested" },
   { area: "Account", feature: "Manual profile, resources, multi-account", status: "implemented" },
   { area: "Account", feature: "Enka.Network public showcase sync", status: "implemented", note: "Fixture-tested; live host blocked in the dev sandbox" },
   { area: "Account", feature: "HoYoLAB Battle Chronicle sync (stats, real-time note, MoC/PF/AS)", status: "implemented", note: "Fixture-tested; live HoYoLAB blocked in dev sandbox; unofficial endpoints" },
@@ -52,6 +54,7 @@ export const FEATURES: FeatureStatus[] = [
   { area: "Log", feature: "OS desktop notifications", status: "planned" },
   { area: "Desktop", feature: "Windows / Linux desktop app (Electron, local server on 127.0.0.1)", status: "tested", note: "Packaged build smoke-tested; macOS build needs a Mac" },
   { area: "Desktop", feature: "API key and HoYoLAB cookies stored with OS encryption (safeStorage)", status: "tested" },
-  { area: "Desktop", feature: "Windows installer built by GitHub Actions", status: "implemented", note: "Runs on a Windows runner once the repository exists" },
+  { area: "Desktop", feature: "Windows installer built by GitHub Actions, server smoke-tested on Windows", status: "tested" },
+  { area: "Desktop", feature: "Update check on launch + one-click update (checksum-verified)", status: "tested", note: "Portable exe and Linux open the download page instead" },
   { area: "Simulated Universe", feature: "Blessings, Curios, Occurrences + collection tracking", status: "implemented" },
 ];
