@@ -29,7 +29,9 @@ jobs:
         env:
           NEXT_TELEMETRY_DISABLED: "1"
       - name: Package (installer + portable)
-        run: pnpm exec electron-builder --win nsis portable --x64 --publish never -c.win.signAndEditExecutable=true
+        shell: bash
+        # On Windows the exe's icon and version info can be embedded (no code signing certificate is used).
+        run: pnpm exec electron-builder --win nsis portable --x64 --publish never --config.win.signAndEditExecutable=true
       - uses: actions/upload-artifact@v4
         with:
           name: silver-wolf-bot-windows
