@@ -1,6 +1,6 @@
 import Dexie, { type Table } from "dexie";
 import type {
-  AchievementProgress, AppNotification, BannerEntry, EndgameRecord, EventEntry, ImportHistoryEntry,
+  AchievementProgress, AppNotification, CodexEntry, BannerEntry, EndgameRecord, EventEntry, ImportHistoryEntry,
   JournalNote, MapMarker, MapZone, OwnedCharacter, OwnedLightCone, Profile, Relic, Team,
 } from "./types";
 import type { WarpRecord } from "./warp/history";
@@ -58,6 +58,7 @@ export class AstralDB extends Dexie {
   importHistory!: Table<ImportHistoryEntry, string>;
   notifications!: Table<AppNotification, string>;
   simSessions!: Table<SimSession, string>;
+  codex!: Table<CodexEntry, string>;
 
   constructor(name = "astral-companion") {
     super(name);
@@ -83,13 +84,14 @@ export class AstralDB extends Dexie {
       notifications: "id, createdAt, read, dedupe",
       simSessions: "id, createdAt",
     });
+    this.version(2).stores({ codex: "id, kind, name, updatedAt" });
   }
 }
 
 /** Personal tables included in backups and in "delete all personal data". */
 export const PERSONAL_TABLES = [
   "kv", "profiles", "characters", "lightCones", "relics", "warps", "materials", "relicProfiles", "teams", "notes",
-  "achievements", "mapZones", "mapMarkers", "endgame", "banners", "events", "importHistory", "notifications", "simSessions",
+  "achievements", "mapZones", "mapMarkers", "endgame", "banners", "events", "importHistory", "notifications", "simSessions", "codex",
 ] as const;
 export type PersonalTable = (typeof PERSONAL_TABLES)[number];
 

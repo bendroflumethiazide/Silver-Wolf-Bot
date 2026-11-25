@@ -302,7 +302,7 @@ function EndgameForm({ initial, onClose }: { initial: EndgameRecord; onClose: ()
 function Inner() {
   const { game } = useApp();
   const params = useSearchParams();
-  const [tab, setTab] = useState<Tab>("builder");
+  const [tab, setTab] = useState<Tab>(() => (["builder", "saved", "optimizer", "endgame"].includes(params.get("tab") ?? "") ? (params.get("tab") as Tab) : "builder"));
   const [editing, setEditing] = useState<Team | undefined>();
   if (!game) return (<><PageHeader title="Builds & Teams" /><WolfComment comment={noGameData()} /></>);
   return (

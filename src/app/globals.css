@@ -144,3 +144,11 @@ input[type="range"] { padding: 0; accent-color: var(--violet); }
 }
 html[data-reduced-motion="true"] .glitch::before,
 html[data-reduced-motion="true"] .glitch::after { animation: none; }
+
+/* Rendered Markdown (journal, codex) */
+.prose-sw h3 { font-size: 1.05rem; font-weight: 600; margin: .6em 0 .3em; color: var(--text); }
+.prose-sw h4, .prose-sw h5 { font-weight: 600; margin: .5em 0 .25em; color: var(--text); }
+.prose-sw p { margin: .35em 0; }
+.prose-sw ul { list-style: disc; padding-left: 1.2em; } .prose-sw ol { list-style: decimal; padding-left: 1.2em; }
+.prose-sw a { color: var(--cyan); text-decoration: underline; }
+.prose-sw code { font-family: var(--font-mono); background: rgba(255,255,255,.06); padding: 0 .3em; border-radius: 4px; }

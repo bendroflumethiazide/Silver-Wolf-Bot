@@ -117,6 +117,8 @@ export interface JournalNote {
   favorite: boolean;
   links: { type: "character" | "lightcone" | "relicSet" | "team" | "zone" | "event" | "warp" | "achievement"; id: string; label: string }[];
   remindAt?: string;
+  /** Small attachments stored inline as data URLs (kept in backups). */
+  attachments?: { name: string; type: string; dataUrl: string }[];
   createdAt: string;
   updatedAt: string;
 }
@@ -238,4 +240,22 @@ export interface AppNotification {
   read: boolean;
   /** De-duplication key so periodic checks do not repeat a notification. */
   dedupe?: string;
+}
+
+export type CodexKind = "boss" | "enemy" | "npc" | "lore" | "mission" | "mode";
+/** Knowledge entries the user records from official sources (no licensed feed exists for these). */
+export interface CodexEntry {
+  id: string;
+  kind: CodexKind;
+  name: string;
+  /** Free-form structured fields, e.g. weaknesses, location, rewards, reset schedule. */
+  fields: Record<string, string>;
+  body: string;
+  status: InfoStatus | "fan-theory";
+  sourceUrl?: string;
+  progress?: ProgressStatus;
+  spoiler?: boolean;
+  version?: string;
+  createdAt: string;
+  updatedAt: string;
 }

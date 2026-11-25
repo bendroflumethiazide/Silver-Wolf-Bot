@@ -105,3 +105,11 @@ describe("account summary", () => {
     expect(s.objectives.map((o) => o.id)).toEqual(["data", "ev-e"]);
   });
 });
+
+import { renderMarkdown } from "../markdown";
+describe("markdown", () => {
+  it("escapes HTML and renders a safe subset", () => {
+    expect(renderMarkdown("<script>x</script>")).toBe("<p>&lt;script&gt;x&lt;/script&gt;</p>");
+    expect(renderMarkdown("# T\n- **a**\n- [x] done\n\n[l](https://x.y) [bad](javascript:alert(1))")).toBe('<h3>T</h3><ul><li><strong>a</strong></li><li>☑ done</li></ul><p><a href="https://x.y" target="_blank" rel="noreferrer noopener">l</a> [bad](javascript:alert(1))</p>');
+  });
+});

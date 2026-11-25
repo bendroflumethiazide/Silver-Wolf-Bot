@@ -28,7 +28,7 @@ export const FILES: Record<string, keyof GameData> = {
   light_cone_promotions: "lightConePromotions", relic_sets: "relicSets", relics: "relics",
   relic_main_affixes: "relicMainAffixes", relic_sub_affixes: "relicSubAffixes", items: "items",
   achievements: "achievements", simulated_blessings: "blessings", simulated_curios: "curios",
-  simulated_events: "simEvents", nickname: "nicknames", descriptions: "descriptions",
+  simulated_events: "simEvents", nickname: "nicknames", descriptions: "descriptions", avatars: "contacts",
 };
 
 const Info = z.object({ version: z.string(), timestamp: z.number(), folder: z.string().optional() });
@@ -142,7 +142,7 @@ export async function loadActiveGameData(): Promise<GameData | null> {
 
 export async function listSnapshots() {
   const rows = await getDb().gameSnapshots.orderBy("downloadedAt").reverse().toArray();
-  return rows.map(({ files: _f, ...meta }) => meta);
+  return rows.map((r) => { const { files, ...meta } = r; void files; return meta; });
 }
 
 export async function activateSnapshot(id: string) {

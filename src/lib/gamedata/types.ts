@@ -63,6 +63,8 @@ export interface GameData {
   simEvents: Record<string, SrrSimEvent>;
   nicknames: { characters?: Record<string, string[]> };
   descriptions: Record<string, SrrDescription>;
+  /** In-game Messages contacts (NPC names and portraits). */
+  contacts: Record<string, { id: string; name: string; icon: string }>;
 }
 
 /** Display names of internal Path ids. */

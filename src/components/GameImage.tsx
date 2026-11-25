@@ -54,6 +54,5 @@ export function GameImage({ path, alt, className, fallback, rounded = "rounded-l
       </div>
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={cx("object-cover", rounded, className)} />;
 }

@@ -60,7 +60,7 @@ export function WolfComment({ comment, className }: { comment: Comment | null; c
       <div className="min-w-0 flex-1">
         <div className="mb-0.5 flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.2em] text-faint">
           <span className="text-violet">Silver Wolf</span>
-          <span>// {MOOD_TAG[comment.mood]}</span>
+          <span>{`// ${MOOD_TAG[comment.mood]}`}</span>
         </div>
         <p className={cx("text-sm leading-relaxed text-text", typed.length < comment.line.length && "caret")}>{typed}</p>
         {mode === "full" && (
