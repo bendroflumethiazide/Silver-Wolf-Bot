@@ -17,6 +17,8 @@ export interface Settings {
   language: string;
   cacheImages: boolean;
   enkaEnabled: boolean;
+  hoyolabEnabled: boolean;
+  aiChat: boolean;
   reducedMotion: boolean;
   sidebarCollapsed: boolean;
   hiddenNav: string[];
@@ -31,6 +33,8 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "en",
   cacheImages: true,
   enkaEnabled: false,
+  hoyolabEnabled: false,
+  aiChat: false,
   reducedMotion: false,
   sidebarCollapsed: false,
   hiddenNav: [],

@@ -24,8 +24,12 @@ export interface TerminalContext {
   materialNeeds: MaterialTotals | null;
   inventory: Record<string, number>;
   codex: { kind: string; name: string; body: string; sourceUrl?: string }[];
+  /** Build ratings for owned characters with relics (see lib/builds). */
+  builds?: BuildSummary[];
   now?: number;
 }
+
+export interface BuildSummary { charId: string; name: string; grade: string; score: number; lacks: string[]; best?: string; equipped: number }
 
 export interface TerminalAnswer {
   line: string;
@@ -48,6 +52,7 @@ export const SUGGESTIONS = [
   "Which achievements am I closest to?",
   "What am I missing on the map?",
   "What events are expiring?",
+  "Rate my builds",
 ];
 
 export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
@@ -62,6 +67,26 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
       line: "Yo|I read ur save data and tell u what's broken|Only stuff that's actually on disk. no guessing|Ask me something",
       facts: [`Local mode: answers come from this device's database${ctx.game ? ` and game data v${ctx.game.version}` : ""}.`],
       sources: ["Local database"], links: [], };
+  }
+
+  if (has(q, "rate", "rating", "grade") || (has(q, "build") && (ctx.builds ?? []).some((b) => q.includes(b.name.toLowerCase())))) {
+    const builds = ctx.builds ?? [];
+    const one = builds.find((b) => q.includes(b.name.toLowerCase()));
+    if (one) return {
+      intent: "rate",
+      line: `${one.name}: ${one.grade}|${one.best ? `${one.best} is carrying` : "Nothing's carrying tbh"}|${one.lacks[0] ?? "No notes"}${one.lacks[1] ? `|Also ${one.lacks[1].charAt(0).toLowerCase()}${one.lacks[1].slice(1)}` : ""}`,
+      facts: [`${one.name}: ${one.grade} (${one.score.toFixed(1)}/100), ${one.equipped}/6 relics.`, ...one.lacks.map((l) => `Lacks: ${l}`)],
+      sources: ["Your relics", "Character scoring profile", "Game data stat tables"],
+      links: [{ label: `Open ${one.name}`, href: `/characters/${one.charId}` }],
+    };
+    if (!builds.length) return { intent: "rate", line: "Nothing to rate|No one has relics equipped in my data|Import a scan first", facts: [], sources: [], links: [{ label: "Import Center", href: "/import" }] };
+    const sorted = [...builds].sort((a, b) => b.score - a.score);
+    return {
+      intent: "rate",
+      line: `Best: ${sorted[0].name} (${sorted[0].grade})|Worst: ${sorted[sorted.length - 1].name} (${sorted[sorted.length - 1].grade})|Fix the bottom one first`,
+      facts: sorted.map((b) => `${b.name}: ${b.grade} (${b.score.toFixed(1)})`), sources: ["Your relics", "Character scoring profiles"],
+      links: [{ label: `Open ${sorted[sorted.length - 1].name}`, href: `/characters/${sorted[sorted.length - 1].charId}` }],
+    };
   }
 
   if (has(q, "pull", "afford", "jade", "save", "how many warp")) {
@@ -173,4 +198,34 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
     line: "What r u even talkin abt|I can't answer that from ur data|Try one of the buttons",
     facts: [], sources: [], links: [],
   };
+}
+
+/**
+ * Compact facts block for the Claude-powered chat. Deliberately minimal: no UID, no nickname, no
+ * signature, no notes — only numbers and names the answer may need.
+ */
+export function buildAiContext(raw: string, ctx: TerminalContext): string {
+  const name = (id: string) => (ctx.game?.characters[id] ? characterDisplayName(ctx.game.characters[id]) : `Character ${id}`);
+  const r = ctx.profile.resources ?? {};
+  const lines: string[] = [];
+  lines.push(`Game data version: ${ctx.game?.version ?? "not downloaded"}`);
+  lines.push(`Resources (user-entered): Stellar Jade ${r.stellarJade ?? "unknown"}, Special Passes ${r.specialPasses ?? "unknown"}, Star Rail Passes ${r.starRailPasses ?? "unknown"}, Undying Starlight ${r.undyingStarlight ?? "unknown"}, Trailblaze Power ${r.trailblazePower ?? "unknown"}`);
+  for (const k of ["character", "lightcone", "standard"] as const) {
+    const p = ctx.summary.pools[k];
+    lines.push(`${POOLS[k].label}: ${p.total} pulls recorded, pity ${p.pity5}/${POOLS[k].five.hard}${POOLS[k].fiveFeaturedChance !== null ? (p.guaranteed5 ? ", next 5★ guaranteed featured" : ", 50/50 not guaranteed") : ""}${p.historyComplete ? "" : ", history may be incomplete"}`);
+  }
+  lines.push(`Characters owned: ${ctx.summary.owned}/${ctx.summary.totalPlayable}`);
+  const chars = ctx.characters.slice(0, 60).map((c) => {
+    const g = ctx.game?.characters[c.charId];
+    return `${name(c.charId)} (${g ? `${g.rarity}★ ${g.path} ${g.element}` : "?"}) Lv${c.level} E${c.eidolon} skills ${c.skills.basic}/${c.skills.skill}/${c.skills.ult}/${c.skills.talent}`;
+  });
+  if (chars.length) lines.push(`Roster: ${chars.join("; ")}`);
+  for (const b of ctx.builds ?? []) lines.push(`Build rating ${b.name}: ${b.grade} (${b.score.toFixed(1)}/100), ${b.equipped}/6 relics. Lacks: ${b.lacks.slice(0, 4).join("; ") || "nothing flagged"}`);
+  lines.push(`Achievements tracked complete: ${ctx.summary.achievementsDone}/${ctx.summary.achievementsTotal}; map markers complete: ${ctx.summary.markersDone}/${ctx.summary.markersTotal}`);
+  for (const o of ctx.summary.objectives.slice(0, 6)) lines.push(`Objective: ${o.title} — ${o.reason}`);
+  const now = ctx.now ?? Date.now();
+  for (const e of ctx.events.filter((e) => e.end && !e.permanent && Date.parse(e.end) > now).slice(0, 5)) lines.push(`Event (${e.status}): ${e.name}, ends ${e.end}, ${e.completion}`);
+  const local = answer(raw, ctx);
+  if (local.intent !== "unknown" && local.intent !== "help") lines.push(`Local lookup (${local.intent}): ${local.facts.join(" | ")}`);
+  return lines.join("\n").slice(0, 15000);
 }
