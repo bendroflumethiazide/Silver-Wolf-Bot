@@ -4,7 +4,7 @@ import { summarizeAccount } from "../summary";
 
 const base = (): TerminalContext => ({
   game: null,
-  summary: summarizeAccount({ game: null, characters: [], lightCones: [], relics: [], warps: [], offsets: {}, achievements: [], markers: [], banners: [], events: [], relicProfiles: {} }),
+  summary: summarizeAccount({ game: null, characters: [], lightCones: [], relics: [], achievements: [], markers: [], banners: [], events: [], relicProfiles: {} }),
   profile: { id: "p", name: "T", source: "manual", createdAt: "", updatedAt: "", resources: { stellarJade: 16000, specialPasses: 80, undyingStarlight: 0 } },
   characters: [], events: [], zones: [], markers: [], materialNeeds: null, inventory: {}, codex: [],
 });
@@ -19,7 +19,7 @@ describe("Silver Wolf terminal", () => {
   });
   it("admits missing data instead of inventing it", () => {
     expect(answer("how do I beat the final boss", base()).line).toMatch(/not inventing/);
-    expect(answer("what's my pity", base()).line).toMatch(/No warp history/);
+    expect(answer("what's my pity", base()).line).toMatch(/I don.t know ur pity/);
     expect(answer("blorp zorp", base()).intent).toBe("unknown");
     expect(answer("which character should I build next", base()).line).toMatch(/haven't told me/);
   });

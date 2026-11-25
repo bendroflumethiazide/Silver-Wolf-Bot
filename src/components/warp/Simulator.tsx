@@ -11,8 +11,7 @@ import { getDb, newId, nowIso } from "@/lib/db";
 import { characterDisplayName } from "@/lib/gamedata/types";
 import { useApp } from "@/lib/store";
 import { playableCharacters } from "@/lib/summary";
-import { STANDARD_5STAR_IDS } from "@/lib/warp/history";
-import { POOLS, type PoolKind } from "@/lib/warp/rules";
+import { POOLS, STANDARD_5STAR_IDS, type PoolKind } from "@/lib/warp/rules";
 import { createRng, INITIAL_SIM_STATE, monteCarlo, simulatePulls, type SimBanner, type SimItem, type SimPull } from "@/lib/warp/simulator";
 
 const SIM_POOLS: PoolKind[] = ["character", "lightcone", "standard"];

@@ -78,7 +78,7 @@ describe("AI context", () => {
   it("contains the needed numbers but no UID, nickname or signature", () => {
     const s = buildAiContext("rate my builds", {
       game: null,
-      summary: summarizeAccount({ game: null, characters: [], lightCones: [], relics: [], warps: [], offsets: {}, achievements: [], markers: [], banners: [], events: [], relicProfiles: {} }),
+      summary: summarizeAccount({ game: null, characters: [], lightCones: [], relics: [], achievements: [], markers: [], banners: [], events: [], relicProfiles: {} }),
       profile: { id: "p", name: "SecretName", uid: "812345678", signature: "my sig", source: "manual", createdAt: "", updatedAt: "", resources: { stellarJade: 3200 } },
       characters: [], events: [], zones: [], markers: [], materialNeeds: null, inventory: {}, codex: [],
       builds: [{ charId: "1006", name: "Silver Wolf", grade: "SS-", score: 56.2, lacks: ["Feet is only B"], equipped: 6 }],

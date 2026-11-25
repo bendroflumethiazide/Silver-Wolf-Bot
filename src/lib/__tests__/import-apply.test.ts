@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getDb } from "../db";
 import { parseHsrScanner } from "../importers/hsrScanner";
-import { applyScanPlan, applyWarpImport, planScan, rollbackImport } from "../importers/apply";
+import { applyScanPlan, planScan, rollbackImport } from "../importers/apply";
 import { createBackup, deleteAllPersonalData, restoreBackup, validateBackup } from "../backup";
 
 const scan = (level: number, relicLevel: number) => ({
@@ -59,12 +59,6 @@ describe("scan import → apply → rollback", () => {
     expect(await getDb().relics.count()).toBe(0);
   });
 
-  it("warp import can be rolled back", async () => {
-    const r = await applyWarpImport([{ id: "1", profileId: "p", pool: "character", gachaType: "11", name: "x", itemType: "", rank: 3, time: "2026-01-01 00:00:00", source: "uigf" }], "uigf");
-    expect(await getDb().warps.count()).toBe(1);
-    await rollbackImport(r.historyId);
-    expect(await getDb().warps.count()).toBe(0);
-  });
 });
 
 describe("backup", () => {

@@ -162,11 +162,11 @@ export default function AccountPage() {
             <Stat label="Light Cones" value={summary?.lightConesOwned ?? "—"} hint={st?.lightCones !== undefined ? `${st.lightCones} per showcase (verified)` : "tracked here"} />
             <Stat label="Achievements" value={st?.achievements ?? summary?.achievementsDone ?? "—"} hint={st?.achievements !== undefined ? "verified count" : "manually tracked"} tone="gold" />
             <Stat label="Map objectives" value={summary ? `${summary.markersDone}/${summary.markersTotal}` : "—"} hint="manual map tracking" />
-            <Stat label="Warps logged" value={summary ? summary.pools.character.total + summary.pools.lightcone.total + summary.pools.standard.total : "—"} />
+            <Stat label="Character pity" value={summary && summary.pity.character.updatedAt ? `${summary.pity.character.pity}/90` : "—"} hint="entered on the Warp page" />
             <Stat label="Last sync" value={profile.syncedAt ? new Date(profile.syncedAt).toLocaleDateString() : "never"} />
           </div>
           <div className="mt-3 flex flex-wrap gap-3 text-xs">
-            <Link href="/characters" className="text-cyan hover:underline">Collection →</Link><Link href="/warp" className="text-cyan hover:underline">Warp history →</Link>
+            <Link href="/characters" className="text-cyan hover:underline">Collection →</Link><a href="https://starrailstation.com/en/warp#import" target="_blank" rel="noreferrer noopener" className="text-cyan hover:underline">Warp history (Star Rail Station) ↗</a>
             <Link href="/achievements" className="text-cyan hover:underline">Achievements →</Link><Link href="/teams?tab=endgame" className="text-cyan hover:underline">Endgame records →</Link>
           </div>
         </Panel>

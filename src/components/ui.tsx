@@ -51,6 +51,19 @@ export function Button({ variant = "subtle", size = "md", className, ...p }: Btn
   );
 }
 
+/** A button-styled link that opens an external site (system browser in the desktop app). */
+export function ExternalButton({ href, children, variant = "primary", size = "md", className }: { href: string; children: ReactNode; variant?: "primary" | "subtle"; size?: "sm" | "md"; className?: string }) {
+  return (
+    <a href={href} target="_blank" rel="noreferrer noopener"
+      className={cx("inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition",
+        size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-2 text-sm",
+        variant === "primary" ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-[0_0_20px_rgba(167,139,250,.35)] hover:brightness-110" : "border border-line bg-white/5 text-text hover:border-violet/50 hover:bg-white/10",
+        className)}>
+      {children}
+    </a>
+  );
+}
+
 export function Badge({ children, tone = "default", className, title }: { children: ReactNode; tone?: "default" | "gold" | "violet" | "cyan" | "ok" | "warn" | "bad"; className?: string; title?: string }) {
   return (
     <span

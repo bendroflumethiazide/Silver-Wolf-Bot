@@ -1,15 +1,13 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
 import { useEffect, useMemo, useState } from "react";
 import { Area, AreaChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { WolfComment } from "@/components/SilverWolf";
 import { Button, ErrorBox, Field, NumberInput, Panel, Stat } from "@/components/ui";
 import { plannerComment } from "@/lib/companion/comments";
-import { getDb } from "@/lib/db";
-import { useOffsets, useProfile } from "@/lib/hooks";
+import { usePity, useProfile } from "@/lib/hooks";
 import { useApp } from "@/lib/store";
-import { DEFAULT_OFFSET, summarizePool } from "@/lib/warp/history";
+import { pityKnown, type PityPool } from "@/lib/warp/pity";
 import { planWarps } from "@/lib/warp/planner";
 import { targetDistribution } from "@/lib/warp/probability";
 import { POOLS, type PoolKind } from "@/lib/warp/rules";
@@ -20,7 +18,7 @@ const PLANNABLE: PoolKind[] = ["character", "lightcone", "standard", "collab-cha
 export function WarpPlanner() {
   const { profileId } = useApp();
   const profile = useProfile();
-  const offsets = useOffsets(profileId);
+  const saved = usePity(profileId);
   const [pool, setPool] = useState<PoolKind>("character");
   const [jade, setJade] = useState(0);
   const [passes, setPasses] = useState(0);
@@ -32,7 +30,6 @@ export function WarpPlanner() {
   const [copies, setCopies] = useState(1);
   const [mc, setMc] = useState<MonteCarloResult | null>(null);
   const [loadedFrom, setLoadedFrom] = useState<string | null>(null);
-  const records = useLiveQuery(() => getDb().warps.where({ profileId, pool }).toArray(), [profileId, pool]);
   const hard = POOLS[pool].five.hard;
 
   useEffect(() => {
@@ -43,13 +40,15 @@ export function WarpPlanner() {
     setStarlight(r.undyingStarlight ?? 0);
   }, [profile?.id, pool]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const useHistory = () => {
-    if (!records) return;
-    const s = summarizePool(pool, records, offsets[pool] ?? DEFAULT_OFFSET);
-    setPity(s.pity5);
-    setGuaranteed(s.guaranteed5);
-    setLoadedFrom(`${s.total} recorded pulls${s.historyComplete ? "" : " (history may be incomplete)"}`);
+  const savedFor = (pool === "character" || pool === "lightcone" || pool === "standard") ? saved[pool as PityPool] : null;
+  const applySaved = () => {
+    if (!savedFor) return;
+    setPity(savedFor.pity);
+    setGuaranteed(savedFor.guaranteed);
+    setLoadedFrom(pityKnown(savedFor) ? `your saved pity (${new Date(savedFor.updatedAt!).toLocaleDateString()})` : "defaults (no pity saved yet)");
   };
+  // Start from the saved pity whenever the target pool changes.
+  useEffect(() => { applySaved(); }, [pool, savedFor?.updatedAt]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const result = useMemo(() => {
     try {
@@ -86,7 +85,7 @@ export function WarpPlanner() {
             <Field label={`Current pity (0–${hard - 1})`}><NumberInput min={0} max={hard - 1} value={pity} onChange={setPity} /></Field>
             <label className="mt-5 flex items-center gap-2 text-sm"><input type="checkbox" checked={guaranteed} disabled={POOLS[pool].fiveFeaturedChance === null} onChange={(e) => setGuaranteed(e.target.checked)} /> Guaranteed</label>
           </div>
-          <Button size="sm" className="mt-3" onClick={useHistory} disabled={!records?.length}>Use pity from my Warp history</Button>
+          <Button size="sm" className="mt-3" onClick={applySaved} disabled={!savedFor}>Reset to my saved pity</Button>
           {loadedFrom && <p className="mt-1 text-[11px] text-muted">Loaded from {loadedFrom}.</p>}
           <p className="mt-2 text-[11px] text-faint">Jade, passes and Starlight are prefilled from the Resources widget on the Express Terminal.</p>
         </Panel>

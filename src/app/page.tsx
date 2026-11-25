@@ -16,6 +16,8 @@ import type { AccountSummary } from "@/lib/summary";
 import { nextDailyReset, nextWeeklyReset, trailblazePowerAt } from "@/lib/time";
 import { pullsFromResources } from "@/lib/warp/planner";
 import { POOLS } from "@/lib/warp/rules";
+import { pityKnown } from "@/lib/warp/pity";
+import { WarpTrackerButton } from "@/components/warp/Pity";
 
 type WidgetId = "objectives" | "account" | "warp" | "resources" | "resets" | "timeline";
 const WIDGETS: { id: WidgetId; title: string }[] = [
@@ -55,7 +57,7 @@ function AccountStats({ s }: { s: AccountSummary }) {
       <Stat label="Light Cones" value={s.lightConesOwned} hint={s.lightConesTotal ? `${s.lightConesTotal} in database` : undefined} />
       <Stat label="Achievements" value={`${s.achievementsDone}/${s.achievementsTotal || "—"}`} hint="manually tracked" />
       <Stat label="Map markers" value={`${s.markersDone}/${s.markersTotal}`} hint="manually tracked" />
-      <Stat label="Warps logged" value={s.pools.character.total + s.pools.lightcone.total + s.pools.standard.total} />
+      <Stat label="Character pity" value={pityKnown(s.pity.character) ? `${s.pity.character.pity}/90` : "—"} hint={s.pity.character.guaranteed ? "guaranteed" : "entered by you"} />
     </div>
   );
 }
@@ -64,22 +66,25 @@ function WarpStatus({ s }: { s: AccountSummary }) {
   return (
     <div className="space-y-3">
       {(["character", "lightcone", "standard"] as const).map((k) => {
-        const p = s.pools[k];
+        const p = s.pity[k];
         const hard = POOLS[k].five.hard;
         return (
           <div key={k}>
             <div className="mb-1 flex items-center justify-between gap-2 text-sm">
               <span className="truncate text-muted">{POOLS[k].label}</span>
               <span className="flex items-center gap-2 font-mono text-xs">
-                {p.total ? <>{p.pity5}/{hard}</> : <span className="text-faint">no data</span>}
-                {p.guaranteed5 && <Badge tone="gold">guaranteed</Badge>}
+                {pityKnown(p) ? <>{p.pity}/{hard}</> : <span className="text-faint">not entered</span>}
+                {p.guaranteed && <Badge tone="gold">guaranteed</Badge>}
               </span>
             </div>
-            <Progress value={p.pity5} max={hard} tone={p.pity5 >= POOLS[k].five.softStart ? "gold" : "violet"} label={`${POOLS[k].label} pity`} />
+            <Progress value={p.pity} max={hard} tone={p.pity >= POOLS[k].five.softStart ? "gold" : "violet"} label={`${POOLS[k].label} pity`} />
           </div>
         );
       })}
-      <Link href="/warp" className="inline-block text-xs text-cyan hover:underline">Open Warp Observatory →</Link>
+      <div className="flex flex-wrap items-center gap-3">
+        <WarpTrackerButton size="sm" />
+        <Link href="/warp" className="text-xs text-cyan hover:underline">Update pity / plan pulls →</Link>
+      </div>
     </div>
   );
 }

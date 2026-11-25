@@ -172,3 +172,15 @@ export function nextHitDistribution(r: RarityPity, pity: number): number[] {
   }
   return d;
 }
+
+/**
+ * Standard (Stellar Warp) 5★ pool. Used by the simulator for off-banner results.
+ * Source: in-game Stellar Warp details (game 1.0 – 4.7).
+ */
+export const STANDARD_5STAR_IDS = new Set([
+  "1003", "1004", "1101", "1104", "1107", "1209", "1211", // Himeko, Welt, Bronya, Gepard, Clara, Yanqing, Bailu
+  "23000", "23002", "23003", "23004", "23005", "23012", "23013", // standard 5★ Light Cones
+]);
+
+/** External Warp tracker (history import, pity, statistics). */
+export const WARP_TRACKER_URL = "https://starrailstation.com/en/warp#import";

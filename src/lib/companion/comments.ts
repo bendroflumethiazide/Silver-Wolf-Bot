@@ -1,6 +1,6 @@
 import { fill, pick, SW, type Comment, type Mood } from "./voice";
-import { POOLS, type PoolKind } from "../warp/rules";
-import type { PoolSummary } from "../warp/history";
+import { POOLS, WARP_TRACKER_URL, type PoolKind } from "../warp/rules";
+import { pityKnown, type PityPool, type PityState } from "../warp/pity";
 import type { PlannerResult } from "../warp/planner";
 import type { RelicScore } from "../relics/scoring";
 import type { AccountSummary } from "../summary";
@@ -19,19 +19,17 @@ export const emptyPersonal = (what: string, href: string, label: string): Commen
 export const unsourced = (module: string): Comment =>
   say("neutral", SW.unsourced, `unsourced-${module}`, {}, [`${module}: no verified or permitted data source is connected. Entries are manual.`]);
 
-export function warpPoolComment(s: PoolSummary): Comment {
-  const rules = POOLS[s.pool];
-  const facts = [
-    `${rules.label}: pity ${s.pity5}/${rules.five.hard}, ${s.total} pulls recorded.`,
-  ];
-  if (rules.fiveFeaturedChance !== null) facts.push(s.guaranteed5 ? "Next 5★ is guaranteed featured." : `Next 5★: ${rules.fiveFeaturedChance * 100}% featured.`);
-  if (!s.historyComplete) facts.push("History may be incomplete (pulls before the first record are unknown).");
-  if (s.total === 0) return say("bored", SW.historyEmpty, "hist-empty", {}, facts, { label: "Import Warp history", href: "/import" });
-  const vars = { pity: s.pity5, rate: pct(rules.five.base), chance: (rules.fiveFeaturedChance ?? 1) * 100 };
-  if (s.guaranteed5) return say("smug", SW.guaranteed, `g-${s.pool}`, vars, facts);
-  if (s.pity5 >= rules.five.softStart) return say("hyped", SW.pitySoft, `soft-${s.pool}-${s.pity5}`, vars, facts);
-  if (s.pity5 >= 20) return say("neutral", SW.pityMid, `mid-${s.pool}-${s.pity5}`, vars, facts);
-  return say("neutral", SW.pityLow, `low-${s.pool}-${s.pity5}`, vars, facts);
+/** Silver Wolf on the pity you entered for one pool. */
+export function pityComment(pool: PityPool, st: PityState): Comment {
+  const rules = POOLS[pool];
+  const facts = [`${rules.label}: pity ${st.pity}/${rules.five.hard} (entered by you${st.updatedAt ? `, ${new Date(st.updatedAt).toLocaleDateString()}` : ""}).`];
+  if (rules.fiveFeaturedChance !== null) facts.push(st.guaranteed ? "Next 5★ is guaranteed featured." : `Next 5★: ${rules.fiveFeaturedChance * 100}% featured.`);
+  if (!pityKnown(st)) return say("bored", SW.historyEmpty, "pity-unknown", {}, ["No pity entered yet."], { label: "Open Star Rail Station", href: WARP_TRACKER_URL });
+  const vars = { pity: st.pity, rate: pct(rules.five.base), chance: (rules.fiveFeaturedChance ?? 1) * 100 };
+  if (st.guaranteed) return say("smug", SW.guaranteed, `g-${pool}`, vars, facts);
+  if (st.pity >= rules.five.softStart) return say("hyped", SW.pitySoft, `soft-${pool}-${st.pity}`, vars, facts);
+  if (st.pity >= 20) return say("neutral", SW.pityMid, `mid-${pool}-${st.pity}`, vars, facts);
+  return say("neutral", SW.pityLow, `low-${pool}-${st.pity}`, vars, facts);
 }
 
 export function plannerComment(r: PlannerResult, pool: PoolKind): Comment {

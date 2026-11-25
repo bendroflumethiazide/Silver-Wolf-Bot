@@ -3,9 +3,8 @@ import { analyzeTeam, investment, suggestTeams } from "../teams";
 import { hasEnhancedKit, kitSkills, kitTrees, formatSkillDesc, type SrrCharacter } from "../gamedata/types";
 import { summarizeAccount } from "../summary";
 import { nextDailyReset, nextWeeklyReset, formatDuration, trailblazePowerAt } from "../time";
-import { characterDetailComment, plannerComment, warpPoolComment } from "../companion/comments";
+import { characterDetailComment, pityComment, plannerComment } from "../companion/comments";
 import { pick, fill } from "../companion/voice";
-import { summarizePool } from "../warp/history";
 import { planWarps } from "../warp/planner";
 
 const info = (id: string, path: string, element = "Fire") => ({ id, path, element, rarity: 5 });
@@ -76,12 +75,13 @@ describe("Silver Wolf commentary", () => {
     expect(fill("pity {pity} {x}", { pity: 3 })).toBe("pity 3 {x}");
   });
   it("speaks about the real pity number and guarantee", () => {
-    const s = { ...summarizePool("character", []), total: 80, pity5: 76 };
-    const c = warpPoolComment(s);
+    const c = pityComment("character", { pity: 76, guaranteed: false, updatedAt: "2026-11-25T00:00:00Z" });
     expect(c.line).toMatch(/76/);
     expect(c.facts[0]).toMatch(/pity 76\/90/);
-    const g = warpPoolComment({ ...s, guaranteed5: true });
+    const g = pityComment("character", { pity: 76, guaranteed: true, updatedAt: "2026-11-25T00:00:00Z" });
     expect(g.facts.join(" ")).toMatch(/guaranteed/);
+    const unknown = pityComment("character", { pity: 0, guaranteed: false });
+    expect(unknown.action?.href).toMatch(/starrailstation\.com/);
   });
   it("planner comment quotes the computed probability", () => {
     const r = planWarps({ pool: "character", stellarJade: 0, passes: 180, undyingStarlight: 0, expectedFutureJade: 0, expectedFuturePasses: 0, state: { pity: 0, guaranteed: false }, copies: 1 });
@@ -98,7 +98,7 @@ describe("account summary", () => {
   it("derives objectives only from provided data", () => {
     const now = Date.UTC(2026, 10, 25);
     const s = summarizeAccount({
-      game: null, characters: [], lightCones: [], relics: [], warps: [], offsets: {}, achievements: [], markers: [], banners: [],
+      game: null, characters: [], lightCones: [], relics: [], achievements: [], markers: [], banners: [],
       events: [{ id: "e", name: "Event X", version: "4.7", end: new Date(now + 2 * 86400_000).toISOString(), permanent: false, status: "official", completion: "in-progress", createdAt: "" }],
       relicProfiles: {}, now,
     });

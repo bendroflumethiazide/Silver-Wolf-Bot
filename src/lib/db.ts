@@ -3,7 +3,6 @@ import type {
   AchievementProgress, AppNotification, CodexEntry, BannerEntry, EndgameRecord, EventEntry, ImportHistoryEntry,
   JournalNote, MapMarker, MapZone, OwnedCharacter, OwnedLightCone, Profile, Relic, Team,
 } from "./types";
-import type { WarpRecord } from "./warp/history";
 import type { ScoringProfile } from "./relics/scoring";
 import type { SimPull, SimState } from "./warp/simulator";
 import type { PoolKind } from "./warp/rules";
@@ -23,7 +22,8 @@ export interface GameSnapshot {
   report: { warnings: string[]; counts: Record<string, number> };
 }
 
-export type WarpRow = WarpRecord & { key: string };
+/** Legacy table from the removed in-app Warp tracker; kept so existing data and backups still load. */
+export type WarpRow = { key: string; profileId: string; [k: string]: unknown };
 export interface MaterialStock { key: string; profileId: string; itemId: string; count: number; updatedAt: string }
 export interface RelicProfileRow { key: string; profileId: string; charId: string; profile: ScoringProfile }
 export interface SimSession {

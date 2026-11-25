@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { parseHsrScanner, relicFingerprint } from "../importers/hsrScanner";
-import { diffWarpRecords, parseCsv, parseWarpCsv, parseWarpJson, warpRecordsToCsv } from "../importers/warp";
 import { countDiff, diffByKey } from "../importers/diff";
 
 const scan = {
@@ -30,42 +29,6 @@ describe("HSR Scanner importer", () => {
   it("relic fingerprints ignore substat order", () => {
     const a = { setId: "1", slot: "HEAD" as const, rarity: 5 as const, level: 3, mainStat: "HP" as const, substats: [{ key: "SPD" as const, value: 2 }, { key: "CRIT Rate" as const, value: 3 }] };
     expect(relicFingerprint(a)).toBe(relicFingerprint({ ...a, substats: [...a.substats].reverse() }));
-  });
-});
-
-const item = (id: string, gt: string, rank: string, t = "2026-01-01 10:00:00") => ({ gacha_id: "2001", gacha_type: gt, item_id: "1308", count: "1", time: t, name: "Acheron", item_type: "Character", rank_type: rank, id });
-
-describe("warp importers", () => {
-  it("parses UIGF v4 hkrpg sections", () => {
-    const r = parseWarpJson({ info: { export_timestamp: 1, export_app: "x", export_app_version: "1", version: "v4.0" }, hkrpg: [{ uid: "1", timezone: 8, list: [item("1", "11", "5"), item("2", "12", "4"), item("3", "77", "3")] }] }, "p");
-    expect(r.format).toBe("uigf");
-    expect(r.accounts[0].records.map((x) => x.pool)).toEqual(["character", "lightcone"]);
-    expect(r.issues[0]).toMatch(/unknown gacha_type 77/);
-  });
-  it("parses SRGF v1", () => {
-    const r = parseWarpJson({ info: { uid: "1", lang: "en-us", srgf_version: "v1.0", region_time_zone: 8 }, list: [item("9", "1", "3")] }, "p");
-    expect(r.format).toBe("srgf");
-    expect(r.accounts[0].records[0].pool).toBe("standard");
-  });
-  it("rejects malformed times and unknown formats", () => {
-    expect(() => parseWarpJson({ nope: true }, "p")).toThrow(/neither UIGF v4/);
-    const r = parseWarpJson({ info: { uid: "1", srgf_version: "v1.0" }, list: [item("9", "1", "3")] }, "p");
-    expect(r.accounts[0].records).toHaveLength(1);
-  });
-  it("CSV round-trips and handles quoting", () => {
-    expect(parseCsv('a,"b,c","d""e"\r\n1,2,3')).toEqual([["a", "b,c", 'd"e'], ["1", "2", "3"]]);
-    const csv = parseWarpCsv("time,name,rank,gacha_type,id\n2026-01-01 00:00:00,\"Acheron, the\",5,11,123\n2026-13-01,bad,5,11,124\n", "p");
-    expect(csv.accounts[0].records).toHaveLength(1);
-    expect(csv.accounts[0].records[0].name).toBe("Acheron, the");
-    expect(csv.issues).toHaveLength(1);
-    const back = parseWarpCsv(warpRecordsToCsv(csv.accounts[0].records), "p");
-    expect(back.accounts[0].records[0]).toMatchObject({ id: "123", name: "Acheron, the", rank: 5 });
-  });
-  it("detects duplicate warp records", () => {
-    const a = parseWarpJson({ info: { uid: "1", srgf_version: "v1.0" }, list: [item("1", "11", "5"), item("2", "11", "3"), item("2", "11", "3")] }, "p").accounts[0].records;
-    const { fresh, duplicates } = diffWarpRecords(a.slice(0, 1), a);
-    expect(fresh.map((r) => r.id)).toEqual(["2"]);
-    expect(duplicates).toBe(2);
   });
 });
 

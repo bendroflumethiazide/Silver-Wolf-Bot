@@ -9,13 +9,12 @@ import { importComment } from "@/lib/companion/comments";
 import { fill, pick, SW } from "@/lib/companion/voice";
 import { getDb } from "@/lib/db";
 import { characterDisplayName } from "@/lib/gamedata/types";
-import { applyScanPlan, applyWarpImport, planScan, rollbackImport, type ScanPlan } from "@/lib/importers/apply";
+import { applyScanPlan, planScan, rollbackImport, type ScanPlan } from "@/lib/importers/apply";
 import { countDiff, type DiffRow } from "@/lib/importers/diff";
 import { parseHsrScanner, type ParsedScan } from "@/lib/importers/hsrScanner";
-import { diffWarpRecords, parseWarpCsv, parseWarpJson, type WarpImport } from "@/lib/importers/warp";
+import { WarpTrackerButton } from "@/components/warp/Pity";
 import { SLOT_LABEL } from "@/lib/relics/stats";
 import { useApp } from "@/lib/store";
-import { POOLS } from "@/lib/warp/rules";
 
 type Cat = "characters" | "lightCones" | "relics";
 const CAT_LABEL: Record<Cat, string> = { characters: "Characters", lightCones: "Light Cones", relics: "Relics" };
@@ -134,61 +133,13 @@ function ScannerImport() {
   );
 }
 
-function WarpImportPanel() {
-  const { profileId } = useApp();
-  const [file, setFile] = useState<string>();
-  const [data, setData] = useState<WarpImport | null>(null);
-  const [account, setAccount] = useState(0);
-  const [preview, setPreview] = useState<{ fresh: number; duplicates: number; byPool: Record<string, number> } | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-  const [done, setDone] = useState<string | null>(null);
-
-  const computePreview = async (d: WarpImport, idx: number) => {
-    const existing = await getDb().warps.where("profileId").equals(profileId).toArray();
-    const { fresh, duplicates } = diffWarpRecords(existing, d.accounts[idx].records);
-    const byPool: Record<string, number> = {};
-    for (const r of fresh) byPool[r.pool] = (byPool[r.pool] ?? 0) + 1;
-    setPreview({ fresh: fresh.length, duplicates, byPool });
-  };
-  const load = async (f: File) => {
-    setErr(null); setDone(null); setData(null); setPreview(null);
-    try {
-      const text = await f.text();
-      const d = f.name.toLowerCase().endsWith(".csv") ? parseWarpCsv(text, profileId) : parseWarpJson(JSON.parse(text), profileId);
-      setFile(f.name); setData(d); setAccount(0); await computePreview(d, 0);
-    } catch (e) { setErr(e instanceof SyntaxError ? "File is not valid JSON." : e instanceof Error ? e.message : String(e)); }
-  };
-  const apply = async () => {
-    if (!data) return;
-    const existing = await getDb().warps.where("profileId").equals(profileId).toArray();
-    const { fresh } = diffWarpRecords(existing, data.accounts[account].records);
-    const r = await applyWarpImport(fresh, data.format, file);
-    setDone(`${r.written} new Warp record(s) imported. Duplicates were skipped.`);
-    setData(null); setPreview(null);
-  };
-
+function WarpHistoryPanel() {
   return (
-    <Panel title="Warp history (UIGF v4 · SRGF v1 · CSV)">
-      <p className="mb-3 text-sm text-muted">Use a file exported by a gacha-log tool that supports the UIGF/SRGF standards. Records are matched by their game record id, so re-importing never creates duplicates. CSV needs the columns time, name, rank and gacha_type.</p>
-      {!data && <FilePick accept=".json,.csv,application/json,text/csv" onFile={load} label="Choose Warp file" />}
-      {err && <div className="mt-3"><ErrorBox>{err}</ErrorBox></div>}
-      {done && <div className="mt-3"><Notice tone="ok">{done}</Notice></div>}
-      {data && preview && (
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center gap-2 text-xs"><Badge tone="cyan">{data.format.toUpperCase()}</Badge><span className="text-muted">{file}</span></div>
-          {data.accounts.length > 1 && (
-            <select value={account} onChange={async (e) => { const i = Number(e.target.value); setAccount(i); await computePreview(data, i); }} aria-label="Account in file">
-              {data.accounts.map((a, i) => <option key={i} value={i}>UID {a.uid} · {a.records.length} records</option>)}
-            </select>
-          )}
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="New records" value={preview.fresh} tone="cyan" /><Stat label="Duplicates skipped" value={preview.duplicates} />
-            {Object.entries(preview.byPool).map(([k, v]) => <Stat key={k} label={POOLS[k as keyof typeof POOLS].label} value={v} />)}
-          </div>
-          {data.issues.length > 0 && <Notice tone="warn"><ul className="list-disc pl-4 text-xs">{data.issues.slice(0, 15).map((i) => <li key={i}>{i}</li>)}</ul></Notice>}
-          <div className="flex gap-2"><Button variant="primary" onClick={apply} disabled={!preview.fresh}>Import {preview.fresh} record(s)</Button><Button variant="ghost" onClick={() => setData(null)}>Cancel</Button></div>
-        </div>
-      )}
+    <Panel title="Warp history">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-xl text-sm text-muted">Warp history (UIGF/SRGF/CSV files or the in-game link) is imported on Star Rail Station, which tracks your pulls and pity. Copy your current pity into the Warp page afterwards.</p>
+        <WarpTrackerButton />
+      </div>
     </Panel>
   );
 }
@@ -226,7 +177,7 @@ export default function ImportPage() {
     <div className="space-y-5">
       <PageHeader title="Import Center" subtitle="Parse → validate → preview → detect duplicates and conflicts → approve → apply → report. Manual entries are never silently overwritten." />
       <ScannerImport />
-      <WarpImportPanel />
+      <WarpHistoryPanel />
       <Notice>Screenshot OCR inside the app is not implemented: in-browser OCR of HSR relic screens is unreliable without a trained model. HSR Scanner does this on your PC and exports a file this page imports.</Notice>
       <History />
     </div>

@@ -10,7 +10,8 @@ import { investment, suggestTeams } from "../teams";
 import type { AccountSummary } from "../summary";
 import type { EventEntry, MapMarker, MapZone, OwnedCharacter, Profile } from "../types";
 import { planWarps, pullsFromResources } from "../warp/planner";
-import { POOLS } from "../warp/rules";
+import { POOLS, WARP_TRACKER_URL } from "../warp/rules";
+import { pityKnown } from "../warp/pity";
 import { pick } from "./voice";
 
 export interface TerminalContext {
@@ -90,30 +91,30 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
   }
 
   if (has(q, "pull", "afford", "jade", "save", "how many warp")) {
-    const s = ctx.summary.pools.character;
-    const plan = planWarps({ pool: "character", stellarJade: r.stellarJade ?? 0, passes: r.specialPasses ?? 0, undyingStarlight: r.undyingStarlight ?? 0, expectedFutureJade: 0, expectedFuturePasses: 0, state: { pity: s.pity5, guaranteed: s.guaranteed5 }, copies: 1 });
+    const s = ctx.summary.pity.character;
+    const plan = planWarps({ pool: "character", stellarJade: r.stellarJade ?? 0, passes: r.specialPasses ?? 0, undyingStarlight: r.undyingStarlight ?? 0, expectedFutureJade: 0, expectedFuturePasses: 0, state: { pity: s.pity, guaranteed: s.guaranteed }, copies: 1 });
     return {
       intent: "pulls",
       line: eventPulls === 0
         ? "0 pulls?|Either ur broke or u didn't tell me ur jade|Fill in Resources on the home screen"
         : `${eventPulls} event pulls in the bank|From ur pity that's ${pct(plan.probability)} for the featured 5★|${plan.probability >= 1 ? "Guaranteed. just pull" : plan.probability >= 0.75 ? `Worst case is ${plan.worstCase}|If ur asking, u want it ;)` : `Worst case is ${plan.worstCase}|Save a bit more`}`,
-      facts: [`Stellar Jade ${r.stellarJade ?? 0} → ${Math.floor((r.stellarJade ?? 0) / 160)} pulls; Special Passes ${r.specialPasses ?? 0}; Undying Starlight ${r.undyingStarlight ?? 0} → ${Math.floor((r.undyingStarlight ?? 0) / 20)} pulls.`, `Character Warp pity ${s.pity5}${s.guaranteed5 ? ", guaranteed" : ""} (from ${s.total} recorded pulls).`, ...plan.assumptions.slice(0, 2)],
-      sources: ["Resources you entered", "Your Warp history", "Published Warp rules + community soft-pity model"],
+      facts: [`Stellar Jade ${r.stellarJade ?? 0} → ${Math.floor((r.stellarJade ?? 0) / 160)} pulls; Special Passes ${r.specialPasses ?? 0}; Undying Starlight ${r.undyingStarlight ?? 0} → ${Math.floor((r.undyingStarlight ?? 0) / 20)} pulls.`, `Character Warp pity ${s.pity}${s.guaranteed ? ", guaranteed" : ""} (${pityKnown(s) ? "entered by you" : "not entered yet, assumed 0"}).`, ...plan.assumptions.slice(0, 2)],
+      sources: ["Resources you entered", "Pity you entered", "Published Warp rules + community soft-pity model"],
       links: [{ label: "Open planner", href: "/warp?tab=planner" }],
     };
   }
 
   if (has(q, "guarantee", "pity", "50/50", "5050")) {
     const lines = (["character", "lightcone", "standard"] as const).map((k) => {
-      const s = ctx.summary.pools[k];
-      return `${POOLS[k].label}: pity ${s.pity5}/${POOLS[k].five.hard}${POOLS[k].fiveFeaturedChance !== null ? (s.guaranteed5 ? ", guaranteed" : ", not guaranteed") : ""} (${s.total} pulls recorded${s.historyComplete ? "" : ", history may be incomplete"})`;
+      const s = ctx.summary.pity[k];
+      return `${POOLS[k].label}: pity ${s.pity}/${POOLS[k].five.hard}${POOLS[k].fiveFeaturedChance !== null ? (s.guaranteed ? ", guaranteed" : ", not guaranteed") : ""}${pityKnown(s) ? "" : " (not entered)"}`;
     });
-    const c = ctx.summary.pools.character;
-    const need = 90 - c.pity5 + (c.guaranteed5 ? 0 : 90);
+    const c = ctx.summary.pity.character;
+    const need = 90 - c.pity + (c.guaranteed ? 0 : 90);
     return {
       intent: "pity",
-      line: c.total === 0 ? "No warp history imported|Can't see ur pity|Drop a UIGF or SRGF file and ask again" : c.guaranteed5 ? `Guarantee's on|${90 - c.pity5} pulls max to the featured unit|U have ${eventPulls}` : `No guarantee|For 100% on the featured 5★ u need ${need} pulls|U have ${eventPulls}`,
-      facts: lines, sources: ["Your Warp history", "Published guarantee rules"], links: [{ label: "Warp tracker", href: "/warp" }],
+      line: !pityKnown(c) ? "I don't know ur pity|Check Star Rail Station, then type it in the Warp page|Then ask again" : c.guaranteed ? `Guarantee's on|${90 - c.pity} pulls max to the featured unit|U have ${eventPulls}` : `No guarantee|For 100% on the featured 5★ u need ${need} pulls|U have ${eventPulls}`,
+      facts: lines, sources: ["Pity you entered", "Published guarantee rules"], links: [{ label: "Warp page", href: "/warp" }, { label: "Star Rail Station", href: WARP_TRACKER_URL }],
     };
   }
 
@@ -211,8 +212,8 @@ export function buildAiContext(raw: string, ctx: TerminalContext): string {
   lines.push(`Game data version: ${ctx.game?.version ?? "not downloaded"}`);
   lines.push(`Resources (user-entered): Stellar Jade ${r.stellarJade ?? "unknown"}, Special Passes ${r.specialPasses ?? "unknown"}, Star Rail Passes ${r.starRailPasses ?? "unknown"}, Undying Starlight ${r.undyingStarlight ?? "unknown"}, Trailblaze Power ${r.trailblazePower ?? "unknown"}`);
   for (const k of ["character", "lightcone", "standard"] as const) {
-    const p = ctx.summary.pools[k];
-    lines.push(`${POOLS[k].label}: ${p.total} pulls recorded, pity ${p.pity5}/${POOLS[k].five.hard}${POOLS[k].fiveFeaturedChance !== null ? (p.guaranteed5 ? ", next 5★ guaranteed featured" : ", 50/50 not guaranteed") : ""}${p.historyComplete ? "" : ", history may be incomplete"}`);
+    const p = ctx.summary.pity[k];
+    lines.push(`${POOLS[k].label}: ${pityKnown(p) ? `pity ${p.pity}/${POOLS[k].five.hard}` : "pity not entered"}${POOLS[k].fiveFeaturedChance !== null && pityKnown(p) ? (p.guaranteed ? ", next 5★ guaranteed featured" : ", 50/50 not guaranteed") : ""}`);
   }
   lines.push(`Characters owned: ${ctx.summary.owned}/${ctx.summary.totalPlayable}`);
   const chars = ctx.characters.slice(0, 60).map((c) => {

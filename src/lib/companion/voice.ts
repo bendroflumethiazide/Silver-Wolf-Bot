@@ -119,10 +119,8 @@ export const SW = {
     "...|{count} pulls and nothing|RNG says hi",
   ],
   historyEmpty: [
-    "No warp history yet|Export a UIGF or SRGF file|Drop it in, I'll do the math",
-  ],
-  historyIncomplete: [
-    "Heads up|The game only keeps recent warp records|Older pulls are missing unless u set the starting pity",
+    "What's ur pity?|Check Star Rail Station, then type it in here|I'll do the math",
+    "I don't know ur pity yet|Import ur warps on Star Rail Station|Then tell me the number",
   ],
 
   // Characters

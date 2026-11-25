@@ -6,22 +6,22 @@ import { PageHeader, Tabs, Loading } from "@/components/ui";
 import { WarpBanners } from "@/components/warp/Banners";
 import { WarpPlanner } from "@/components/warp/Planner";
 import { WarpSimulator } from "@/components/warp/Simulator";
-import { WarpTracker } from "@/components/warp/Tracker";
+import { PityPanel, WarpTrackerButton } from "@/components/warp/Pity";
 
-type Tab = "tracker" | "planner" | "simulator" | "banners";
+type Tab = "pity" | "planner" | "simulator" | "banners";
 const TABS: { id: Tab; label: string }[] = [
-  { id: "tracker", label: "My Warps" }, { id: "planner", label: "Planner" }, { id: "simulator", label: "Simulator" }, { id: "banners", label: "Banners" },
+  { id: "pity", label: "My pity" }, { id: "planner", label: "Planner" }, { id: "simulator", label: "Simulator" }, { id: "banners", label: "Banners" },
 ];
 
 function Inner() {
   const params = useSearchParams();
   const router = useRouter();
-  const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "tracker") as Tab;
+  const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "pity") as Tab;
   return (
     <div>
-      <PageHeader title="Warp Observatory" subtitle="Real pity tracking, exact pull probabilities, and a sandbox simulator. Separate pity pools are never combined." />
+      <PageHeader title="Warp Observatory" subtitle="Exact pull probabilities, a sandbox simulator and banners. Warp history lives on Star Rail Station." actions={<WarpTrackerButton size="sm" variant="subtle" />} />
       <Tabs<Tab> tabs={TABS} value={tab} onChange={(t) => router.replace(`/warp?tab=${t}`, { scroll: false })} />
-      {tab === "tracker" && <WarpTracker />}
+      {tab === "pity" && <PityPanel />}
       {tab === "planner" && <WarpPlanner />}
       {tab === "simulator" && <WarpSimulator />}
       {tab === "banners" && <WarpBanners />}

@@ -4,8 +4,7 @@ import { LEVEL_CAP_BY_ASCENSION } from "./materials/calculator";
 import { PROFILE_TEMPLATES, scoreRelic, suggestTemplate, type ScoringProfile } from "./relics/scoring";
 import { SLOT_LABEL } from "./relics/stats";
 import type { AchievementProgress, BannerEntry, EventEntry, MapMarker, OwnedCharacter, OwnedLightCone, Relic } from "./types";
-import { DEFAULT_OFFSET, summarizePool, type PoolOffset, type PoolSummary, type WarpRecord } from "./warp/history";
-import type { PoolKind } from "./warp/rules";
+import { EMPTY_PITY, type PityStore } from "./warp/pity";
 
 export interface Objective {
   id: string;
@@ -21,8 +20,8 @@ export interface AccountInput {
   characters: OwnedCharacter[];
   lightCones: OwnedLightCone[];
   relics: Relic[];
-  warps: WarpRecord[];
-  offsets: Partial<Record<PoolKind, PoolOffset>>;
+  /** Current pity the user entered (Warp history lives on Star Rail Station). */
+  pity?: PityStore;
   achievements: AchievementProgress[];
   markers: MapMarker[];
   banners: BannerEntry[];
@@ -42,7 +41,7 @@ export interface AccountSummary {
   achievementsTotal: number;
   markersDone: number;
   markersTotal: number;
-  pools: Record<"character" | "lightcone" | "standard", PoolSummary>;
+  pity: PityStore;
   objectives: Objective[];
 }
 
@@ -105,13 +104,9 @@ export function summarizeAccount(i: AccountInput): AccountSummary {
   for (const m of i.markers) if (m.status === "not-started" || m.status === "in-progress" || m.status === "investigate") zoneTodo.set(m.zoneId, (zoneTodo.get(m.zoneId) ?? 0) + 1);
   for (const [zone, n] of zoneTodo) objectives.push({ id: `map-${zone}`, title: `${n} map objective(s) remaining`, reason: "Tracked markers not yet completed in one of your zones.", href: `/map?zone=${zone}`, priority: 20 + Math.min(10, n), category: "exploration" });
 
-  const pools = {
-    character: summarizePool("character", i.warps, i.offsets.character ?? DEFAULT_OFFSET),
-    lightcone: summarizePool("lightcone", i.warps, i.offsets.lightcone ?? DEFAULT_OFFSET),
-    standard: summarizePool("standard", i.warps, i.offsets.standard ?? DEFAULT_OFFSET),
-  };
-  if (pools.character.total && pools.character.pity5 >= 74)
-    objectives.push({ id: "warp-soft", title: "Character Warp in soft pity", reason: `Pity ${pools.character.pity5}: a 5★ is very likely within the next few pulls.`, href: "/warp?tab=planner", priority: 50, category: "warp" });
+  const pity = i.pity ?? EMPTY_PITY;
+  if (pity.character.pity >= 74)
+    objectives.push({ id: "warp-soft", title: "Character Warp in soft pity", reason: `Pity ${pity.character.pity}: a 5★ is very likely within the next few pulls.`, href: "/warp", priority: 50, category: "warp" });
 
   const achTotal = i.game ? Object.keys(i.game.achievements).length : 0;
   const achDone = i.achievements.filter((a) => a.status === "completed").length;
@@ -127,7 +122,7 @@ export function summarizeAccount(i: AccountInput): AccountSummary {
     achievementsTotal: achTotal,
     markersDone: i.markers.filter((m) => m.status === "completed").length,
     markersTotal: i.markers.length,
-    pools,
+    pity,
     objectives: objectives.sort((a, b) => b.priority - a.priority),
   };
 }

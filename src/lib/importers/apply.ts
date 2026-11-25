@@ -1,6 +1,5 @@
 import { getDb, newId, nowIso } from "../db";
 import type { ImportHistoryEntry, OwnedCharacter, OwnedLightCone, Relic } from "../types";
-import type { WarpRecord } from "../warp/history";
 import { diffByKey, type DiffRow } from "./diff";
 import { lightConeFingerprint, relicFingerprint, type ParsedScan } from "./hsrScanner";
 
@@ -95,16 +94,6 @@ export async function applyScanPlan(plan: ScanPlan, opts: ApplyOptions): Promise
     undo,
   });
   return { written, removed, historyId };
-}
-
-export async function applyWarpImport(records: WarpRecord[], kind: "uigf" | "srgf" | "csv", fileName?: string) {
-  const db = getDb();
-  const rows = records.map((r) => ({ ...r, key: `${r.profileId}:${r.id}` }));
-  const undo: Undo = rows.map((r) => ({ table: "warps", key: r.key, before: null }));
-  await db.warps.bulkPut(rows);
-  const historyId = newId("import");
-  await db.importHistory.put({ id: historyId, kind, fileName, importedAt: nowIso(), summary: `${rows.length} Warp record(s) added`, undo });
-  return { written: rows.length, historyId };
 }
 
 /** Restore every row touched by an import to its prior state. */
