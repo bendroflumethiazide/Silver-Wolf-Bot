@@ -40,7 +40,7 @@ export default function CharacterPage() {
   const trees = useMemo(() => (c && game ? kitTrees(c, kit).map((t) => game.characterSkillTrees[t]).filter(Boolean) : []), [c, game, kit]);
   const ranks = useMemo(() => (c && game ? c.ranks.map((r) => game.characterRanks[r]).filter(Boolean) : []), [c, game]);
 
-  if (!game) return <WolfComment comment={noGameData()} />;
+  if (!game) return (<><PageHeader title="Character" /><WolfComment comment={noGameData()} /></>);
   if (!c) return <Empty title="Unknown character">No character with id {id} in game data v{game.version}. <Link href="/characters" className="text-cyan">Back to archive</Link></Empty>;
 
   const name = characterDisplayName(c);

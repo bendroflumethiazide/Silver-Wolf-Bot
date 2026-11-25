@@ -146,7 +146,7 @@ function Inner() {
     return { r, s: scoreRelic(r, profile), profile };
   }), [relics, charId, game, saved]);
 
-  if (!game) return <WolfComment comment={noGameData()} />;
+  if (!game) return (<><PageHeader title="Relic Database" /><WolfComment comment={noGameData()} /></>);
   if (!relics || !owned) return <Loading />;
 
   const filtered = scored
