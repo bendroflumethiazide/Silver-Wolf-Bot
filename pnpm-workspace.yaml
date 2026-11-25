@@ -1,0 +1,8 @@
+# Only install package versions that have been public for at least 2 days (supply-chain safety;
+# also keeps the lockfile valid for pnpm 11, which refuses versions younger than 1 day by default).
+minimumReleaseAge: 2880
+
+# Packages allowed to run install scripts (Electron downloads its binary).
+onlyBuiltDependencies:
+  - electron
+  - esbuild
