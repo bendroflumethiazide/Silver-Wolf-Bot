@@ -182,7 +182,7 @@ export default function Home() {
         actions={<Button size="sm" onClick={() => setCustomize((v) => !v)}><SlidersHorizontal size={14} /> {customize ? "Done" : "Customize"}</Button>}
       />
       <WolfComment comment={dashboardComment(summary, !!game)} className="mb-5" />
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         {order.filter((id) => customize || !settings.dashboardHidden.includes(id)).map((id) => {
           const w = WIDGETS.find((x) => x.id === id)!;
           const hidden = settings.dashboardHidden.includes(id);

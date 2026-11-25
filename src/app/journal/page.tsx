@@ -119,7 +119,7 @@ function Inner() {
       <PageHeader title="Personal Journal" subtitle="Notes on characters, builds, teams, bosses, events and Warp plans. Stored locally and included in backups."
         actions={<><Button size="sm" onClick={exportAll} disabled={!notes.length}><Download size={14} /> Export .md</Button><Button size="sm" variant="primary" onClick={() => setEditing(blank())}><Plus size={14} /> New note</Button></>} />
       <WolfComment comment={journalComment(notes.length)} className="mb-5" />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.3fr)]">
         <div className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search notes" aria-label="Search notes" className="min-w-0 flex-1" />

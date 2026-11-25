@@ -9,7 +9,7 @@ export const cx = clsx;
 
 export function Panel({ title, actions, children, className, hud, id }: { title?: ReactNode; actions?: ReactNode; children: ReactNode; className?: string; hud?: boolean; id?: string }) {
   return (
-    <section id={id} className={cx("glass p-4 sm:p-5", hud && "hud", className)}>
+    <section id={id} className={cx("glass min-w-0 p-4 sm:p-5", hud && "hud", className)}>
       {(title || actions) && (
         <header className="mb-3 flex flex-wrap items-center justify-between gap-2">
           {title && <h2 className="font-mono text-xs uppercase tracking-[0.18em] text-muted">{title}</h2>}
@@ -154,6 +154,7 @@ export function NumberInput({ value, onChange, min, max, step = 1, ...rest }: { 
       min={min}
       max={max}
       step={step}
+      className="w-full"
       onChange={(e) => {
         const v = e.target.value === "" ? 0 : Number(e.target.value);
         if (Number.isNaN(v)) return;

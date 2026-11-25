@@ -249,7 +249,7 @@ function Inner() {
       <Notice>Official map data and marker coordinates (HoYoLAB Interactive Map) are not licensed for reuse here, so no markers are preloaded. Everything on this map is yours and labelled as manual tracking. It is never presented as verified account data.</Notice>
       {err && <div className="mt-3"><ErrorBox>{err}</ErrorBox></div>}
       {!zone ? <div className="mt-5"><Empty title="No zones yet" action={<Button variant="primary" onClick={() => setAdding(true)}>Add your first zone</Button>}>Take a screenshot of an in-game map, upload it here, and start placing markers.</Empty></div> : (
-        <div className="mt-5 grid gap-5 xl:grid-cols-[260px_1fr]">
+        <div className="mt-5 grid grid-cols-1 gap-5 xl:grid-cols-[260px_1fr]">
           <Panel title="Zones">
             <nav className="space-y-3 text-sm">
               {[...tree.entries()].map(([planet, regions]) => {

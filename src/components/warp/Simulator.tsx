@@ -21,6 +21,7 @@ export function WarpSimulator() {
   const { game, settings } = useApp();
   const [kind, setKind] = useState<PoolKind>("character");
   const [featuredId, setFeaturedId] = useState("1006");
+  const [featured4, setFeatured4] = useState<string[]>(["", "", ""]);
   const [seed, setSeed] = useState(() => Math.random().toString(36).slice(2, 10));
   const [rngState, setRngState] = useState<{ seed: string; rng: () => number } | null>(null);
   const [state, setState] = useState(INITIAL_SIM_STATE);
@@ -56,10 +57,10 @@ export function WarpSimulator() {
       kind,
       featured5: kind === "standard" || !f ? [] : [f],
       offBanner5: kind === "lightcone" ? pools.std5l : kind === "standard" ? [...pools.std5c, ...pools.std5l] : pools.std5c,
-      featured4: [], // featured 4★ vary per banner; any 4★ is drawn uniformly from the pool below
-      offBanner4: pools.four,
+      featured4: pools.four.filter((x) => featured4.includes(x.id!)),
+      offBanner4: pools.four.filter((x) => !featured4.includes(x.id!)),
     };
-  }, [kind, featuredId, pools, options]);
+  }, [kind, featuredId, pools, options, featured4]);
 
   const reset = (newSeed = seed) => { setRngState({ seed: newSeed, rng: createRng(newSeed) }); setState(INITIAL_SIM_STATE); setHistory([]); setLast([]); setSaved(false); };
   const pull = (n: number) => {
@@ -89,7 +90,7 @@ export function WarpSimulator() {
     <div className="space-y-5">
       <Notice tone="warn">SIMULATION — fictional pulls with fictional currency. Results here are never mixed with your real Warp history.</Notice>
       <WolfComment comment={comment} />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,340px)_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,340px)_1fr]">
         <Panel title="Banner">
           <div className="grid gap-3">
             <Field label="Warp type"><select value={kind} onChange={(e) => { setKind(e.target.value as PoolKind); reset(); }}>{SIM_POOLS.map((k) => <option key={k} value={k}>{POOLS[k].label}</option>)}</select></Field>
@@ -101,12 +102,24 @@ export function WarpSimulator() {
                 </select>
               </Field>
             )}
+            {kind !== "standard" && (
+              <Field label="Featured 4★ (optional)" hint="Unset slots show as “Featured 4★”.">
+                <div className="grid gap-1.5">
+                  {featured4.map((v, i) => (
+                    <select key={i} aria-label={`Featured 4★ ${i + 1}`} value={v} onChange={(e) => setFeatured4(featured4.map((x, j) => (j === i ? e.target.value : x)))}>
+                      <option value="">—</option>
+                      {pools.four.filter((x) => (kind === "lightcone") === x.id!.startsWith("2")).map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}
+                    </select>
+                  ))}
+                </div>
+              </Field>
+            )}
             <Field label="Seed" hint="Change the seed for a different run."><input value={seed} onChange={(e) => { setSeed(e.target.value); reset(e.target.value); }} /></Field>
             <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={skip} onChange={(e) => setSkip(e.target.checked)} /> Skip animations</label>
             <div className="flex flex-wrap gap-2">
               <Button variant="primary" onClick={() => pull(1)}><Dices size={15} /> ×1</Button>
               <Button variant="primary" onClick={() => pull(10)}><Dices size={15} /> ×10</Button>
-              <NumberInput min={1} max={2000} value={custom} onChange={setCustom} aria-label="Custom pull count" />
+              <div className="w-24"><NumberInput min={1} max={2000} value={custom} onChange={setCustom} aria-label="Custom pull count" /></div>
               <Button onClick={() => pull(Math.max(1, Math.min(2000, custom)))}>×{custom}</Button>
             </div>
             <div className="flex gap-2">

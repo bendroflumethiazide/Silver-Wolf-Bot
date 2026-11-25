@@ -71,7 +71,7 @@ export function WarpPlanner() {
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,380px)_1fr]">
         <Panel title="Inputs">
           <div className="grid grid-cols-2 gap-3">
             <Field label="Target banner" className="col-span-2">

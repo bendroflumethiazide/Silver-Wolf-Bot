@@ -78,7 +78,7 @@ function SyncPanel({ profile }: { profile: Profile }) {
   return (
     <Panel title="Account connection" hud>
       <WolfComment comment={comment} className="mb-4" />
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-2"><span className="font-medium">{ENKA_CAPABILITIES.name}</span><Badge tone="ok">read-only</Badge><Badge>no login</Badge></div>
           {!settings.enkaEnabled ? (
@@ -144,7 +144,7 @@ export default function AccountPage() {
     <div className="space-y-5">
       <PageHeader title="My Account" subtitle="Trailblazer profile, verified sync, and an overview of everything tracked for this account."
         actions={<><Button size="sm" onClick={addProfile}><Plus size={14} /> Add profile</Button>{profiles.length > 1 && <Button size="sm" variant="danger" onClick={removeProfile}><Trash2 size={14} /> Delete profile</Button>}</>} />
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,380px)_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,380px)_1fr]">
         <Panel title="Profile" actions={<SourceBadge source={profile.source} />}>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Name" className="col-span-2"><input value={profile.name} onChange={(e) => upd({ name: e.target.value })} /></Field>

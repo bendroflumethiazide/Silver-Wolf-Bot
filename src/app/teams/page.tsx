@@ -106,7 +106,7 @@ function Builder({ initial }: { initial?: Team }) {
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {members.map((m, i) => <Slot key={i} id={m} onPick={() => setPicking(i)} onClear={() => setMembers(members.map((x, j) => (j === i ? null : x)))} />)}
       </div>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <Panel title="Analysis">
           <div className="mb-2 flex flex-wrap gap-1.5">
             <Badge tone="ok">sustain {a.roles.sustain}</Badge><Badge tone="violet">support {a.roles.support}</Badge><Badge tone="gold">damage {a.roles.damage}</Badge>

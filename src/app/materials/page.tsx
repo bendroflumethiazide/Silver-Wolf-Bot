@@ -41,10 +41,10 @@ function MaterialTable({ totals }: { totals: MaterialTotals }) {
             return (
               <tr key={r.id} className="border-t border-line align-top">
                 <td className="py-2"><div className="flex items-center gap-2"><GameImage path={it?.icon} alt={it?.name ?? r.id} className="h-8 w-8 shrink-0" /><span className={it?.rarity === 5 ? "text-gold" : it?.rarity === 4 ? "text-[var(--purple4)]" : ""}>{it?.name ?? r.id}</span></div></td>
-                <td className="font-mono">{r.required.toLocaleString()}</td>
-                <td><NumberInput min={0} value={r.owned} onChange={(v) => setStock(profileId, r.id, v)} aria-label={`Owned ${it?.name ?? r.id}`} /></td>
-                <td className={`font-mono ${r.missing ? "text-warn" : "text-ok"}`}>{r.missing ? r.missing.toLocaleString() : "✓"}</td>
-                <td className="max-w-[260px] text-xs text-muted">{it?.come_from?.slice(0, 3).join(" · ") || "—"}</td>
+                <td className="pr-3 font-mono">{r.required.toLocaleString()}</td>
+                <td className="w-28 pr-3"><NumberInput min={0} value={r.owned} onChange={(v) => setStock(profileId, r.id, v)} aria-label={`Owned ${it?.name ?? r.id}`} /></td>
+                <td className={`pr-3 font-mono ${r.missing ? "text-warn" : "text-ok"}`}>{r.missing ? r.missing.toLocaleString() : "✓"}</td>
+                <td className="max-w-[280px] py-2 text-xs text-muted"><span className="line-clamp-2" title={it?.come_from?.join(" · ")}>{it?.come_from?.slice(0, 3).join(" · ") || "—"}</span></td>
               </tr>
             );
           })}
@@ -112,7 +112,7 @@ function Inner() {
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: "calculator", label: "Calculator" }, { id: "planner", label: `Farming plan (${plans.length})` }, { id: "inventory", label: "Inventory" }]} />
 
       {tab === "calculator" && (
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,340px)_1fr]">
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,340px)_1fr]">
           <Panel title="Target">
             <div className="grid gap-3">
               <Field label="Upgrade"><select value={mode} onChange={(e) => setMode(e.target.value as typeof mode)}><option value="character">Character</option><option value="lightcone">Owned Light Cone</option></select></Field>

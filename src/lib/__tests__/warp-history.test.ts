@@ -60,3 +60,12 @@ describe("warp planner", () => {
     expect(sure.probability).toBe(1);
   });
 });
+
+describe("record ordering", () => {
+  it("orders game records by id even when timestamps disagree", () => {
+    const mk = (id: string, time: string, rank: 3 | 5 = 3): WarpRecord => ({ id, profileId: "p", pool: "character", gachaType: "11", itemId: "1308", name: "x", itemType: "", rank, time, source: "uigf" });
+    // id order: A(5★) then B, C — timestamps are deliberately out of order
+    const s = summarizePool("character", [mk("1700000000000000003", "2026-01-01 00:00:00"), mk("1700000000000000001", "2026-01-01 00:00:09", 5), mk("1700000000000000002", "2026-01-01 00:00:01")], { pity5Before: 0, pity4Before: 0, guaranteedBefore: false, complete: true });
+    expect(s.pity5).toBe(2);
+  });
+});

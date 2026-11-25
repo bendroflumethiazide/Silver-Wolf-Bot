@@ -69,12 +69,16 @@ export interface PoolSummary {
   warnings: string[];
 }
 
-/** Chronological comparison: game ids are increasing numeric strings; manual entries use seq. */
+/**
+ * Chronological order. Game record ids increase strictly with every pull (ten-pulls share one
+ * timestamp), so when both records carry game ids, the id decides. Manual entries fall back to
+ * time, then their insertion sequence.
+ */
 export function compareRecords(a: WarpRecord, b: WarpRecord): number {
-  if (a.time !== b.time) return a.time < b.time ? -1 : 1;
   const ai = /^\d+$/.test(a.id) ? a.id : "";
   const bi = /^\d+$/.test(b.id) ? b.id : "";
   if (ai && bi && ai !== bi) return ai.length !== bi.length ? ai.length - bi.length : ai < bi ? -1 : 1;
+  if (a.time !== b.time) return a.time < b.time ? -1 : 1;
   return (a.seq ?? 0) - (b.seq ?? 0);
 }
 

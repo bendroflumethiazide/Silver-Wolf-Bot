@@ -106,6 +106,7 @@ test("journal persists, backup → delete → restore round-trip", async ({ page
   await page.getByLabel("Add tag").fill("boss");
   await page.getByLabel("Add tag").press("Enter");
   await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByText(/^saved /)).toBeVisible();
   await page.reload();
   await expect(page.getByText("Boss plan")).toBeVisible();
   await page.goto("/settings");

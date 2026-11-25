@@ -133,7 +133,7 @@ export function WarpTracker() {
               <button className="mt-1 underline" onClick={() => setEditingOffset(true)}>Set history start</button>
             </Notice>
           )}
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <Panel title="5★ pity distribution">
               <div className="h-56">
                 <ResponsiveContainer>
