@@ -6,6 +6,7 @@ import { GameImage } from "@/components/GameImage";
 import { WolfComment } from "@/components/SilverWolf";
 import { Badge, cx, Empty, Notice, PageHeader, Progress, Tabs } from "@/components/ui";
 import { noGameData } from "@/lib/companion/comments";
+import { fill, pick, SW } from "@/lib/companion/voice";
 import { kvGet, kvSet } from "@/lib/db";
 import { stripMarkup } from "@/lib/gamedata/types";
 import { useApp } from "@/lib/store";
@@ -38,7 +39,7 @@ export default function UniversePage() {
   return (
     <div>
       <PageHeader title="Simulated Universe" subtitle="Blessings, Curios and Occurrence images from game data, with your personal collection tracking." />
-      <WolfComment comment={{ mood: "neutral", line: `${totals.curios} curios and ${totals.blessings} blessings logged. Collection's a grind. Good thing grinding is my specialty — watching other people do it, anyway.`, facts: [`${Object.keys(game.blessings).length} blessings, ${Object.keys(game.curios).length} curios, ${Object.keys(game.simEvents).length} occurrence entries in game data v${game.version}.`, "Collection status is tracked manually."] }} className="mb-5" />
+      <WolfComment comment={{ mood: "neutral", line: fill(pick(SW.universe, "su"), { curios: totals.curios, blessings: totals.blessings }), facts: [`${Object.keys(game.blessings).length} blessings, ${Object.keys(game.curios).length} curios, ${Object.keys(game.simEvents).length} occurrence entries in game data v${game.version}.`, "Collection status is tracked manually."] }} className="mb-5" />
       <Notice>Equations, Paths/Resonances by mode, domain types, difficulty modifiers and rewards are not in the downloaded data source, so they are not listed. Blessing entries cover all Universe variants and include duplicates across modes.</Notice>
       <div className="my-4 grid gap-3 sm:grid-cols-2">
         <div><div className="mb-1 flex justify-between text-xs text-muted"><span>Curios</span><span>{totals.curios}/{Object.keys(game.curios).length}</span></div><Progress value={totals.curios} max={Object.keys(game.curios).length} tone="gold" /></div>

@@ -131,3 +131,16 @@ export function dashboardComment(s: AccountSummary | null, hasGame: boolean): Co
   if (!top) return say("bored", SW.dashClear, "dash-clear", {}, facts);
   return say(top.category === "event" || top.category === "banner" ? "alert" : "neutral", SW.dashTop, `dash-${top.id}`, { title: top.title, reason: top.reason }, [top.reason, ...facts], { label: "Go", href: top.href });
 }
+
+export function buildComment(e: import("../builds/evaluate").BuildEvaluation): Comment {
+  const facts = [
+    `Overall ${e.overall.grade.label} (${e.overall.score.toFixed(1)}/100), ${e.equipped}/6 relics equipped.`,
+    ...e.slots.filter((s) => s.grade).map((s) => `${s.slot}: ${s.grade!.label} (${s.effective.toFixed(1)})${s.score && !s.score.mainStatFits ? " — wrong main stat" : ""}`),
+  ];
+  if (!e.equipped) return say("bored", SW.buildEmpty, "build-empty", {}, facts, { label: "Import a scan", href: "/import" });
+  const lack = e.lacks[0] ?? "Nothing major missing";
+  const best = e.strengths[0] ?? "Nothing";
+  const vars = { grade: e.overall.grade.label, lack, best };
+  if (e.overall.grade.rank >= 15) return say("hyped", SW.buildGreat, `build-${e.overall.grade.label}`, vars, facts);
+  return say(e.overall.grade.rank <= 6 ? "bored" : "neutral", SW.buildTop, `build-${e.overall.grade.label}-${lack}`, vars, facts);
+}

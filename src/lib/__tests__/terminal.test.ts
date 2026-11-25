@@ -19,7 +19,7 @@ describe("Silver Wolf terminal", () => {
   });
   it("admits missing data instead of inventing it", () => {
     expect(answer("how do I beat the final boss", base()).line).toMatch(/not inventing/);
-    expect(answer("what's my pity", base()).line).toMatch(/No Warp history/);
+    expect(answer("what's my pity", base()).line).toMatch(/No warp history/);
     expect(answer("blorp zorp", base()).intent).toBe("unknown");
     expect(answer("which character should I build next", base()).line).toMatch(/haven't told me/);
   });

@@ -4,7 +4,9 @@ import { Lock } from "lucide-react";
 import type { RelicScore } from "@/lib/relics/scoring";
 import { formatStat, SLOT_LABEL } from "@/lib/relics/stats";
 import type { Relic } from "@/lib/types";
-import { Badge, cx, SourceBadge } from "./ui";
+import { grade } from "@/lib/builds/grade";
+import { GradeTag } from "./GradeTag";
+import { cx, SourceBadge } from "./ui";
 
 export const VERDICT_TONE = { keep: "gold", good: "cyan", usable: "default", fodder: "bad" } as const;
 
@@ -17,7 +19,7 @@ export function RelicCard({ relic, setName, ownerName, score, onClick }: { relic
           <div className="truncate text-[11px] text-muted">{setName}</div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <Badge tone={VERDICT_TONE[score.verdict]}>{score.score.toFixed(0)}</Badge>
+          <span className="flex items-baseline gap-1 font-mono text-xs"><span className="text-muted">{score.score.toFixed(1)}</span><GradeTag g={grade(score.mainStatFits ? (score.remainingUpgrades ? score.expectedAtMax : score.score) : score.score * 0.5)} /></span>
           {relic.lock && <Lock size={11} className="text-faint" aria-label="Locked" />}
         </div>
       </div>

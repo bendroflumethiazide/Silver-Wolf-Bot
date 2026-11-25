@@ -30,6 +30,8 @@ export interface ScoringProfile {
   origin: "template" | "user";
   templateId?: string;
   note?: string;
+  /** Optional total-stat targets (percent stats in %, SPD flat). Starting values only; edit per guide. */
+  targets?: Partial<Record<"CRIT Rate" | "CRIT DMG" | "SPD" | "Effect Hit Rate" | "Break Effect" | "Energy Regeneration Rate", number>>;
 }
 
 export interface ScoreBreakdownRow {
@@ -137,11 +139,13 @@ export const PROFILE_TEMPLATES: ScoringProfile[] = [
     id: "tpl-crit-atk", name: "Crit DPS (ATK scaling)", origin: "template",
     weights: { "CRIT Rate": 1, "CRIT DMG": 1, "ATK%": 0.75, SPD: 0.75, ATK: 0.3 },
     mainStats: { BODY: ["CRIT Rate", "CRIT DMG"], FOOT: ["SPD", "ATK%"], NECK: ["ATK%"], OBJECT: ["ATK%", "Energy Regeneration Rate"] },
+    targets: { "CRIT Rate": 70 },
   },
   {
     id: "tpl-crit-hp", name: "Crit DPS (HP scaling)", origin: "template",
     weights: { "CRIT Rate": 1, "CRIT DMG": 1, "HP%": 0.75, SPD: 0.75, HP: 0.3 },
     mainStats: { BODY: ["CRIT Rate", "CRIT DMG"], FOOT: ["SPD", "HP%"], NECK: ["HP%"], OBJECT: ["HP%", "Energy Regeneration Rate"] },
+    targets: { "CRIT Rate": 70 },
   },
   {
     id: "tpl-break", name: "Break DPS", origin: "template",
@@ -162,6 +166,7 @@ export const PROFILE_TEMPLATES: ScoringProfile[] = [
     id: "tpl-debuffer", name: "Debuffer (Effect Hit Rate)", origin: "template",
     weights: { SPD: 1, "Effect Hit Rate": 1, "HP%": 0.3, "DEF%": 0.3, "Effect RES": 0.3 },
     mainStats: { BODY: ["Effect Hit Rate"], FOOT: ["SPD"], OBJECT: ["Energy Regeneration Rate"] },
+    targets: { "Effect Hit Rate": 67 },
   },
   {
     id: "tpl-healer", name: "Healer (HP)", origin: "template",

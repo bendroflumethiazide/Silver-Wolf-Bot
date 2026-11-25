@@ -5,27 +5,24 @@ import { useParams } from "next/navigation";
 import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
+import { BuildCard } from "@/components/BuildCard";
 import { blankOwned, CharacterEditor } from "@/components/CharacterEditor";
 import { GameImage } from "@/components/GameImage";
 import { WolfComment } from "@/components/SilverWolf";
 import { Badge, Button, Empty, PageHeader, Panel, SourceBadge, Stars, Stat, Tabs } from "@/components/ui";
-import { characterDetailComment, noGameData, relicComment } from "@/lib/companion/comments";
+import { characterDetailComment, noGameData } from "@/lib/companion/comments";
 import { getDb } from "@/lib/db";
 import { statAt } from "@/lib/gamedata/stats";
 import { characterDisplayName, elementName, formatSkillDesc, hasEnhancedKit, kitSkills, kitTrees, pathName, stripMarkup, type KitVariant } from "@/lib/gamedata/types";
-import { useRelicProfiles } from "@/lib/hooks";
 import { ascensionForLevel } from "@/lib/materials/calculator";
-import { scoreRelic } from "@/lib/relics/scoring";
-import { formatStat, SLOT_LABEL } from "@/lib/relics/stats";
 import { useApp } from "@/lib/store";
-import { profileFor } from "@/lib/summary";
 
-type Tab = "overview" | "abilities" | "traces" | "eidolons" | "equipment";
+type Tab = "build" | "overview" | "abilities" | "traces" | "eidolons";
 
 export default function CharacterPage() {
   const { id } = useParams<{ id: string }>();
   const { game, profileId } = useApp();
-  const [tab, setTab] = useState<Tab>("overview");
+  const [tab, setTab] = useState<Tab>("build");
   const [editing, setEditing] = useState(false);
   const [previewLevel, setPreviewLevel] = useState(80);
   const [kit, setKit] = useState<KitVariant>("original");
@@ -33,7 +30,6 @@ export default function CharacterPage() {
   const equippedLc = useLiveQuery(() => getDb().lightCones.where("location").equals(id).filter((l) => l.profileId === profileId).toArray(), [profileId, id]);
   const equippedRelics = useLiveQuery(() => getDb().relics.where("location").equals(id).filter((r) => r.profileId === profileId).toArray(), [profileId, id]);
   const notes = useLiveQuery(() => getDb().notes.filter((n) => n.links.some((l) => l.type === "character" && l.id === id)).toArray(), [id]);
-  const relicProfiles = useRelicProfiles(profileId);
   const c = game?.characters[id];
 
   const skills = useMemo(() => (c && game ? kitSkills(c, kit).map((s) => game.characterSkills[s]).filter(Boolean) : []), [c, game, kit]);
@@ -52,7 +48,6 @@ export default function CharacterPage() {
   const lcData = lc ? game.lightCones[lc.lcId] : null;
   const lcPromo = lc ? game.lightConePromotions[lc.lcId]?.values : undefined;
   const lcStat = (k: string) => (lc ? statAt(lcPromo, k, lc.level, lc.ascension) : null);
-  const profile = profileFor(id, game, relicProfiles);
   const skillLevel = (type: string) => {
     if (!owned) return previewLevel >= 80 ? (type === "Normal" ? 6 : 10) : 1;
     if (type === "Normal") return owned.skills.basic;
@@ -94,8 +89,8 @@ export default function CharacterPage() {
       </div>
 
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[
-        { id: "overview", label: "Stats" }, { id: "abilities", label: "Abilities" }, { id: "traces", label: "Traces" },
-        { id: "eidolons", label: "Eidolons" }, { id: "equipment", label: "Equipment" },
+        { id: "build", label: "Build & rating" }, { id: "overview", label: "Base stats" }, { id: "abilities", label: "Abilities" },
+        { id: "traces", label: "Traces" }, { id: "eidolons", label: "Eidolons" },
       ]} />
 
       {tab === "overview" && (
@@ -184,42 +179,9 @@ export default function CharacterPage() {
         </div>
       )}
 
-      {tab === "equipment" && (
-        <div className="space-y-4">
-          <Panel title="Light Cone">
-            {!lc || !lcData ? <Empty title="None equipped">Import an HSR Scanner file or assign a Light Cone in the Light Cone page.</Empty> : (
-              <div className="flex gap-3">
-                <GameImage path={lcData.icon} alt={lcData.name} className="h-16 w-16 shrink-0" />
-                <div className="min-w-0">
-                  <div className="font-medium">{lcData.name} <Stars n={lcData.rarity} /></div>
-                  <div className="text-xs text-muted">Lv {lc.level} · Superimposition {lc.superimposition} · {pathName(lcData.path)}{lcData.path !== c.path && <span className="text-warn"> · Path mismatch: passive inactive</span>}</div>
-                  <p className="mt-1 text-sm text-muted">{formatSkillDesc(game.lightConeRanks[lc.lcId]?.desc ?? "", game.lightConeRanks[lc.lcId]?.params, lc.superimposition)}</p>
-                </div>
-              </div>
-            )}
-          </Panel>
-          <Panel title={`Relics — graded with profile "${profile.name}"${profile.origin === "template" ? " (template)" : ""}`} actions={<Link href={`/relics?char=${id}`} className="text-xs text-cyan hover:underline">Edit profile</Link>}>
-            {!equippedRelics?.length ? <Empty title="No relics">Equipped relics appear after an inventory import.</Empty> : (
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                {equippedRelics.sort((a, b) => a.slot.localeCompare(b.slot)).map((r) => {
-                  const s = scoreRelic(r, profile);
-                  return (
-                    <div key={r.uid} className="rounded-lg border border-line p-3 text-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate font-medium">{SLOT_LABEL[r.slot]} · {game.relicSets[r.setId]?.name ?? r.setId}</span>
-                        <Badge tone={s.verdict === "keep" ? "gold" : s.verdict === "fodder" ? "bad" : "cyan"}>{s.score.toFixed(0)}</Badge>
-                      </div>
-                      <div className="mt-1 text-xs text-violet">+{r.level} {r.mainStat}</div>
-                      <ul className="mt-1 text-xs text-muted">{r.substats.map((x) => <li key={x.key}>{x.key} {formatStat(x.key, x.value)}</li>)}</ul>
-                      <WolfComment comment={relicComment(s, profile.origin === "template")} className="mt-2 !p-2" />
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </Panel>
-        </div>
-      )}
+      {tab === "build" && (owned
+        ? <BuildCard charId={id} owned={owned} />
+        : <Empty title="Not owned">Mark this character as owned and import their relics to get Silver Wolf&apos;s build rating.</Empty>)}
 
       {owned && editing && <CharacterEditor key={owned.updatedAt} open={editing} onClose={() => setEditing(false)} initial={owned} name={name} />}
     </div>

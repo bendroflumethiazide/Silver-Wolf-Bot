@@ -1,17 +1,21 @@
 /**
- * Silver Wolf companion voice.
+ * Silver Wolf companion voice — texting style.
  *
- * Every line here is ORIGINAL writing in her style (see docs/silver-wolf-voice.md). No in-game
- * voice lines are reproduced. Lines are templates: `{name}` placeholders are filled ONLY with
- * values computed from the user's data, so personality never introduces a fact.
+ * Modelled on how she messages the Trailblazer in-game: short bursts sent as separate bubbles,
+ * shorthand (u, ur, abt, 2day, lemme, w/), little punctuation, the odd ";)" or "...", and an
+ * impulsive "just pull" streak. All lines are ORIGINAL writing (docs/09-silver-wolf-voice.md).
+ *
+ * Format: one template = one burst of messages; "|" separates bubbles. `{name}` placeholders are
+ * filled ONLY with values computed from the user's data, so personality never introduces a fact.
  */
 
 export type Mood = "smug" | "bored" | "hyped" | "alert" | "neutral" | "glitch";
 
 export interface Comment {
   mood: Mood;
+  /** Bubbles separated by "|". Use `bubbles()` to split. */
   line: string;
-  /** The verifiable facts the line is based on, shown under the speech bubble. */
+  /** The verifiable facts the line is based on, shown under the messages. */
   facts: string[];
   action?: { label: string; href: string };
 }
@@ -24,237 +28,210 @@ export function pick<T>(options: readonly T[], key: string, day = new Date().toI
   return options[h % options.length];
 }
 
+/** Fill placeholders. Values can never create extra bubbles ("|" in data becomes "/"). */
 export function fill(template: string, vars: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
+  return template.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]).replace(/\|/g, "/") : m));
 }
+
+/** Split a line into message bubbles. */
+export function bubbles(line: string): string[] {
+  return line.split("|").map((b) => b.trim()).filter(Boolean);
+}
+
+/** Her in-game Messages signature, shown in the chat header (user-provided reference). */
+export const SIGNATURE = "Don't make a game if you don't know how to";
 
 export const SW = {
   name: "Silver Wolf",
   handle: "SW//",
-  signoffs: ["GG.", "Logging off.", "Back to my game.", "Don't make me debug this twice."],
 
   noGameData: [
-    "No game data loaded. Can't speedrun a level that isn't installed. Hit download — it's like five megabytes, you'll live.",
-    "Database is empty. I could guess, but guessing is for people who don't read patch notes. Download the data first.",
-    "Zero records on disk. Install the game data and I'll start pointing out everything you're doing wrong. Helpfully.",
+    "Hold up|Ur database is empty|Can't play a game u didn't install|Hit download. it's like 5MB",
+    "...|No game data|Download it first, then we talk",
+    "Bruh|Zero files on disk|Settings → download. go",
   ],
   emptyPersonal: [
-    "No save file detected. Import a scan or add stuff manually — I don't do commentary on blank screens.",
-    "Nothing here yet. Feed me some data and I'll tell you what's broken.",
-    "Empty inventory. Either you're new, or you haven't imported anything. Fix one of those.",
+    "No save file?|Import something or add it urself|I don't comment on blank screens",
+    "It's empty in here|Feed me data|Then I'll tell u what's broken",
   ],
   unsourced: [
-    "No permitted data source for this module yet. I'm not making stuff up to fill the screen — that's how you get bad builds.",
-    "This one's on manual. No trusted feed to pull from, and I don't fabricate data. Add entries yourself and I'll track them.",
+    "No legit source for this one|Not gonna make stuff up|U add it, I'll track it",
+    "Manual mode|No trusted feed to pull from|Fake data = bad builds. pass",
   ],
 
   // Dashboard
   dashTop: [
-    "Top priority: {title}. {reason} Everything else can wait.",
-    "Quest log's sorted. First up — {title}. {reason}",
-    "If you only do one thing today: {title}. {reason}",
+    "Top priority: {title}|{reason}|Everything else can wait",
+    "First up|{title}|{reason}",
+    "If u do one thing 2day|{title}|{reason}",
   ],
   dashClear: [
-    "Nothing urgent in my queue. Either you're efficient, or you haven't given me enough data. I suspect the second one.",
-    "No objectives flagged. Import more data and I'll find something for you to fix.",
+    "Nothing urgent|Either ur efficient or u didn't give me enough data|I bet it's the second one",
+    "Queue's empty|Import more stuff and I'll find u something to fix",
   ],
 
   // Warp
   pitySoft: [
-    "Pity {pity}. You're in the soft-pity zone — odds climb every pull from here. This is the part where you don't stop.",
-    "{pity} pulls deep. Soft pity's active. The RNG is about to get generous, statistically speaking.",
+    "Pity {pity}|Soft pity zone|Odds go up every pull now|Don't stop. just pull",
+    "{pity} pulls deep|It's coming|Don't hesitate",
   ],
   pityMid: [
-    "Pity {pity}. Mid-game grind. Nothing exciting until about 74.",
-    "{pity} on the counter. Base rate's still {rate}% per pull. Save or commit — no half-measures.",
+    "Pity {pity}|Mid-game grind|Nothing fun till like 74",
+    "Counter's at {pity}|Still {rate}% per pull|Save or commit. no half stuff",
   ],
   pityLow: [
-    "Pity {pity}. Fresh start. Long road ahead — budget like it.",
-    "Counter's at {pity}. You just hit, didn't you? Enjoy it. The next one's a grind.",
+    "Pity {pity}|Fresh run|Long grind ahead, budget for it",
+    "{pity}?|U just hit didn't u|Next one's gonna take a while ;)",
   ],
   guaranteed: [
-    "You lost the last 50/50, so your next 5★ here is locked to the featured unit. That's not luck. That's a rule.",
-    "Guarantee's active. Next 5★ on this banner is the rate-up. No coin flip this time.",
+    "U lost the last 50/50|So the next 5★ here is locked to the featured one|That's not luck, that's a rule",
+    "Guarantee's on|No coin flip this time|Just pull",
   ],
   notGuaranteed: [
-    "No guarantee. Next 5★ is a {chance}% coin flip for the featured one. Plan for the bad branch.",
+    "No guarantee|Next 5★ is a {chance}% coin flip|Plan for the bad ending",
   ],
   planGood: [
-    "{prob}% chance with {pulls} pulls. Those are odds I'd queue into.",
-    "{pulls} pulls, {prob}% to hit. Solid. Still not 100, so don't brag yet.",
+    "{prob}% with {pulls} pulls|Don't ask|Don't hesitate|Just pull",
+    "{pulls} pulls, {prob}% to hit|If ur asking, u want it ;)",
   ],
   planRisky: [
-    "{prob}% with {pulls} pulls. Coin-flip territory. Worst case needs {worst}. Your call.",
-    "{pulls} pulls gets you {prob}%. Risky. If you can wait for more Jade, wait.",
+    "{prob}% w/ {pulls} pulls|Coin-flip territory|Worst case is {worst}. ur call",
+    "{pulls} pulls → {prob}%|Risky|If u can wait for more jade... wait",
   ],
   planBad: [
-    "{prob}% chance. That's not a plan, that's a lottery ticket. You need about {median} pulls for even odds.",
-    "Only {pulls} pulls? {prob}% odds. I've seen better win rates from bots. Save up.",
+    "{prob}%...|That's a lottery ticket, not a plan|U need like {median} pulls for even odds",
+    "Only {pulls} pulls?|{prob}%|Save up. seriously",
   ],
   planCertain: [
-    "{pulls} pulls covers the worst case of {worst}. Guaranteed. Go ahead, flex.",
+    "{pulls} pulls covers the worst case ({worst})|It's a lock|Seize the moment!",
+    "Guaranteed|{pulls} ≥ {worst}|Come on. now",
   ],
   simIntro: [
-    "Simulator. Fake Jade, fake pulls, zero consequences. Rage-pull here instead of in the real game.",
-    "Sandbox mode. Nothing here touches your account. Seeded RNG, so you can replay a run exactly.",
+    "Simulator|Fake jade, zero consequences|Rage-pull here instead of the real game",
+    "Sandbox mode|Seeded RNG so u can replay a run|Pull first, ask questions later ;)",
   ],
   simFive: [
-    "Gold. {name} at pull {pity}. Don't get used to it — it's a simulation.",
-    "{name}, pity {pity}. Nice roll. Shame it's not real.",
+    "It's here!!!|{name} at pity {pity}|Shame it's not real ;)",
+    "{name}!!!|Pity {pity}|Don't get used to it",
   ],
   simDry: [
-    "{count} pulls, no 5★. Welcome to the actual experience.",
-    "Nothing gold in {count} pulls. The RNG says hi.",
+    "{count} pulls|No gold|Welcome to the real experience",
+    "...|{count} pulls and nothing|RNG says hi",
   ],
   historyEmpty: [
-    "No Warp history imported. Export a UIGF or SRGF file from a gacha-log tool and drop it here. I'll do the math.",
+    "No warp history yet|Export a UIGF or SRGF file|Drop it in, I'll do the math",
   ],
   historyIncomplete: [
-    "Heads up: the game only keeps recent Warp records. Anything older is missing unless you set the starting pity yourself.",
+    "Heads up|The game only keeps recent warp records|Older pulls are missing unless u set the starting pity",
   ],
 
   // Characters
   charCollection: [
-    "{owned} of {total} characters. {pct}% collection. Not bad. Not complete either.",
-    "Roster: {owned}/{total}. Every unit you don't have is a team comp you can't run.",
+    "{owned}/{total} characters|{pct}%|Not bad. not done either",
+    "Roster's at {owned}/{total}|Every unit u don't have is a team u can't run",
   ],
   charUnbuilt: [
-    "{count} owned characters still under level 80. That's a lot of bench warmers.",
-    "{count} characters below max level. Half-built units lose to fully-built ones. Basic stuff.",
+    "{count} of ur characters aren't lv 80|That's a lot of bench warmers",
+    "{count} half-built units|Half-built loses to fully built|Basic stuff",
   ],
   charSelf: [
-    "Oh, me. Obviously a top pick. Implanting weaknesses is basically cheating, and I'm very good at cheating.",
-    "My profile. Weakness implant, DEF shred, bugs everywhere. Build me properly or don't build me at all.",
+    "Oh. me|Obviously a top pick|Implanting weaknesses is basically cheating ;)",
+    "My page|Build me right or don't build me at all",
   ],
   charSelf999: [
-    "LV.999 build. Max level is a suggestion. I patched it.",
-    "That's me with the level cap removed. Don't ask how. It's a feature, not a bug.",
+    "LV.999|Level cap? never heard of it",
+    "That's me w/ the cap removed|Patched it myself. don't ask how",
   ],
   charNotOwned: [
-    "Not on your roster. Check the material list before you even think about pulling.",
+    "Not on ur roster|Check the mats before u even think abt pulling",
   ],
   charLowLevel: [
-    "Level {level}. Ascension {asc}. This unit's still in the tutorial.",
+    "Lv {level}, A{asc}|This unit's still in the tutorial",
   ],
   charMaxed: [
-    "Level 80, ascension 6. Now go fix their relics — that's where the real numbers are.",
+    "80/80|Now fix their relics|That's where the real numbers are",
   ],
 
-  // Relics
+  // Relics & builds
   relicKeep: [
-    "{score}/100. That's a keeper. Lock it before you accidentally feed it to something.",
-    "{score}. Clean rolls. This is the kind of drop people screenshot.",
+    "{score}/100|Keeper|Lock it before u feed it to something",
+    "{score}!!!|Clean rolls|Screenshot-worthy ;)",
   ],
-  relicGood: [
-    "{score}/100. Usable. Not a god roll, but it'll carry for now.",
-  ],
-  relicUsable: [
-    "{score}/100. Filler. Wear it until something better drops.",
-  ],
+  relicGood: ["{score}/100|Usable|Not a god roll but it'll carry"],
+  relicUsable: ["{score}/100|Filler|Wear it till something better drops"],
   relicFodder: [
-    "{score}/100. That's not a relic, that's a bug report. Fodder.",
-    "{score}. Useless substats for this profile. Feed it to something that matters.",
+    "{score}/100|That's not a relic, that's a bug report|Fodder",
+    "{score}...|Useless subs for this build|Feed it to something",
   ],
-  relicMainMismatch: [
-    "Wrong main stat for this profile. Substats can't save it. Next.",
-  ],
+  relicMainMismatch: ["Wrong main stat|Subs can't save it|Next"],
   relicInventory: [
-    "{count} relics scanned. {fodder} look like fodder for the profiles you've set. Clean up your inventory.",
-    "Inventory: {count} relics. {keep} worth keeping. The rest is clutter.",
+    "{count} relics|{fodder} look like fodder|Clean ur inventory",
+    "Inventory: {count}|{keep} worth keeping|Rest is clutter",
   ],
   relicTemplate: [
-    "These weights are a generic template, not a real build for this character. Tweak them, or I'm grading on a bad curve.",
+    "These weights are a generic template|Not a real build for this character|Tweak them or I'm grading on a bad curve",
+  ],
+  buildTop: [
+    "Build rating: {grade}|{best} is carrying|{lack}",
+    "{grade}|{lack}|Fix that and we'll talk",
+    "Ok I looked|{grade} overall|{lack}",
+  ],
+  buildGreat: [
+    "{grade}!!!|Ok this build is actually cracked|Lemme see who got the better one ;)",
+    "{grade}|No notes|...ok one note. {lack}",
+  ],
+  buildEmpty: [
+    "No relics on this unit|Can't rate an empty build|Import a scan first",
   ],
 
   // Light Cones
-  lcCollection: [
-    "{owned} Light Cones logged. {five} of them are 5★. Check who's actually wearing them.",
-  ],
+  lcCollection: ["{owned} light cones|{five} are 5★|Check who's actually wearing them"],
 
   // Materials
   materialsMissing: [
-    "You're short on {count} materials. {top} is the worst one. Go farm.",
-    "{count} materials missing. Biggest gap: {top}. Trailblaze Power doesn't spend itself.",
+    "U're short on {count} mats|Worst one: {top}|Go farm",
+    "{count} mats missing|Biggest gap is {top}|TB power doesn't spend itself",
   ],
-  materialsDone: [
-    "Everything's covered. Rare. Upgrade before you spend it on something dumb.",
-  ],
-  materialsCaveat: [
-    "This counts ascension and trace costs from the game tables. Level-up EXP isn't in my data feed, so it's not included.",
-  ],
+  materialsDone: ["Everything's covered|Rare|Upgrade before u forget"],
+  materialsCaveat: ["Heads up|Level-up EXP isn't in my data feed|So it's not counted"],
 
   // Achievements
   achievements: [
-    "{done} of {total} achievements. {pct}%. Completionist run's in progress.",
-    "{pct}% complete. {left} left. Some are hidden — no spoilers unless you ask.",
+    "{done}/{total} achievements|{pct}%|Keep going",
+    "{pct}% done|{left} left|Some are hidden. no spoilers unless u ask",
   ],
-  achievementsZero: [
-    "Zero achievements tracked. Start ticking boxes. I like seeing numbers go up.",
-  ],
+  achievementsZero: ["Zero achievements tracked|Start ticking boxes|I like seeing numbers go up"],
 
   // Teams
-  teamEmpty: [
-    "Empty slots. Four characters, Trailblazer. That's the whole game.",
-  ],
-  teamNoSustain: [
-    "No Preservation or Abundance unit. Glass-cannon strat? Bold. Hope you're fast.",
-  ],
-  teamNoSupport: [
-    "No Harmony or Nihility support. Your DPS is doing all the work alone.",
-  ],
-  teamSolid: [
-    "Roles look covered: {roles}. Composition checks out. Execution is on you.",
-  ],
+  teamEmpty: ["Empty slots|It's 4 characters|That's the whole game"],
+  teamNoSustain: ["No sustain?|Glass cannon run|Bold. hope ur fast"],
+  teamNoSupport: ["No harmony or nihility|Ur DPS is doing everything alone"],
+  teamSolid: ["Roles covered: {roles}|Comp checks out|Execution's on u"],
 
   // Imports
   importPreview: [
-    "{new} new, {changed} changed, {conflict} conflicts. Read the conflicts before you hit apply. I won't overwrite your manual stuff without asking.",
+    "{new} new, {changed} changed, {conflict} conflicts|Read the conflicts first|I won't overwrite ur manual stuff w/o asking",
   ],
-  importDone: [
-    "Import applied. {applied} records written. If it went wrong, there's a rollback. You're welcome.",
-  ],
+  importDone: ["Done|{applied} records written|Messed up? there's a rollback ;)"],
 
   // Journal, map, misc
   journal: [
-    "{count} notes. Good. Even I keep logs — mostly of other people's security holes.",
-    "Notes logged: {count}. Memory is unreliable. Text files aren't.",
+    "{count} notes|Good|I keep logs too... mostly of other ppl's security holes",
+    "{count} notes logged|Memory's unreliable. text files aren't",
   ],
-  journalEmpty: [
-    "No notes. Write things down. Future you will thank present you. Probably.",
-  ],
-  mapEmpty: [
-    "No map zones yet. Upload a map screenshot, drop markers, track your loot. Old-school, but it works offline.",
-  ],
-  mapProgress: [
-    "{done} of {total} markers cleared in this zone. {pct}%. Keep sweeping.",
-  ],
-  settings: [
-    "Settings. Everything stays on this device unless you turn something on. I like a tight firewall.",
-  ],
-  dataUpdate: [
-    "Version {remote} is out and you're on {local}. Patch day. Update the data.",
-  ],
-  dataCurrent: [
-    "Data's on {local}. Up to date. Nothing to patch.",
-  ],
-  accountNoSync: [
-    "Sync is off. Everything here is what you typed or imported. If you want verified numbers, enable the public showcase lookup.",
-  ],
-  accountSynced: [
-    "Showcase synced {ago}. Those numbers came from the game, not from you. Verified.",
-  ],
-  endgameEmpty: [
-    "No endgame runs logged. Can't track a high score you never record.",
-  ],
-  endgameBest: [
-    "Best {mode} run: {score}. Beat it.",
-  ],
-  eventsExpiring: [
-    "{name} ends in {left}. Clear it before the timer does.",
-  ],
-  eventsNone: [
-    "No events tracked. Add them from the official notices and I'll count down for you.",
-  ],
+  journalEmpty: ["No notes|Write stuff down|Future u will thank u. probably"],
+  mapEmpty: ["No zones yet|Upload a map screenshot, drop markers|Old-school but it works"],
+  mapProgress: ["{done}/{total} cleared here|{pct}%|Keep sweeping"],
+  universe: ["{curios} curios, {blessings} blessings logged|Collection's a grind|Good thing I like watching ppl grind ;)"],
+  settings: ["Settings|Everything stays on this device unless u turn it on|I like a tight firewall"],
+  dataUpdate: ["{remote} is out|U're on {local}|Patch day. update"],
+  dataCurrent: ["Data's on {local}|Up to date|Nothing to patch"],
+  accountNoSync: ["Sync's off|Everything here is what u typed or imported|Want verified numbers? turn on a sync"],
+  accountSynced: ["Synced {ago}|Those numbers came from the game, not u|Verified ;)"],
+  endgameEmpty: ["No runs logged|Can't beat a high score u never record"],
+  endgameBest: ["Best {mode}: {score}|Beat it"],
+  eventsExpiring: ["{name} ends in {left}|Clear it before the timer does|Now"],
+  eventsNone: ["No events tracked|Add them from the notices|I'll count down for u"],
 } as const;
 
 export type LineKey = keyof typeof SW;

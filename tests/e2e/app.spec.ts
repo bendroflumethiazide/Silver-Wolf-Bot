@@ -10,7 +10,7 @@ test("every page renders without errors, before and after game data", async ({ p
     await page.goto(r);
     await expect(page.locator("main h1")).toBeVisible();
   }
-  await expect(page.getByText(/No game data loaded|Database is empty|Zero records on disk/).first()).toBeVisible();
+  await expect(page.getByText(/Ur database is empty|No game data|Zero files on disk/).first()).toBeVisible();
   await installGameData(page);
   for (const r of ROUTES) {
     await page.goto(r);
@@ -43,7 +43,7 @@ test("characters: mark owned, validation, edit progress, dashboard reflects it",
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(page.getByText("75/80")).toBeVisible();
   await page.goto("/characters/1006");
-  await expect(page.getByText(/Oh, me|My profile/)).toBeVisible(); // Silver Wolf comments on herself
+  await expect(page.getByText(/Oh\. me|My page/)).toBeVisible(); // Silver Wolf comments on herself
   await page.goto("/");
   await expect(page.getByText("1/5")).toBeVisible();
 });
@@ -81,7 +81,7 @@ test("warp: SRGF import → pity, planner, deterministic simulator", async ({ pa
   await expect(page.getByText("80 new Warp record(s) imported")).toBeVisible();
   await page.goto("/warp");
   await expect(page.getByText("70/90")).toBeVisible(); // 80 pulls, 5★ at pull 10 → pity 70
-  await expect(page.getByText(/Pity 70|70 on the counter|Mid-game grind/).first()).toBeVisible();
+  await expect(page.getByText(/Pity 70|Counter's at 70/).first()).toBeVisible();
   await page.goto("/warp?tab=planner");
   await page.getByRole("button", { name: "Use pity from my Warp history" }).click();
   await page.getByLabel("Special Passes").fill("200");
