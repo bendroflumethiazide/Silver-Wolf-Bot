@@ -8,7 +8,7 @@ import {
   advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
-  ahaStats, choosePlotArmor, equipAha, gradeRulesOf, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
+  ahaStats, choosePlotArmor, equipAha, gradeRulesOf, rerollEnvironments, rerollSupply, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
 import { openBox, specialNode } from "@/lib/currencywars/escapade";
 import { GRADE_LABEL } from "@/lib/currencywars/strategyGrades";
@@ -26,6 +26,8 @@ import { BattleView } from "./BattleView";
 import { CharacterSheet } from "./CharacterSheet";
 import { CharacterCard } from "./CharacterCard";
 import { ElationPanel } from "./Elation";
+import { ADVANTAGE_KEY, loadLayout } from "./AdvantageLayout";
+import { payRun } from "@/lib/currencywars/advantage";
 import { RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
@@ -229,7 +231,20 @@ export function RunSim({ pack }: { pack: CwPack }) {
     setRun(next);
     void kvSet(RUN_KEY, next);
   };
-  const start = (rank: string, seed: string) => { const r = newRun(pack, seed, rank); setSel(null); setRun(r); void kvSet(RUN_KEY, r); };
+  const start = (rank: string, seed: string) => {
+    // Advantage Layout nodes unlocked now apply to this run.
+    void loadLayout(pack.season).then((l) => { const r = newRun(pack, seed, rank, { advantage: l.unlocked, lastPlaneOne: l.lastPlaneOne }); setSel(null); setRun(r); void kvSet(RUN_KEY, r); });
+  };
+  // Phantasmal Orbs when a run ends (once per run).
+  const [orbsEarned, setOrbsEarned] = useState<number | null>(null);
+  useEffect(() => {
+    if (!run || run.phase !== "over") { setOrbsEarned(null); return; }
+    void loadLayout(pack.season).then((l) => {
+      const [next, n] = payRun(l, { id: `${run.seed}|${run.rank}`, cleared: run.result === "cleared", rankSteps: rankGain(run), planesReached: run.plane + 1, planeOneCleared: run.plane > 0 || run.result === "cleared" });
+      if (n) void kvSet(ADVANTAGE_KEY, next);
+      setOrbsEarned(n || null);
+    });
+  }, [run, pack.season]);
   const quit = () => { setRun(null); setSel(null); void kvSet(RUN_KEY, null); };
 
   const tp = useMemo(() => (run ? teamPower(run, pack) : null), [run, pack]);
@@ -321,7 +336,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
       {run.phase === "teaBreak" && <TeaBreakPanel run={run} onPick={(i) => { setSel(null); update((s) => pickTea(s, pack, i)); }} />}
       {run.phase === "plotArmor" && <PlotArmorPanel run={run} pack={pack} onProtagonist={(uid) => update((s) => chooseProtagonist(s, pack, uid))} onRefresh={() => update((s) => refreshPlot(s, pack))} onChoose={(i) => update((s) => choosePlotArmor(s, pack, i))} />}
       {run.phase === "environment" && (
-        <Panel title="Choose an Investment Environment">
+        <Panel title="Choose an Investment Environment" actions={run.advantage?.includes("total-refresh") && !(run.advantageUsed ?? []).includes("env") ? <Button size="sm" variant="ghost" onClick={() => update((s) => rerollEnvironments(s, pack))}><RefreshCw size={12} /> Total Refresh</Button> : undefined}>
           <div className="grid gap-3 sm:grid-cols-3">
             {run.offers.environments?.map((e, i) => (
               <button key={e.name} type="button" onClick={() => update((s) => chooseEnvironment(s, pack, i))} className="rounded-xl border border-cyan/30 bg-gradient-to-b from-cyan/10 to-transparent p-4 text-left hover:border-cyan">
@@ -366,7 +381,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
         );
       })()}
       {run.phase === "supply" && (
-        <Panel title="Supply: take one character and the item they carry" actions={<Button size="sm" variant="ghost" onClick={() => update((s) => skipSupply(s, pack))}>Skip</Button>}>
+        <Panel title="Supply: take one character and the item they carry" actions={<span className="flex gap-1">{run.advantage?.includes("total-refresh") && !(run.advantageUsed ?? []).includes(`supply:${run.plane}-${run.node}`) && <Button size="sm" variant="ghost" onClick={() => update((s) => rerollSupply(s, pack))}><RefreshCw size={12} /> Total Refresh</Button>}<Button size="sm" variant="ghost" onClick={() => update((s) => skipSupply(s, pack))}>Skip</Button></span>}>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {run.offers.supply?.map((o, i) => (
               <div key={i} className="flex flex-col gap-1">
@@ -406,6 +421,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
         : <>
           {run.phase === "result" && run.last && <Report run={run} pack={pack} onNext={() => { setSel(null); update((s) => advance(s, pack)); }} />}
           {run.phase === "over" && <Summary run={run} pack={pack} onNew={quit} />}
+          {run.phase === "over" && orbsEarned ? <p role="status" className="rounded-lg border border-violet-300/40 bg-violet-500/10 px-3 py-2 text-sm text-violet-100">+{orbsEarned} Phantasmal Orbs for the Advantage Layout.</p> : null}
         </>}
 
       <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">

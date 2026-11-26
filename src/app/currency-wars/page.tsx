@@ -8,6 +8,7 @@ import { EquipmentTable } from "@/components/currencywars/EquipmentTable";
 import { Investments } from "@/components/currencywars/Investments";
 import { RunSim } from "@/components/currencywars/RunSim";
 import { RosterAudit } from "@/components/currencywars/RosterAudit";
+import { AdvantageLayoutPanel } from "@/components/currencywars/AdvantageLayout";
 import { TeamBuilder } from "@/components/currencywars/TeamBuilder";
 import { TrackedProvider } from "@/components/currencywars/tracking";
 import { SimpleProvider, SimpleToggle } from "@/components/currencywars/simple";
@@ -16,7 +17,7 @@ import { kvGet, kvSet } from "@/lib/db";
 import { CW_PACK_KEY, CW_PACK_SCHEMA, downloadCwPack, type CwPack } from "@/lib/currencywars/sim";
 import { WIKI } from "@/lib/wiki/fandom";
 
-type Tab = "run" | "builder" | "equipment" | "investments" | "roster";
+type Tab = "run" | "builder" | "equipment" | "investments" | "roster" | "advantage";
 
 export default function CurrencyWarsPage() {
   const pack = useLiveQuery(() => kvGet<CwPack | null>(CW_PACK_KEY, null), []);
@@ -45,12 +46,14 @@ export default function CurrencyWarsPage() {
             { id: "equipment", label: "Equipment" },
             { id: "investments", label: "Investments" },
             { id: "roster", label: "Roster" },
+            { id: "advantage", label: "Advantage" },
           ]} />
           {tab === "run" && (outdated ? <Panel><p className="text-sm text-muted">Update the data first (button above).</p></Panel> : <RunSim pack={pack} />)}
           {tab === "builder" && <TeamBuilder pack={pack} />}
           {tab === "equipment" && <EquipmentTable pack={pack} />}
           {tab === "investments" && <Investments pack={pack} />}
           {tab === "roster" && <RosterAudit pack={pack} />}
+          {tab === "advantage" && <AdvantageLayoutPanel season={pack.season} />}
           <p className="text-[11px] text-faint">Data from the <a className="underline" href={WIKI.page(`Currency Wars: ${pack.season}`)} target="_blank" rel="noreferrer">{WIKI.name}</a> ({WIKI.license}), downloaded {pack.fetchedAt.slice(0, 10)}. Game content © HoYoverse.</p>
         </TrackedProvider>
       ) : (

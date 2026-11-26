@@ -15,6 +15,7 @@ import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPac
 import { buildTimeline, type Timeline, type TlKind } from "./timeline";
 import { GRADES, offerGrades, shiftGrade, startingRefreshes, type Grade, type GradeRules, type OfferMeta, type PendingSelection } from "./strategyGrades";
 import { kitEffect } from "./kits";
+import { advantageStats } from "./advantage";
 import { AHA, simulateElation, type AhaState, type ElationResult } from "./elation";
 import { addStats, bondEffect, itemEffect, powerMult, zeroStats, type BondCtx, type Stats, type Summon } from "./combat";
 import { specialItem } from "./specialItems";
@@ -242,6 +243,10 @@ export interface RunState {
   goldPerStrategy?: number;
   /** Aha (Elation Bond): THEIR equipment (3 random basic pieces on arrival; synthesized into advanced). */
   aha?: { items: string[] };
+  /** Advantage Layout nodes unlocked when this run started (advantage.ts). */
+  advantage?: string[];
+  /** One-time Advantage effects used (Claims Settlement, Safety Mechanism, Total Refresh of the Environment). */
+  advantageUsed?: string[];
 }
 
 // --------------------------------------------------------------------------------------------- helpers
@@ -668,7 +673,7 @@ function runTriggerText(s: RunState, pack: CwPack, t: Trigger, rng: () => number
 
 // --------------------------------------------------------------------------------------------- run flow
 
-export function newRun(pack: CwPack, seed: string, rank: string, opts: { companion?: string; variant?: string } = {}): RunState {
+export function newRun(pack: CwPack, seed: string, rank: string, opts: { companion?: string; variant?: string; advantage?: string[]; lastPlaneOne?: boolean } = {}): RunState {
   const rng = createRng(`${seed}:start`);
   let s: RunState = {
     seed, tick: 0, rank, plane: 0, node: 0, phase: "environment",
@@ -699,11 +704,39 @@ export function newRun(pack: CwPack, seed: string, rank: string, opts: { compani
   }
   // Start the three on the field so a first battle isn't empty.
   for (const u of [...s.bench]) if (u) s = moveUnit(s, findUnit(s, u.uid)!, autoSpot(s, pack, u) ?? findUnit(s, u.uid)!);
+  // Advantage Layout: the nodes unlocked now apply to this run.
+  const adv = opts.advantage ?? [];
+  if (adv.length) {
+    s = { ...s, advantage: [...adv] };
+    if (adv.includes("strategy-refresh")) s = { ...s, grades: { ...s.grades, perOptionRefresh: true } };
+    if (adv.includes("sustained-combat")) { const b = randomBasic(pack, rng); if (b) s = log({ ...s, bag: [...s.bag, b] }, `Sustained Combat: ${b}.`); }
+    if (adv.includes("gold-blessing") && opts.lastPlaneOne) s = { ...s, triggers: [0, 1, 2].map((plane) => ({ on: "plane" as const, plane, text: "Gains 2 Gold Coin(s)", source: "Gold Blessing" })) };
+    if (adv.includes("plot-selection")) s = { ...s, plotArmor: { ...plotOf(s), cheapBonus: 2 } };
+    s = log(s, `Advantage Layout: ${adv.length} node${adv.length === 1 ? "" : "s"} active.`);
+  }
   // Escapade: one random Voyage Companion per run.
-  s = startEscapade(s, pack, opts.companion, opts.variant);
+  s = startEscapade(s, pack, opts.companion, opts.variant, adv.includes("luck-escapade"));
   if (!s.offers.environments?.length) s = enterNode(s, pack);
   for (const v of Object.values(s.variants ?? {})) s = log(s, `This run's rule: ${v}.`);
   return log(s, `Starting squad: ${units(s).map((u) => u.name).join(", ")}.`);
+}
+
+/** Advantage Layout "Total Refresh": reroll the Investment Environment offers once per run. */
+export function rerollEnvironments(s0: RunState, pack: CwPack): RunState {
+  if (s0.phase !== "environment" || !s0.advantage?.includes("total-refresh") || (s0.advantageUsed ?? []).includes("env")) return s0;
+  const [s, rng] = step(s0);
+  const seen = new Set((s.offers.environments ?? []).map((e) => e.name));
+  const pool = (pack.environments ?? []).filter((e) => !seen.has(e.name));
+  return log({ ...s, advantageUsed: [...(s.advantageUsed ?? []), "env"], offers: { environments: sample(rng, pool.length >= RULES.environmentOffers ? pool : pack.environments ?? [], RULES.environmentOffers) } }, "Total Refresh: new Investment Environments.");
+}
+
+/** Advantage Layout "Total Refresh": reroll a Supply node's options once. */
+export function rerollSupply(s0: RunState, pack: CwPack): RunState {
+  const key = `supply:${s0.plane}-${s0.node}`;
+  if (s0.phase !== "supply" || !s0.advantage?.includes("total-refresh") || (s0.advantageUsed ?? []).includes(key)) return s0;
+  const [s, rng] = step(s0);
+  const fresh = nodePhase({ ...s, advantageUsed: [...(s.advantageUsed ?? []), key] }, pack, "Supply", rng);
+  return log(fresh, "Total Refresh: new Supply options.");
 }
 
 export function chooseEnvironment(s0: RunState, pack: CwPack, index: number): RunState {
@@ -732,6 +765,8 @@ export function enterNode(s0: RunState, pack: CwPack): RunState {
   }
   if (s.xpPerNode) s = levelUp(s, s.xpPerNode);
   if (s.node === 0) s = fireTriggers(s, pack, "plane", rng);
+  if (s.node === 0 && s.plane === 1 && s.advantage?.includes("reselect")) s = log({ ...s, plotArmor: { ...plotOf(s), swaps: plotOf(s).swaps + 1 } }, "Reselect Protagonist: 1 Plot Armor reselection chance.");
+  if (s.node === 0 && s.plane === 1 && s.advantage?.includes("master-smith")) s = log({ ...s, bag: [...s.bag, "Smelting Furnace", "Disassembly Wrench"] }, "Master Smith: Smelting Furnace and Disassembly Wrench.");
   s = fireTriggers(s, pack, "node", rng);
   s = nodeTp(s);
   s = frenzyContract(s, pack, rng);
@@ -772,7 +807,9 @@ function nodePhase(s: RunState, pack: CwPack, kind: NodeKind, rng: () => number)
   }
   if (kind === "Supply") {
     const roster = shopRoster(pack);
-    const base = rollShop(pack.odds, s.level, roster, rng, Math.max(1, RULES.supplyOffers - (s.supplyFewer ?? 0))).map((c) => ({ name: c.name, cost: c.cost, item: randomBasic(pack, rng) ?? "" }));
+    const extra = s.advantage?.includes("bonus-supply") ? 1 : 0;
+    const gem = () => (s.advantage?.includes("shining-diamond") || s.advantage?.includes("diamond")) && rng() < 0.2 ? pickOne(rng, ["Red Gem", "Blue Gem"]) : null;
+    const base = rollShop(pack.odds, s.level, roster, rng, Math.max(1, RULES.supplyOffers + extra - (s.supplyFewer ?? 0))).map((c) => ({ name: c.name, cost: c.cost, item: gem() ?? randomBasic(pack, rng) ?? "" }));
     const offer = supplyOffers(s, pack, base, rng);
     if (offer.length) return { ...s, phase: "supply", offers: { supply: offer } };
   }
@@ -986,6 +1023,20 @@ function highestBond(s: RunState, pack: CwPack): string | null {
 }
 
 /**
+ * Aeon ★ Aha's cost: 5-cost from level 5 (the wiki's "Upgrade Aeon ★ Aha's level to 5", read as the level),
+ * 7-cost when Elation characters' total star rating reaches 10 or Phantasmoon Games' reaches 12 (verified).
+ */
+export function promoteAeonAha(s: RunState, states: ReturnType<typeof placedBondStates>): RunState {
+  const all = units(s).filter((u) => u.name === "Aeon ★ Aha");
+  if (!all.length) return s;
+  const starsOf = (bond: string) => [...s.on, ...s.off].filter((u): u is Unit => !!u && !u.npc && (states.find((b) => b.bond.name === bond || b.bond.name.startsWith(`${bond}: `))?.bond.members.includes(u.name) ?? false)).reduce((n, u) => n + u.stars, 0);
+  const target = starsOf("Elation") >= 10 || starsOf("Phantasmoon Games") >= 12 ? 7 : s.level >= 5 ? 5 : 4;
+  if (all.every((u) => u.cost >= target)) return s;
+  const up = (u: Unit | null) => (u && u.name === "Aeon ★ Aha" && u.cost < target ? { ...u, cost: target } : u);
+  return note(log({ ...s, on: s.on.map(up), off: s.off.map(up), bench: s.bench.map(up) }, `Aeon ★ Aha ascends to ${target}-cost!`), `Aeon ★ Aha is now ${target}-cost: stronger Elation Skill and buffs.`);
+}
+
+/**
  * Things that happen as soon as the board allows them (once each): Trailblaze Store unlocks and the
  * Bond level 10 grant, Roll-Call's Imagenae: Plot Armor, finished Ashwolf assignments. Returns the
  * same object when nothing changes.
@@ -998,6 +1049,8 @@ export function settle(s: RunState, pack: CwPack): RunState {
   const rule = s.variants?.["Phantasmoon Games"];
   out = rollCallGrant(out, count("Phantasmoon Games"), !!rule && /Roll-Call/.test(rule));
   out = checkAssignments(out);
+  // Aeon ★ Aha becomes 5-cost, then 7-cost (Master of Phantasia's unlock criteria).
+  out = promoteAeonAha(out, states);
   // Aha descends into the preparation area once the Elation Bond is active, with 3 random basic pieces.
   if (!out.aha && count("Elation") && ahaStar(out, pack)) {
     const rng = createRng(`${out.seed}:aha`);
@@ -1239,7 +1292,8 @@ export function unitBase(u: Unit, place: "on" | "off", pack: CwPack): number {
   if (u.npc) return 0;
   const info: CwCharInfo | undefined = pack.info?.[u.name];
   const i = u.stars - 1;
-  return info ? ((place === "on" ? info.onField : info.offField)[i] ?? 0) * (1 + ((info.hp[i] ?? 0) / 100) * MODEL.hpWeight) : (STRENGTH_FALLBACK[u.cost] ?? STRENGTH_FALLBACK[1])[i];
+  const aeon = u.name === "Aeon ★ Aha" ? (u.cost >= 7 ? 2 : u.cost >= 5 ? 1.25 : 1) : 1;
+  return aeon * (info ? ((place === "on" ? info.onField : info.offField)[i] ?? 0) * (1 + ((info.hp[i] ?? 0) / 100) * MODEL.hpWeight) : (STRENGTH_FALLBACK[u.cost] ?? STRENGTH_FALLBACK[1])[i]);
 }
 
 /** What a unit's own equipment does: stats on itself, and passives for the whole squad. */
@@ -1387,13 +1441,15 @@ export function teamPower(s: RunState, pack: CwPack) {
       if (own) st = addStats(st, own);
     }
     st = addStats(st, kitSquad);
+    st = addStats(st, advantageStats(s.advantage ?? []));
+    if (s.advantage?.includes("battle-prep")) st = addStats(st, { dmg: 0.05 });
     st = addStats(st, { on: store.on, off: store.off, dmg: store.team, str: plot.strength, spd: plot.spd });
     const base = bases.get(x.u.uid) ?? 0;
     return { uid: x.u.uid, name: x.u.name, place: x.place, power: base * powerMult(st, x.place), noBonds: base * powerMult(noBonds, x.place), spd: st.spd, plot: plot.strength, stats: st };
   });
   // Elation: Aha Instants, Punchline, Certified Banger, Lucky Strike (elation.ts).
   const elation = simulateElation(
-    per.map((x) => ({ uid: x.uid, name: x.name, stars: fighters.find((f) => f.u.uid === x.uid)!.u.stars, place: x.place, power: x.power, spdAmp: x.spd + (pack.info?.[x.name]?.spd?.[fighters.find((f) => f.u.uid === x.uid)!.u.stars - 1] ?? 0) / 100, lucky: x.stats.lucky, luckyDmg: x.stats.luckyDmg, elation: 0 })),
+    per.map((x) => ({ uid: x.uid, name: x.name, cost: fighters.find((f) => f.u.uid === x.uid)!.u.cost, stars: fighters.find((f) => f.u.uid === x.uid)!.u.stars, place: x.place, power: x.power, spdAmp: x.spd + (pack.info?.[x.name]?.spd?.[fighters.find((f) => f.u.uid === x.uid)!.u.stars - 1] ?? 0) / 100, lucky: x.stats.lucky, luckyDmg: x.stats.luckyDmg, elation: 0 })),
     ahaStats(s, pack, aStar), av ?? 150, `${s.seed}:${s.tick}:${s.plane}-${s.node}`,
   );
   // Silver Wolf LV.999: Hidden MMR at 180+ adds DMG Amplification.
@@ -1447,7 +1503,7 @@ export function enemyPower(s: RunState, pack: CwPack, kind: NodeKind = nodeKind(
   const star = 1 + 0.9 * (g / (totalNodes - 1));
   const odds = pack.odds.find((o) => o.level === Math.round(level))?.odds ?? [1, 0, 0, 0, 0];
   const unit = odds.reduce((n, p, c) => n + p * avgStrength(pack, c + 1, star), 0);
-  const kindMult: Record<NodeKind, number> = { Reward: 0.3, Strategy: 0.95, Combat: 0.95, Supply: 0, Encounter: s.encounter === "hard" ? ASSUMED.encounter.hard.power : ASSUMED.encounter.easy.power, Boss: 1.15 };
+  const kindMult: Record<NodeKind, number> = { Reward: 0.3, Strategy: 0.95, Combat: 0.95, Supply: 0, Encounter: s.encounter === "hard" ? (s.advantage?.includes("risk-hedging") ? 1.15 : ASSUMED.encounter.hard.power) : ASSUMED.encounter.easy.power, Boss: 1.15 };
   const third = kind === "Combat" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? 1.1 : 1;
   const rankStep = pack.difficulty?.find((d) => d.id === s.rank);
   const hpBoost = rankStep?.planes[s.plane]?.hp ?? 0;
@@ -1469,7 +1525,8 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const tp = teamPower(s, pack);
   const { power } = tp;
   // Bubble Wolf's Trotters (own RNG stream, so other rolls stay the same).
-  const trotter = enemyMods(s, kind, false, createRng(`${s.seed}:trotter:${s.tick}`)).trotter;
+  const trotterRng = createRng(`${s.seed}:trotter:${s.tick}`);
+  const trotter = enemyMods(s, kind, false, trotterRng).trotter || (!!s.advantage?.includes("fauna") && kind !== "Boss" && kind !== "Reward" && trotterRng() < 0.15);
   const enemy = enemyPower(s, pack, kind) * (trotter ? ESCAPADE_ASSUMED.trotterMult : 1);
   const chance = kind === "Reward" ? 1 : winChance(power, enemy);
   let won = kind === "Reward" || rng() < chance;
@@ -1479,10 +1536,13 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const boss = kind === "Boss";
   const base = RULES.hpLoss[s.plane][boss ? 1 : 0];
   const cleared = won ? 1 : Math.max(0.05, Math.min(0.95, (power / Math.max(1, enemy)) * 0.9));
-  const hpLost = won ? 0 : base + Math.round((1 - cleared) * base);
+  const hpLost = won ? 0 : Math.round((base + Math.round((1 - cleared) * base)) * (s.advantage?.includes("safety") ? 0.9 : 1));
   const streak = kind === "Reward" ? s.streak : won ? s.streak + 1 : 0;
   const interest = Math.min(s.interestCap, Math.floor(s.gold / RULES.interestPer));
-  const streakGold = won && kind !== "Reward" ? ASSUMED.streakBonus[Math.min(streak, ASSUMED.streakBonus.length - 1)] : 0;
+  const adv = s.advantage ?? [];
+  let streakGold: number = won && kind !== "Reward" ? ASSUMED.streakBonus[Math.min(streak, ASSUMED.streakBonus.length - 1)] : 0;
+  if (adv.includes("fauna") && streak >= 6 && won) streakGold = Math.max(streakGold, 4);
+  if (adv.includes("claims") && kind !== "Reward" && streak === 0) streakGold = Math.max(streakGold, 1);
   let drops = 0, item: string | undefined;
   const ores: string[] = [];
   if (kind === "Reward") {
@@ -1533,7 +1593,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
     allies: [...placed.map((x) => ({ name: x.u.name, cost: x.u.cost, stars: x.u.stars, power: perOf(x.u.uid)?.power ?? 0, place: x.place, spd: (pack.info?.[x.u.name]?.spd?.[x.u.stars - 1] ?? 0) + 100 * (perOf(x.u.uid)?.spd ?? 0) })), ...helpers],
     enemies: foes, waves: kind === "Boss" ? 1 : 2, won, cleared, ratio: power / Math.max(1, enemy),
     limit: kind === "Reward" ? null : RULES.actionValue[s.plane][boss ? 1 : 0], bossPhases: s.plane === 2 ? 3 : 2,
-    reviveCost: rankNumber(s.rank) >= 3 ? 35 : 15,
+    reviveCost: (rankNumber(s.rank) >= 3 ? 35 : 15) - (s.advantage?.includes("action-recovery") ? 10 : 0),
     scripted, notes,
   }, rng);
   if (s.oreOnKill) for (let k = 0; k < timeline.kills; k++) if (rng() < s.oreOnKill) ores.push(randomOre(s.plane, rng));
@@ -1554,6 +1614,13 @@ export function battle(s0: RunState, pack: CwPack): RunState {
     s = afterCombat(s, pack, tsrLevel, tp.express.collisions);
     s = afterFight(s, won);
   }
+  // Advantage Layout after-fight effects.
+  // Safety first: at 0 HP the run is over unless the Safety Mechanism catches it; healing never revives.
+  if (adv.includes("safety") && s.hp <= 0 && !(s.advantageUsed ?? []).includes("safety")) s = log({ ...s, hp: 1, advantageUsed: [...(s.advantageUsed ?? []), "safety"] }, "Safety Mechanism: squad HP stays at 1.");
+  if (adv.includes("claims") && s.hp > 0 && s.hp < 50 && !(s.advantageUsed ?? []).includes("claims")) s = log({ ...s, gold: s.gold + 5, advantageUsed: [...(s.advantageUsed ?? []), "claims"] }, "Claims Settlement: +5 gold.");
+  if (adv.includes("sustained-combat") && kind !== "Reward" && s.hp > 0) s = { ...s, hp: Math.min(RULES.startHp, s.hp + 2) };
+  if (adv.includes("basic-armament") && kind === "Boss" && won && s.plane < 2) { const b = randomBasic(pack, rng); if (b) s = log({ ...s, bag: [...s.bag, b] }, `Basic Armament: ${b}.`); }
+  if (adv.includes("victory") && kind === "Boss" && won && s.plane === RULES.planes.length - 1 && (timeline.end <= (timeline.limit ?? 0) - 100)) s = log({ ...s, hp: Math.min(RULES.startHp, s.hp + 40) }, "Victory Commendation: +40 squad HP.");
   if (kind !== "Reward") s = fireTriggers(s, pack, "combat", rng);
   if (kind === "Encounter") s = fireTriggers(s, pack, "encounter", rng);
   if (kind === "Boss") s = fireTriggers(s, pack, "boss", rng);

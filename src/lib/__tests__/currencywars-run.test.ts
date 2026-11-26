@@ -7,7 +7,7 @@ import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
-  ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, ahaStar, equipAha, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
+  ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, ahaStar, equipAha, promoteAeonAha, placedBondStates, rerollEnvironments, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
   nodeKind, nodeKinds, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
 import { chooseProtagonist, eligible, refreshPlot, refreshPrice, changeProtagonist, plotOf, plotOptions, PLOT_ARMOR_CONFIG } from "../currencywars/plotArmor";
@@ -18,6 +18,7 @@ import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/co
 import { offerGrades, shiftGrade } from "../currencywars/strategyGrades";
 import { abilityCard } from "../currencywars/abilities";
 import { kitCoverage, kitEffect, starValue } from "../currencywars/kits";
+import { emptyLayout, lockReason, payRun, resetLayout, syncSeason, unlockNode, advNode } from "../currencywars/advantage";
 import { ahaSpeed, PUNCHLINE, simulateElation, type ElationUnit } from "../currencywars/elation";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
 import { createRng } from "../warp/simulator";
@@ -1673,5 +1674,70 @@ describe("character kits in combat", () => {
     expect(kafka.power).toBeGreaterThan(alone.power);
     const tl = battle(s, withTopaz).last!.timeline!;
     expect(tl.units.some((u) => u.name === "Numby" && u.summon)).toBe(true);
+  });
+});
+
+// --------------------------------------------------------------------------------------------- Advantage Layout, Aeon ★ Aha
+
+describe("Advantage Layout and Phantasmal Orbs", () => {
+  it("seasonal nodes need every permanent one; unlocking spends Orbs; reset refunds; a new season refunds only seasonal", () => {
+    let l = { ...emptyLayout("Voyage Into the Canvas"), orbs: 500 };
+    expect(lockReason(l, advNode("atk-1")!)).toMatch(/Permanent/);
+    for (const id of ["battle-prep", "gold-blessing", "basic-armament", "bonus-supply", "strategy-refresh", "sustained-combat"]) l = unlockNode(l, id);
+    expect(lockReason(l, advNode("atk-1")!)).toBeNull();
+    l = unlockNode(unlockNode(l, "atk-1"), "sb-atk");
+    expect(advNode("sb-atk")!.cost).toBe(20);
+    const spent = 500 - l.orbs;
+    expect(resetLayout(l)).toMatchObject({ orbs: 500, unlocked: [] });
+    const next = syncSeason(l, "Next Season");
+    expect(next.unlocked.every((id) => !["atk-1", "sb-atk"].includes(id))).toBe(true);
+    expect(next.orbs).toBe(l.orbs + advNode("atk-1")!.cost + 20);
+    expect(spent).toBeGreaterThan(0);
+  });
+
+  it("a run pays Orbs once", () => {
+    const [a, n] = payRun(emptyLayout("S"), { id: "r1", cleared: true, rankSteps: 3, planesReached: 3, planeOneCleared: true });
+    expect(n).toBeGreaterThan(0);
+    expect(payRun(a, { id: "r1", cleared: true, rankSteps: 3, planesReached: 3, planeOneCleared: true })[1]).toBe(0);
+    expect(a.lastPlaneOne).toBe(true);
+  });
+
+  it("unlocked nodes change the run: Strategy Refresh, Sustained Combat, Bonus Supply, Safety Mechanism, Total Refresh", () => {
+    const adv = ["strategy-refresh", "sustained-combat", "bonus-supply", "safety", "total-refresh"];
+    let s = newRun(PG, "adv", "A0-1", { companion: "Sundove", variant: "sd-gift", advantage: adv });
+    expect(s.advantage).toEqual(adv);
+    expect(s.bag.length).toBeGreaterThanOrEqual(1);
+    const envs = rerollEnvironments(s, PG);
+    expect(envs.advantageUsed).toEqual(["env"]);
+    expect(rerollEnvironments(envs, PG)).toBe(envs);
+    s = chooseEnvironment(s, PG, 0);
+    const node = enterNode({ ...s, node: nodeKinds(0).indexOf("Strategy"), phase: "prep" }, PG);
+    expect(node.offers.strategyMeta!.perOption).toEqual([false, false, false]);
+    const sup = enterNode({ ...s, node: nodeKinds(0).indexOf("Supply"), phase: "prep" }, PG);
+    expect(sup.offers.supply).toHaveLength(RULES.supplyOffers + 1);
+    const fight = battle({ ...s, phase: "prep", plane: 1, node: 0, hp: 50 }, PG);
+    if (fight.last!.won) expect(fight.hp).toBe(52);
+    const dying = battle({ ...s, phase: "prep", plane: 2, node: 3, hp: 1, on: [u47(1, "Welt"), null, null, null], off: Array(6).fill(null) }, PG);
+    // Safety Mechanism keeps the squad at 1 HP (then Sustained Combat heals 2): the run goes on.
+    if (!dying.last!.won) { expect(dying.phase).not.toBe("over"); expect(dying.hp).toBe(3); expect(dying.advantageUsed).toContain("safety"); }
+    // Without Safety Mechanism, 0 HP ends the run even with Sustained Combat.
+    const noSafety = battle({ ...s, advantage: ["sustained-combat"], phase: "prep", plane: 2, node: 3, hp: 1, on: [u47(1, "Welt"), null, null, null], off: Array(6).fill(null) }, PG);
+    if (!noSafety.last!.won) expect(noSafety.phase).toBe("over");
+  });
+});
+
+describe("Aeon ★ Aha progression", () => {
+  const AA: CwPack = { ...PE, characters: [...PE.characters, { name: "Aeon ★ Aha", cost: 4 }], bonds: PE.bonds.map((b) => (b.name === "Elation" ? { ...b, members: [...b.members, "Aeon ★ Aha"] } : b)), info: { ...PE.info, "Aeon ★ Aha": { cost: 4, field: "on", roles: [], bonds: [], onField: STR[4], offField: [0, 0, 0], hp: [0, 30, 60] } } };
+  const aa = (stars: 1 | 2 | 3 = 1) => ({ uid: 77, name: "Aeon ★ Aha", cost: 4, stars, items: [] as string[] });
+  it("becomes 5-cost at level 5 and 7-cost when Elation characters' stars reach 10", () => {
+    const base = at47([], { level: 4, on: [aa(), null, null, null] });
+    expect(promoteAeonAha(base, placedBondStates(base, AA))).toBe(base);
+    const five = promoteAeonAha({ ...base, level: 5 }, placedBondStates(base, AA));
+    expect(five.on[0]!.cost).toBe(5);
+    const pe = (uid: number, name: string, stars: 1 | 2 | 3) => ({ uid, name, cost: AA.characters.find((c) => c.name === name)!.cost, stars, items: [] as string[] });
+    const big = at47([], { level: 5, on: [aa(3), pe(2, "Sparxie", 3), pe(3, "Yao Guang", 2), pe(4, "Silver Wolf LV.999", 2)] });
+    const seven = promoteAeonAha(big, placedBondStates(big, AA));
+    expect(seven.on[0]!.cost).toBe(7);
+    expect(teamPower(seven, AA).per.find((p) => p.name === "Aeon ★ Aha")!.power).toBeGreaterThan(teamPower(big, AA).per.find((p) => p.name === "Aeon ★ Aha")!.power);
   });
 });

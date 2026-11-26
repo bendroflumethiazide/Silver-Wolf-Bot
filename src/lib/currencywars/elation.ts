@@ -80,8 +80,9 @@ export interface ElationKit {
   bangerOnAction?: number; bangerCap?: number;
   /** Pearl's Repellency: share of DMG offset while holding Certified Banger. */
   repellency?: number;
-  /** Aeon ★ Aha: True DMG = share of the Instant's other DMG; always last. */
+  /** Aeon ★ Aha: True DMG = share of the Instant's other DMG; always last; values by cost (4/5/7). */
   trueShare?: number; last?: boolean;
+  byCost?: Record<number, { aoe: Star4; trueShare: Star4 }>;
   /** Silver Wolf LV.999: Hidden MMR at the start, DMG Amp at 180 points (by star). */
   hiddenMmrStart?: number; mmrDmgAt180?: Star4;
   /** Gains Punchline once per fight when Aha Instant is on the field (Sparkle's Ultimate). */
@@ -110,7 +111,7 @@ export const ELATION_KITS: Record<string, ElationKit> = {
     pid: 999, canElationSkill: true, aoe: [100, 125, 180], basicGetsAha: [60, 70, 80], bangerHit: [20, 30, 44], hiddenMmrStart: 60, mmrDmgAt180: [15, 20, 25],
     assumed: "Elation Skill multiplier (100/125/180%) assumed; Hidden MMR rises with every Punchline gained (her base kit).",
   },
-  "Aeon ★ Aha": { pid: 1000, canElationSkill: true, aoe: [80, 80, 80], trueShare: 0.3, last: true },
+  "Aeon ★ Aha": { pid: 1000, canElationSkill: true, aoe: [80, 80, 80], trueShare: 0.3, last: true, byCost: { 4: { aoe: [80, 80, 80], trueShare: [30, 30, 30] }, 5: { aoe: [100, 100, 100], trueShare: [40, 40, 40] }, 7: { aoe: [120, 150, 1000], trueShare: [50, 60, 100] } } },
   Sparkle: { pid: 0, canElationSkill: false, punchOnce: [10, 20, 30, 40] },
 };
 
@@ -123,7 +124,7 @@ export const AHA = {
 
 export const starOf = (v: Star4 | undefined, stars: number) => (v ? v[Math.min(v.length - 1, stars - 1)] ?? v[0] : 0) ?? 0;
 
-export interface ElationUnit { uid: number; name: string; stars: number; place: "on" | "off"; power: number; spdAmp: number; lucky: number; luckyDmg: number; elation: number }
+export interface ElationUnit { uid: number; name: string; cost?: number; stars: number; place: "on" | "off"; power: number; spdAmp: number; lucky: number; luckyDmg: number; elation: number }
 export interface AhaState { star: number; strength: number; dmg: number; lucky: number; luckyDmg: number; spdAmp: number }
 export type ElEventKind = "aha" | "dispel" | "elation" | "hit" | "punchline" | "banger" | "lucky" | "laughter" | "ore" | "boon" | "mmr";
 export interface ElEvent { t: number; kind: ElEventKind; who?: string; uid?: number; amount?: number; punchline?: number; text: string; lucky?: boolean }
@@ -282,10 +283,12 @@ export function simulateElation(units: ElationUnit[], aha: AhaState | null, av: 
       events.push({ t: tt, kind: "elation", who: u.name, uid: u.uid, text: `${u.name}: Elation Skill` });
       const boost = aha ? ahaBoost : none;
       if (k.trueShare) {
-        deal(tt += 0.005, u, u.name, starOf(k.aoe, u.stars) * ELATION_ASSUMED.aoeTargets, counted(), boost, "all enemies");
-        const tr = (damage - before) * k.trueShare;
+        const byCost = k.byCost?.[u.cost ?? 4] ?? k.byCost?.[4];
+        deal(tt += 0.005, u, u.name, starOf(byCost?.aoe ?? k.aoe, u.stars) * ELATION_ASSUMED.aoeTargets, counted(), boost, "all enemies");
+        const share = byCost ? starOf(byCost.trueShare, u.stars) / 100 : k.trueShare;
+        const tr = (damage - before) * share;
         damage += tr; byUnit.set(u.uid, (byUnit.get(u.uid) ?? 0) + tr);
-        events.push({ t: tt += 0.005, kind: "hit", who: u.name, uid: u.uid, amount: tr, text: `${u.name} · True DMG (${k.trueShare * 100}% of this Instant's DMG): ${Math.round(tr * 10) / 10}` });
+        events.push({ t: tt += 0.005, kind: "hit", who: u.name, uid: u.uid, amount: tr, text: `${u.name} · True DMG (${Math.round(share * 100)}% of this Instant's DMG): ${Math.round(tr * 10) / 10}` });
         continue;
       }
       if (k.pearlBuff) {

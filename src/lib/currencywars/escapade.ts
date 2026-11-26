@@ -136,10 +136,12 @@ export function checkAssignments(s: RunState): RunState {
 // --------------------------------------------------------------------------------------------- run start
 
 /** Roll this run's companion and effect, and apply what happens at the start. */
-export function startEscapade(s0: RunState, pack: CwPack, companion?: string, variant?: string): RunState {
+export function startEscapade(s0: RunState, pack: CwPack, companion?: string, variant?: string, luck = false): RunState {
   const rng = createRng(`${s0.seed}:escapade`);
   const c = (companion && companionOf(companion)) || pickOne(rng, COMPANIONS);
-  const v = (variant && c.variants.find((x) => x.id === variant)) || pickOne(rng, c.variants);
+  let v = (variant && c.variants.find((x) => x.id === variant)) || pickOne(rng, c.variants);
+  // Advantage Layout "Luck Escapade": a chance at a luckier occurrence (here: one with a Backstage Tea Break, which gives a choice).
+  if (luck && !variant && !v.teaBreak && rng() < 0.5) { const tea = c.variants.filter((x) => x.teaBreak); if (tea.length) v = pickOne(rng, tea); }
   let s: RunState = { ...s0, escapade: { companion: c.name, variant: v.id, revealed: false, history: [], done: [] } };
   s = log(s, `Voyage Companion: ${c.name}. ${v.text}`);
   switch (v.id) {

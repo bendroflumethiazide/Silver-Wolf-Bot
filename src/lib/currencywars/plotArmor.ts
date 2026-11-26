@@ -110,6 +110,10 @@ export interface PlotArmorState {
   paid: number;
   /** "Plot Armor Procurement": fixed price. */
   fixedCost?: number;
+  /** Advantage Layout "Plot Armor Selection": extra refreshes at the first price. */
+  cheapBonus?: number;
+  /** Recently offered options (Victory Commendation: no repeats within 12 refreshes). */
+  recent?: string[];
   /** "Refresh Chain": free Store refreshes per Plot Armor refresh. */
   storeChain: number;
   /** "Early Entrance": selection nodes [plane 1, plane 2] (0-based). */
@@ -141,12 +145,15 @@ export const selectionDue = (s: RunState) => (PLOT_ARMOR_RULES.planes as readonl
 /** The price of the next paid refresh. */
 export function refreshPrice(p: PlotArmorState): number {
   if (p.fixedCost !== undefined) return p.fixedCost;
-  const over = Math.max(0, p.paid - PLOT_ARMOR_CONFIG.cheapRefreshes + 1);
+  const over = Math.max(0, p.paid - (PLOT_ARMOR_CONFIG.cheapRefreshes + (p.cheapBonus ?? 0)) + 1);
   return PLOT_ARMOR_RULES.firstPaidCost + over * PLOT_ARMOR_CONFIG.escalation;
 }
 
-function rollOptions(s: RunState, pack: CwPack, rng: () => number, avoid: string[] = []): string[] {
+function rollOptions(s: RunState, pack: CwPack, rng: () => number, avoid0: string[] = []): string[] {
   const all = plotOptions(pack);
+  // Victory Commendation: no option repeats within 12 refreshes (when enough options exist).
+  const recent = s.advantage?.includes("victory") ? (s.plotArmor?.recent ?? []).slice(-12 * PLOT_ARMOR_CONFIG.options) : [];
+  const avoid = all.length - recent.length > PLOT_ARMOR_CONFIG.options + avoid0.length ? [...avoid0, ...recent] : avoid0;
   const boosted = !!s.escapade?.powerfulPlot;
   const chance = boosted ? PLOT_ARMOR_CONFIG.powerfulBoosted : PLOT_ARMOR_CONFIG.powerful;
   const out: string[] = [];
@@ -197,7 +204,8 @@ export function refreshPlot(s0: RunState, pack: CwPack): RunState {
   if (freeIdx >= 0) text = `Free Plot Armor refresh (${p0.free[freeIdx].source}).`;
   else { s = { ...s, gold: s.gold - price }; p = { ...p, paid: p.paid + 1 }; text = `Plot Armor refresh for ${price} gold.`; }
   p = hist(p, s, { kind: "refresh", text, cost: freeIdx >= 0 ? 0 : price, free: freeIdx >= 0 ? p0.free[freeIdx].source : undefined });
-  p = { ...p, current: { ...cur, options: rollOptions(s, pack, rng, cur.options), refreshes: cur.refreshes + 1 } };
+  const fresh = rollOptions(s, pack, rng, cur.options);
+  p = { ...p, current: { ...cur, options: fresh, refreshes: cur.refreshes + 1 }, recent: [...(p.recent ?? []), ...cur.options].slice(-48) };
   if (p.storeChain) { s = { ...s, freeRefreshes: s.freeRefreshes + p.storeChain }; text += ` +${p.storeChain} free Store refresh (Refresh Chain).`; }
   return log(withPlot(s, p), text);
 }
