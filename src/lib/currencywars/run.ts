@@ -8,11 +8,12 @@
  * turn-by-turn battle.
  */
 import { createRng } from "../warp/simulator";
-import type { BondTier, CwAdvancedItem, CwCharInfo, CwNamed, CwStrategy, StrategyRarity } from "./parse";
+import type { CwAdvancedItem, CwCharInfo, CwNamed, CwStrategy, StrategyRarity } from "./parse";
 import { combineResult, emblemBond, goldOreName, isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS, oreGold, oreName, oreTier, type OreTier } from "./items";
 import { membersOf } from "./bonds";
 import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPack } from "./sim";
 import { buildTimeline, type Timeline } from "./timeline";
+import { addStats, bondEffect, itemEffect, powerMult, zeroStats, type BondCtx, type Stats, type Summon } from "./combat";
 import { specialItem } from "./specialItems";
 import { afterCombat, expressPower, nodeTp, storeStats, syncTsrLevel, TSR_BOND, tsrOf, type TsrState } from "./trailblazeStore";
 import {
@@ -96,18 +97,14 @@ export const ASSUMED = {
 
 /** Combat model weights (a simplification). */
 export const MODEL = {
-  bond: { bronze: 0.08, silver: 0.12, gold: 0.18, plat: 0.25 } as Record<BondTier, number>,
-  basicItem: 0.05,
-  /** An Emblem's own stats (its Bond is counted separately). */
-  emblemItem: 0.08,
-  advancedItem: 0.15,
+  // Equipment and Bonds now use their own wiki stats and effects (combat.ts).
   /** Extra for an advanced item the wiki lists as good on that character. */
   recommended: 0.1,
   /** How much the HP bonus counts toward strength. */
   hpWeight: 0.5,
   /** Win chance = 1 / (1 + e^(-steepness × (ratio − 1))). */
   steepness: 6,
-  enemyScale: 0.66,
+  enemyScale: 0.74,
   /** Expected player level at the start, at each plane's boss. */
   levelCurve: [3, 6, 8, 9],
 } as const;
@@ -116,6 +113,8 @@ export interface Unit {
   uid: number; name: string; cost: number; stars: 1 | 2 | 3; items: string[];
   /** A non-character squad member (Peppy): no strength of its own, never merges, its Emblems count for Bonds. */
   npc?: boolean;
+  /** Whatever Dice: basic equipment it put on this unit for the current node. */
+  dice?: string[];
 }
 /** A grant that happens later or repeatedly. `text` is wiki wording run through the grant parser (or a special "__" rule). */
 export interface Trigger {
@@ -721,6 +720,7 @@ export function enterNode(s0: RunState, pack: CwPack): RunState {
   s = fireTriggers(s, pack, "node", rng);
   s = nodeTp(s);
   s = frenzyContract(s, pack, rng);
+  s = rollDice(s, pack);
   // The store refreshes at the start of every node. Lock keeps it for the next node only (tutorial "Store"), then releases.
   if (!s.locked) s = { ...s, shop: rollShopSlots(s, pack, rng), shopNote: "refreshed" };
   else s = log({ ...s, locked: false, shopNote: "kept" }, "Store kept by Lock for this node (lock released).");
@@ -728,6 +728,20 @@ export function enterNode(s0: RunState, pack: CwPack): RunState {
   s = { ...s, nodeOpponent: opp ?? "", encounter: null, last: null, interlude: undefined };
   s = onEnterNode(s, pack, rng, () => highestBond(s, pack));
   return settle(withInterludes(nodePhase(s, pack, kind, rng), pack), pack);
+}
+
+/** Whatever Dice: at each node it puts two random items on its holder (for that node). */
+function rollDice(s: RunState, pack: CwPack): RunState {
+  if (!units(s).some((u) => u.items.includes("Whatever Dice") || u.dice)) return s;
+  const rng = createRng(`${s.seed}:dice:${s.tick}`);
+  const roll = (u: Unit | null): Unit | null => {
+    if (!u || (!u.items.includes("Whatever Dice") && !u.dice)) return u;
+    if (!u.items.includes("Whatever Dice")) { const { dice: _gone, ...rest } = u; void _gone; return rest; }
+    return { ...u, dice: [randomBasic(pack, rng), randomBasic(pack, rng)].filter((x): x is string => !!x) };
+  };
+  const out = { ...s, on: s.on.map(roll), off: s.off.map(roll), bench: s.bench.map(roll) };
+  const got = units(out).filter((u) => u.dice?.length).map((u) => `${u.name}: ${u.dice!.join(", ")}`);
+  return got.length ? log(out, `Whatever Dice: ${got.join("; ")}.`) : out;
 }
 
 /** The node's own choice (Strategy, Supply, Encounter, Tea Break) or preparation. */
@@ -1053,29 +1067,38 @@ export function openOre(s0: RunState, pack: CwPack, bagIndex: number): RunState 
 
 const STRENGTH_FALLBACK: Record<number, number[]> = { 1: [100, 160, 220], 2: [125, 190, 260], 3: [140, 220, 300], 4: [175, 270, 450], 5: [200, 320, 2000] };
 
-/** One unit's strength in a position: wiki On-/Off-Field Strength at its star, HP bonus and items. */
-export function unitPower(u: Unit, place: "on" | "off", pack: CwPack, ctx: { singularity?: number } = {}): number {
+/** A unit's strength from its wiki page alone: On-/Off-Field Strength at its star and HP bonus. */
+export function unitBase(u: Unit, place: "on" | "off", pack: CwPack): number {
   if (u.npc) return 0;
   const info: CwCharInfo | undefined = pack.info?.[u.name];
   const i = u.stars - 1;
-  let base = info ? ((place === "on" ? info.onField : info.offField)[i] ?? 0) * (1 + ((info.hp[i] ?? 0) / 100) * MODEL.hpWeight) : (STRENGTH_FALLBACK[u.cost] ?? STRENGTH_FALLBACK[1])[i];
-  if (!base) return 0;
-  let mult = 1;
-  for (const it of u.items) {
-    const kind = itemKind(pack, it);
-    if (kind === "basic") mult += MODEL.basicItem;
-    else if (kind === "emblem") mult += MODEL.emblemItem;
-    else if (kind === "gem" || kind === "consumable") continue;
-    else if (kind === "component") {
-      const sp = specialItem(it);
-      mult += it === "Imploding Singularity" ? ESCAPADE_ASSUMED.singularity.perStack * (ctx.singularity ?? 0) : sp?.power ?? MODEL.advancedItem;
-    } else {
-      mult += MODEL.advancedItem;
-      if (pack.equipment?.advanced.find((a) => a.name === it)?.users.includes(u.name)) mult += MODEL.recommended;
-    }
+  return info ? ((place === "on" ? info.onField : info.offField)[i] ?? 0) * (1 + ((info.hp[i] ?? 0) / 100) * MODEL.hpWeight) : (STRENGTH_FALLBACK[u.cost] ?? STRENGTH_FALLBACK[1])[i];
+}
+
+/** What a unit's own equipment does: stats on itself, and passives for the whole squad. */
+export function unitItems(u: Unit, place: "on" | "off", pack: CwPack, ctx: { singularity?: number; boss?: boolean } = {}): { self: Stats; squad: Partial<Stats>[]; notes: string[] } {
+  let self = zeroStats();
+  const squad: Partial<Stats>[] = [];
+  const notes: string[] = [];
+  // Evolution Modification Module: the first advanced item counts as privileged.
+  const evo = u.items.includes("Evolution Modification Module");
+  const firstAdv = u.items.find((it) => itemKind(pack, it) === "advanced");
+  for (const it of [...u.items, ...(u.dice ?? [])]) {
+    if (it === "Imploding Singularity") { self = addStats(self, { str: ESCAPADE_ASSUMED.singularity.perStack * (ctx.singularity ?? 0) }); continue; }
+    const fx = itemEffect(pack, it, { place, stars: u.stars, boss: !!ctx.boss, privileged: evo && it === firstAdv });
+    self = addStats(self, fx.self);
+    if (Object.keys(fx.squad).length) squad.push(fx.squad);
+    if (fx.notes.length) notes.push(`${it}: ${fx.notes.join(", ")}`);
+    if (pack.equipment?.advanced.find((a) => a.name === it)?.users.includes(u.name)) self = addStats(self, { str: MODEL.recommended });
   }
-  base *= mult;
-  return base;
+  return { self, squad, notes };
+}
+
+/** One unit's strength in a position on its own: wiki strength, HP bonus and its equipment's stats. */
+export function unitPower(u: Unit, place: "on" | "off", pack: CwPack, ctx: { singularity?: number; boss?: boolean } = {}): number {
+  const base = unitBase(u, place, pack);
+  if (!base) return 0;
+  return base * powerMult(unitItems(u, place, pack, ctx).self, place);
 }
 
 /** The season's bonds with this run's variant rules. */
@@ -1104,38 +1127,70 @@ export function placedBondStates(s: RunState, pack: CwPack) {
   return boardBonds(board, bondList);
 }
 
+export interface SummonPower extends Summon { power: number }
+
 export function teamPower(s: RunState, pack: CwPack) {
   const placed = placedOf(s);
-  const ctx = { singularity: s.escapade?.singularity };
-  const bases = placed.map((x) => unitPower(x.u, x.place, pack, ctx));
-  const raw = bases.reduce((n, b) => n + b, 0);
+  const kind = nodeKind(s);
+  const boss = kind === "Boss" || kind === "Encounter";
+  const av = kind === "Reward" ? null : RULES.actionValue[s.plane]?.[kind === "Boss" ? 1 : 0] ?? null;
+  const ctx = { singularity: s.escapade?.singularity, boss };
+  const fighters = placed.filter((x) => !x.u.npc);
+  const items = new Map(placed.map((x) => [x.u.uid, unitItems(x.u, x.place, pack, ctx)]));
+  const bases = new Map(fighters.map((x) => [x.u.uid, unitBase(x.u, x.place, pack)]));
+  const raw = fighters.reduce((n, x) => n + (bases.get(x.u.uid) ?? 0) * powerMult(items.get(x.u.uid)!.self, x.place), 0);
+  // Equipment passives that help the whole squad (Weapon Master, Meteor Wings, Sturdy Plate…).
+  const squadItems = [...items.values()].flatMap((x) => x.squad).reduce<Stats>((a, b) => addStats(a, b), zeroStats());
   const touched = placedBondStates(s, pack);
   const bonds = touched.filter((b) => b.tier);
   const teamBonds = bonds.filter((b) => b.bond.category !== PLOT_ARMOR_RULES.bondCategory);
-  const bonus = teamBonds.reduce((n, b) => n + MODEL.bond[b.tier!], 0);
-  const idle = placed.filter((x) => !x.u.npc && unitPower(x.u, x.place, pack, ctx) === 0).map((x) => x.u.name);
+  const idle = placed.filter((x) => !x.u.npc && !bases.get(x.u.uid)).map((x) => x.u.name);
+  const bctx: BondCtx = {
+    placed: fighters.map((x) => ({ uid: x.u.uid, name: x.u.name, cost: x.u.cost, stars: x.u.stars, items: x.u.items, place: x.place, base: (bases.get(x.u.uid) ?? 0) * powerMult(items.get(x.u.uid)!.self, x.place) })),
+    nodes: globalIndex(s.plane, s.node) + 1, av: av ?? 150, boss, storeLevel: s.level, isBasic: (i) => isBasic(pack, i),
+  };
+  const effects = teamBonds.map((b) => bondEffect(pack, b, bctx));
+  const memberOf = (e: (typeof effects)[number], name: string) => teamBonds.find((b) => b.bond.name === e.bond)?.bond.members.includes(name) ?? false;
   // 4.7 extras: Trailblaze Store stats, Plot Armor (options, Plot Armor Bonds, Roll-Call 7).
   const store = storeStats(s);
   const rule = s.variants?.["Phantasmoon Games"];
   const phantasmoon = touched.find((b) => b.bond.name.startsWith("Phantasmoon Games"))?.count ?? 0;
   const rollCall7 = !!rule && /Roll-Call/.test(rule) && phantasmoon >= PLOT_ARMOR_RULES.rollCall.boostAt;
-  const ctxs: UnitCtx[] = placed.filter((x) => !x.u.npc).map((x) => ({ uid: x.u.uid, name: x.u.name, cost: x.u.cost, stars: x.u.stars, place: x.place, bonds: touched.filter((b) => b.bond.members.includes(x.u.name)).map((b) => b.bond.name.replace(/: .*$/, "")) }));
-  const share = (c: UnitCtx) => teamBonds.filter((b) => b.bond.members.includes(c.name)).reduce((n, b) => n + MODEL.bond[b.tier!], 0);
-  const per = placed.map((x, i) => {
-    const c = ctxs.find((y) => y.uid === x.u.uid);
-    const plot = c ? plotUnitBonus(s, pack, c, ctxs, rollCall7, share) : { strength: 0, spd: 0 };
-    const mult = 1 + bonus + (x.place === "on" ? store.on : store.off) + store.team + plot.strength;
-    return { uid: x.u.uid, name: x.u.name, place: x.place, power: bases[i] * mult, spd: store.spd + plot.spd, plot: plot.strength };
+  const ctxs: UnitCtx[] = fighters.map((x) => ({ uid: x.u.uid, name: x.u.name, cost: x.u.cost, stars: x.u.stars, place: x.place, bonds: touched.filter((b) => b.bond.members.includes(x.u.name)).map((b) => b.bond.name.replace(/: .*$/, "")) }));
+  const share = (c: UnitCtx) => effects.filter((e) => memberOf(e, c.name)).reduce((n, e) => n + (e.members.str ?? 0) + (e.members.dmg ?? 0), 0);
+  const per = fighters.map((x) => {
+    const c = ctxs.find((y) => y.uid === x.u.uid)!;
+    const plot = plotUnitBonus(s, pack, c, ctxs, rollCall7, share);
+    let st = addStats(items.get(x.u.uid)!.self, squadItems);
+    const noBonds = st;
+    for (const e of effects) {
+      if (memberOf(e, x.u.name)) st = addStats(st, e.members);
+      st = addStats(st, e.squad);
+      const own = e.perUnit.get(x.u.uid);
+      if (own) st = addStats(st, own);
+    }
+    st = addStats(st, { on: store.on, off: store.off, dmg: store.team, str: plot.strength, spd: plot.spd });
+    const base = bases.get(x.u.uid) ?? 0;
+    return { uid: x.u.uid, name: x.u.name, place: x.place, power: base * powerMult(st, x.place), noBonds: base * powerMult(noBonds, x.place), spd: st.spd, plot: plot.strength, stats: st };
   });
-  const kind = nodeKind(s);
-  const av = kind === "Reward" ? null : RULES.actionValue[s.plane]?.[kind === "Boss" ? 1 : 0] ?? null;
+  const units = per.reduce((n, x) => n + x.power, 0);
+  const bonus = units / Math.max(1, per.reduce((n, x) => n + x.noBonds, 0)) - 1;
+  // Bond summons fight too (Crimson Thorns, Starskiff, Quintet Joint, Soul, Aha, chimeras, Svarog, Dan Heng • Permansor Terrae…).
+  const summons: SummonPower[] = effects.flatMap((e) => e.summons).map((m) => {
+    if (m.character) {
+      const src = fighters.find((x) => x.u.name === "Dan Heng • Imbibitor Lunae");
+      const copy: Unit = { uid: -1, name: m.character.name, cost: m.character.cost, stars: m.character.stars, items: (src?.u.items ?? []).slice(0, m.character.stars) };
+      return { ...m, power: unitPower(copy, m.character.place, pack, ctx) * powerMult(squadItems, m.character.place) };
+    }
+    return { ...m, power: m.power ?? m.share * units };
+  });
+  const summonPower = summons.reduce((n, m) => n + m.power, 0);
   const whistles = placed.filter((x) => x.u.items.includes("Trailblaze's Whistle")).length;
   const express = expressPower(s, av, whistles);
   const robot = robotFor(s, kind);
   const robotBonus = robot ? (robot.mult / 100) * Math.max(1, Math.floor(((av ?? 150) * robot.spd) / 10000)) * 0.01 : 0;
-  const units = per.reduce((n, x) => n + x.power, 0);
-  const power = units * (1 + express.bonus + robotBonus);
-  return { raw, bonus, power, bonds, idle, per, express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7 };
+  const power = (units + summonPower) * (1 + express.bonus + robotBonus);
+  return { raw, bonus, power, bonds, idle, per, summons, effects, express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7, squadItems };
 }
 
 /** Average strength of a cost at a (fractional) star level, from the pack's character pages. */
@@ -1210,11 +1265,16 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const enemies = !oppData ? [] : boss ? [oppData.bosses.join(" + ")] : kind === "Reward" ? ["Independent Venture"] : sample(rng, oppData.normals, 2).concat(nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? sample(rng, oppData.elites, 1) : []);
   const placed = [...s.on.map((u) => ({ u, place: "on" as const })), ...s.off.map((u) => ({ u, place: "off" as const }))].filter((x): x is { u: Unit; place: "on" | "off" } => !!x.u && !x.u.npc);
   const perOf = (uid: number) => tp.per.find((p) => p.uid === uid);
-  // The Astral Express and Mr. Yang's Belobog Robot fight alongside the squad.
-  const helpers: { name: string; cost: number; stars: 1; power: number; place: "on"; spd: number }[] = [];
+  // Bond summons, the Astral Express and Mr. Yang's Belobog Robot fight alongside the squad (and show on the turn order).
+  type Helper = { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off"; spd: number; summon?: { emoji: string; bond: string; spd: number; note?: string } };
+  const helpers: Helper[] = [];
   const squad = tp.per.reduce((n, p) => n + p.power, 0);
-  if (tp.express.bonus > 0) helpers.push({ name: "Astral Express", cost: 5, stars: 1, power: squad * tp.express.bonus, place: "on", spd: Math.max(0, tp.express.spd - 100) });
-  if (tp.robot) helpers.push({ name: "Belobog Robot", cost: 4, stars: 1, power: squad * tp.robot.bonus, place: "on", spd: tp.robot.spd - 100 });
+  for (const m of tp.summons) {
+    if (m.character) helpers.push({ name: m.character.name, cost: m.character.cost, stars: m.character.stars, power: m.power, place: m.character.place, spd: pack.info?.[m.character.name]?.spd?.[m.character.stars - 1] ?? 0 });
+    else helpers.push({ name: m.name, cost: 3, stars: 1, power: m.power, place: "on", spd: 0, summon: { emoji: m.emoji, bond: m.bond, spd: m.spd, note: m.note } });
+  }
+  if (tp.express.bonus > 0) helpers.push({ name: "Astral Express", cost: 5, stars: 1, power: squad * tp.express.bonus, place: "on", spd: 0, summon: { emoji: "🚂", bond: "Trailblaze Silver Rail", spd: tp.express.spd, note: tp.express.spd ? `${tp.express.spd} SPD` : "crashes in at the start" } });
+  if (tp.robot) helpers.push({ name: "Belobog Robot", cost: 4, stars: 1, power: squad * tp.robot.bonus, place: "on", spd: 0, summon: { emoji: "🤖", bond: "Mr. Yang", spd: tp.robot.spd, note: `${tp.robot.mult}% base DMG` } });
   const foes = kind === "Boss" ? [{ name: enemies[0] ?? "Boss", boss: true }]
     : Array.from({ length: kind === "Reward" ? 4 : 5 + (nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? 1 : 0) }, (_, k) => {
       const elite = kind !== "Reward" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node && k >= 4;

@@ -14,6 +14,7 @@ import { chooseProtagonist, eligible, refreshPlot, refreshPrice, changeProtagoni
 import { buyTsr, expressPower, refreshTsr, tsrIncome, tsrOf, priceOf, tsrGood, TSR_GOODS } from "../currencywars/trailblazeStore";
 import { COMPANIONS } from "../currencywars/voyageCompanions";
 import { openBox, shiftEarlier } from "../currencywars/escapade";
+import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
 import { createRng } from "../warp/simulator";
 
@@ -379,7 +380,7 @@ describe("Currency Wars run simulator", () => {
   it("pays base, streak and interest after a fight and loses HP by the plane table on a loss", () => {
     let s = chooseEnvironment(newRun(PACK, "g", "A0-1"), PACK, 1);
     s = { ...s, gold: 37, phase: "prep", plane: 1, node: 0, streak: 0 };
-    const won = battle({ ...s, on: [{ uid: 1, name: "Kafka", cost: 5, stars: 3, items: [] }, null, null, null] }, PACK);
+    const won = battle({ ...s, on: [{ uid: 1, name: "Kafka", cost: 5, stars: 3, items: [] }, null, null, null], off: [{ uid: 2, name: "Jade", cost: 5, stars: 3, items: [] }, null, null, null, null, null] }, PACK);
     expect(won.last!.won).toBe(true);
     expect(won.last!.gold).toEqual({ base: ASSUMED.baseIncome, streak: 0, interest: 3, drops: 0 });
     const lost = battle({ ...s, on: [{ uid: 1, name: "Welt", cost: 1, stars: 1, items: [] }, null, null, null], off: Array(6).fill(null) }, PACK);
@@ -1229,5 +1230,91 @@ describe("4.7 Plot Armor", () => {
     expect(new Set(a.plotArmor!.done).size).toBe(a.plotArmor!.done.length);
     expect(TSR_GOODS.length).toBeGreaterThan(40);
     expect(nextInterlude(a, P47)).toBe(a);
+  });
+});
+
+// --------------------------------------------------------------------------------------------- summons and equipment passives
+
+const adv = (name: string, stats: string[], effect: string) => ({ name, tags: [], stats, effect, users: [], recipe: ["Folding Knife", "Roller Skates"] as [string, string] });
+const P48: CwPack = {
+  ...P47,
+  characters: [...P47.characters, { name: "Dan Heng • Imbibitor Lunae", cost: 5 }, { name: "Dan Heng • Permansor Terrae", cost: 4 }].filter((c, i, a) => a.findIndex((x) => x.name === c.name) === i),
+  bonds: [
+    ...P47.bonds,
+    { name: "DoT", category: "School", members: ["Kafka", "Natasha", "Luocha", "Huohuo", "Serval"], summary: '"DoT" members\' DoT Amplification increases, and "Crimson Thorns" are summoned to attack all enemy targets. Ally squad gains 20% DMG Mitigation.', levels: [
+      { count: 3, effect: "20% DoT Amplification.", tier: "bronze" }, { count: 5, effect: '50% DMG Amplification. Increases the action SPD of "Crimson Thorns" to 300', tier: "silver" }] },
+    { name: "Twin Dragons' Call", category: "Unique", members: ["Dan Heng • Imbibitor Lunae", "Dan Heng • Permansor Terrae"], summary: "", levels: [{ count: 1, effect: 'When entering combat, summons "Dan Heng • Permansor Terrae" to the off-field area.', tier: "gold" }] },
+  ],
+  equipment: {
+    ...P47.equipment!,
+    advanced: [
+      ...P47.equipment!.advanced,
+      adv("Weapon Master", ["On-Field Strength 20%/40%", "Off-Field Strength 20%/40%"], "Increases ally squad's on-field/off-field strength by 25%/50%."),
+      adv("Codex of Combat", ["On-Field Strength 20%/40%"], "The wearer gains 7%/14% SPD Amplification and 7%/14% DMG Amplification. When the wearer is 2/3-star or higher, these amplifications respectively increase to 3/6 times their original values."),
+      adv("Colossal Imagenated Armor", ["DMG Mitigation 10%/20%"], "After the wearer is attacked by an enemy target or consumes HP, gains 6%/12% On/Off-Field Strength. This effect is stackable and can only be triggered 1 time per action."),
+      adv("Whatever Dice", ["DMG Mitigation 20%/40%"], "At each Node, Whatever Dice randomly equips the character with two items (requires empty equipment slot to equip Whatever Dice)."),
+    ],
+  },
+  info: { ...P47.info, "Dan Heng • Imbibitor Lunae": { cost: 5, field: "on", roles: [], bonds: [], onField: STR[5], offField: [0, 0, 0], hp: [0, 30, 60] }, "Dan Heng • Permansor Terrae": { cost: 4, field: "off", roles: [], bonds: [], onField: [0, 0, 0], offField: STR[4], hp: [0, 30, 60] } },
+};
+
+describe("equipment passives and Bond effects work in battle", () => {
+  it("reads item stats and passives: squad buffs, star scaling, stacks, privileged values", () => {
+    const wm = itemEffect(P48, "Weapon Master", { place: "on", stars: 1, boss: false });
+    expect(wm.self).toMatchObject({ on: 0.2, off: 0.2 });
+    expect(wm.squad).toEqual({ str: 0.25 });
+    expect(itemEffect(P48, "Weapon Master", { place: "on", stars: 1, boss: false, privileged: true }).squad).toEqual({ str: 0.5 });
+    expect(itemEffect(P48, "Codex of Combat", { place: "on", stars: 3, boss: false }).self.dmg).toBeCloseTo(0.42);
+    expect(itemEffect(P48, "Colossal Imagenated Armor", { place: "on", stars: 1, boss: false }).self.str).toBeGreaterThan(0);
+    expect(itemEffect(P48, "Folding Knife", { place: "on", stars: 1, boss: false }).self).toEqual({ on: 0.1 });
+    expect(powerMult({ ...zeroStats(), on: 0.5 }, "off")).toBe(1);
+  });
+
+  it("Weapon Master raises the whole squad's strength, not just its wearer", () => {
+    const s = at47(["Kafka", "Welt"], {}, { companion: "Sundove", variant: "sd-gift" });
+    const plain = teamPower(s, P48).per.find((p) => p.name === "Welt")!.power;
+    const worn = { ...s, on: [{ ...s.on[0]!, items: ["Weapon Master"] }, ...s.on.slice(1)] };
+    expect(teamPower(worn, P48).per.find((p) => p.name === "Welt")!.power).toBeCloseTo(plain * 1.25, 3);
+  });
+
+  it("Bond texts become stats: members vs squad", () => {
+    expect(levelStats("50% DMG Amplification. Increases the action SPD of \"Crimson Thorns\" to 300")).toEqual([{ dmg: 0.5 }, {}]);
+    expect(levelStats("Ally squad gains 20% DMG Mitigation.")).toEqual([{}, { mit: 0.2 }]);
+    expect(levelStats("Gains 1 Height. DMG taken by the enemy increases by 12%, and DMG dealt decreases by 6%.")[1]).toEqual({ dmg: 0.12, mit: 0.06 });
+  });
+
+  it("DoT's Crimson Thorns fights at 300 SPD, is on the turn order and isn't attacked", () => {
+    const s = at47(["Kafka", "Natasha", "Luocha", "Huohuo", "Serval"], { plane: 0, node: 3 });
+    const tp = teamPower(s, P48);
+    expect(tp.summons.map((m) => [m.name, m.spd])).toEqual([["Crimson Thorns", 300]]);
+    expect(tp.effects.find((e) => e.bond === "DoT")!.squad).toEqual({ mit: 0.2 });
+    const fought = battle(s, P48);
+    const tl = fought.last!.timeline!;
+    const thorns = tl.units.find((u) => u.name === "Crimson Thorns")!;
+    expect(thorns.summon).toMatchObject({ bond: "DoT", spd: 300 });
+    expect(tl.turns!.some((t) => t.id === thorns.id)).toBe(true);
+    expect(tl.events.some((e) => e.kind === "hit" && e.to === thorns.id)).toBe(false);
+    // Without the summon the squad is weaker.
+    const solo = teamPower({ ...s, on: [s.on[0], null, null, null], off: Array(6).fill(null) }, P48);
+    expect(solo.summons).toHaveLength(0);
+  });
+
+  it("Twin Dragons' Call summons Dan Heng • Permansor Terrae off-field with copied equipment", () => {
+    const s = at47(["Dan Heng • Imbibitor Lunae"], { plane: 0, node: 3 });
+    const withGear = { ...s, on: [{ ...s.on[0]!, stars: 2 as const, items: ["Folding Knife", "Weapon Master", "Roller Skates"] }, null, null, null] };
+    const tp = teamPower(withGear, P48);
+    const pt = tp.summons.find((m) => m.character)!;
+    expect(pt.character).toMatchObject({ name: "Dan Heng • Permansor Terrae", stars: 2, place: "off" });
+    expect(pt.power).toBeGreaterThan(0);
+    const tl = battle(withGear, P48).last!.timeline!;
+    expect(tl.units.some((u) => u.name === "Dan Heng • Permansor Terrae" && u.side === "ally" && !u.summon)).toBe(true);
+  });
+
+  it("Whatever Dice puts two random items on its holder at each node", () => {
+    const s = at47(["Kafka"], { plane: 0, node: 3 });
+    const held = { ...s, on: [{ ...s.on[0]!, items: ["Whatever Dice"] }, null, null, null] };
+    const next = enterNode(held, P48);
+    expect(next.on[0]!.dice).toHaveLength(2);
+    expect(teamPower(next, P48).power).toBeGreaterThan(teamPower(held, P48).power);
   });
 });

@@ -28,6 +28,7 @@ import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
 import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
 import { BondTracker, TrackMark, useTracked } from "./tracking";
+import { useSimple, Verbose } from "./simple";
 
 const RUN_KEY = "cwRun";
 const NODE_ICON: Record<NodeKind, LucideIcon> = { Reward: Gift, Strategy: Flag, Combat: Swords, Supply: Package, Encounter: Dices, Boss: Skull };
@@ -45,13 +46,13 @@ function Setup({ pack, onStart }: { pack: CwPack; onStart: (rank: string, seed: 
   const step = steps.find((d) => d.id === rank);
   return (
     <Panel title="New run">
-      <ol className="mb-4 grid gap-2 text-sm sm:grid-cols-3">
+      <Verbose><ol className="mb-4 grid gap-2 text-sm sm:grid-cols-3">
         {[
           ["1. Pick an Investment Environment", "A buff for the whole run."],
           ["2. Build your squad", "Buy, merge 3 copies into stars, deploy On-/Off-Field, equip items."],
           ["3. Clear 3 planes", "Each ends in a boss. Lose a fight, lose squad HP. 0 HP ends the run."],
         ].map(([t, d]) => <li key={t} className="rounded-lg border border-line p-2.5"><b className="block text-text">{t}</b><span className="text-xs text-muted">{d}</span></li>)}
-      </ol>
+      </ol></Verbose>
       <div className="flex flex-wrap items-end gap-3">
         <label className="flex flex-col gap-1 text-xs text-muted">Difficulty
           <select value={rank} onChange={(e) => setRank(e.target.value)} aria-label="Difficulty">
@@ -230,6 +231,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
   const tp = useMemo(() => (run ? teamPower(run, pack) : null), [run, pack]);
   const tsrLevel = useMemo(() => (run ? placedBondStates(run, pack).find((b) => b.bond.name === TSR_BOND)?.count ?? 0 : 0), [run, pack]);
   const collection = useCollection(run);
+  const simple = useSimple();
   const { gear: gearTracked, toggleGear } = useTracked();
   /** Characters whose recommended equipment is tracked: the ones you picked, else everyone deployed. */
   const gearTargets = useMemo<GearTarget[]>(() => {
@@ -257,7 +259,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
     return { wanted: want.wanted, ready: craft.length > 0, notes, preferred: want.notes, craft: craft.map((c) => `${c.partner} → ${c.makes}`), who };
   };
   if (run === undefined) return null;
-  if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><CompanionCollection collection={collection} /><Rules /></div>;
+  if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><CompanionCollection collection={collection} /><Verbose><Rules /></Verbose></div>;
 
   const prep = run.phase === "prep";
   const odds = pack.odds.find((o) => o.level === run.level)?.odds ?? [1, 0, 0, 0, 0];
@@ -304,9 +306,9 @@ export function RunSim({ pack }: { pack: CwPack }) {
 
   return (
     <div className="space-y-4">
-      <WolfComment comment={run.phase === "over"
+      {!simple && <WolfComment comment={run.phase === "over"
         ? { mood: run.result === "cleared" ? "hyped" : "smug", line: run.result === "cleared" ? `Cleared with ${run.hp} HP|Not bad for a sandbox` : "Squad HP gone|Run it back, different econ", facts: [`Seed ${run.seed}, ${run.rank}.`] }
-        : { mood: chance >= 0.6 ? "smug" : "neutral", line: prep ? `${NODE_LABEL[kind]} next|I give u ${Math.round(chance * 100)}%${tp?.idle.length ? `|${tp.idle[0]} is IDLE there btw` : ""}` : "Pick one|Choices matter", facts: [`Seed ${run.seed}, ${run.rank}.`] }} />
+        : { mood: chance >= 0.6 ? "smug" : "neutral", line: prep ? `${NODE_LABEL[kind]} next|I give u ${Math.round(chance * 100)}%${tp?.idle.length ? `|${tp.idle[0]} is IDLE there btw` : ""}` : "Pick one|Choices matter", facts: [`Seed ${run.seed}, ${run.rank}.`] }} />}
 
       <Hud run={run} />
       {run.note && <p role="status" className={cx("rounded-lg border px-3 py-2 text-sm", run.note.startsWith("Opened") ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-amber-300/40 bg-amber-300/10 text-amber-100")}>{run.note}</p>}
@@ -382,7 +384,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
 
       <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
         <Panel title={`Bonds${tp?.bonds.length ? ` (${tp.bonds.length} active)` : ""}`}>
-          <BondList pack={pack} states={tp?.bonds ?? []} have={new Set(units(run).map((u) => u.name))} />
+          <BondList pack={pack} states={tp?.bonds ?? []} have={new Set(units(run).map((u) => u.name))} effects={tp?.effects} />
           {tp && <BondsInactive run={run} pack={pack} />}
         </Panel>
 
@@ -406,7 +408,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
                     <button type="button" onClick={() => toggleGear(n)} aria-label={`Stop tracking ${n}'s gear`} className="rounded-full p-0.5 hover:bg-white/10"><X size={10} /></button>
                   </span>
                 )) : <span className="text-faint">everyone deployed (select a character → Track gear to choose)</span>}
-                <span className="text-faint">· 👍 preferred · <span className="rounded px-1 ring-1 ring-sky-400">blue</span> = you can craft it now</span>
+                <Verbose><span className="text-faint">· 👍 preferred · <span className="rounded px-1 ring-1 ring-sky-400">blue</span> = you can craft it now</span></Verbose>
               </p>
               {run.bag.length ? (
                 <div className="flex flex-wrap gap-1.5">
@@ -446,7 +448,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
                     <span>· On-Field {Math.round(unitPower(selUnit, "on", pack))} / Off-Field {Math.round(unitPower(selUnit, "off", pack))}</span>
                   </span>
                   {selUnit.items.length > 0 && <span className="mt-1 flex flex-wrap gap-1">{selUnit.items.map((it, i) => <button key={i} type="button" onClick={() => { setPeek(it); setSel(null); }} className="inline-flex items-center gap-1 rounded border border-line px-1 py-0.5 hover:border-cyan/50"><ItemIcon pack={pack} name={it} size={11} />{it}</button>)}</span>}
-                  <span className="block text-faint">Tap a slot to move it there.</span>
+                  <Verbose><span className="block text-faint">Tap a slot to move it there.</span></Verbose>
                 </span>
                 {sel.spot.zone === "bench"
                   ? <Button size="sm" onClick={() => { const to = autoSpot(run, pack, selUnit); if (to) update((s) => moveUnit(s, sel.spot, to)); else update((s) => ({ ...s, note: `Team is full: level ${s.level} deploys ${teamSize(s)}.` })); setSel(null); }}><Swords size={13} /> Deploy</Button>
@@ -490,12 +492,12 @@ export function RunSim({ pack }: { pack: CwPack }) {
           {(run.environment || run.strategies.length > 0) && (
             <Panel title="Your buffs">
               <ul className="space-y-1.5 text-xs">
-                {run.environment && <li><Badge tone="cyan">Environment</Badge> <b>{run.environment.name}</b> <span className="text-muted">{fillUnknown(run.environment.name, run.environment.effect)}</span></li>}
-                {run.strategies.map((s) => <li key={s.name}><Badge tone={s.rarity === "Prismatic" ? "violet" : s.rarity === "Gold" ? "gold" : "default"}>{s.rarity}</Badge> <b>{s.name}</b> <span className="text-muted">{fillUnknown(s.name, s.effect)}</span></li>)}
+                {run.environment && <li title={fillUnknown(run.environment.name, run.environment.effect)}><Badge tone="cyan">Environment</Badge> <b>{run.environment.name}</b> {!simple && <span className="text-muted">{fillUnknown(run.environment.name, run.environment.effect)}</span>}</li>}
+                {run.strategies.map((s) => <li key={s.name} title={fillUnknown(s.name, s.effect)}><Badge tone={s.rarity === "Prismatic" ? "violet" : s.rarity === "Gold" ? "gold" : "default"}>{s.rarity}</Badge> <b>{s.name}</b> {!simple && <span className="text-muted">{fillUnknown(s.name, s.effect)}</span>}</li>)}
               </ul>
             </Panel>
           )}
-          <Rules />
+          <Verbose><Rules /></Verbose>
         </div>
       </div>
       <Modal open={!!sheet} onClose={() => setSheet(null)} title={sheet ? `${sheet.name} · details` : "Details"} wide>

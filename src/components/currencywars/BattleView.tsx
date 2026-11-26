@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { hpAt, turnOrder, type Timeline, type TlUnit } from "@/lib/currencywars/timeline";
 import { Button, cx, Panel } from "../ui";
 import { Portrait } from "./shared";
+import { Verbose } from "./simple";
 
 /** Action Value played per real second at 1× (a 150 AV fight lasts about 12 seconds). */
 const AV_PER_SECOND = 12;
@@ -22,8 +23,23 @@ function HpBar({ hp, max, tone, phases }: { hp: number; max: number; tone: "ally
   );
 }
 
+function SummonFace({ u, size }: { u: TlUnit; size: number }) {
+  return <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/40 to-cyan-500/30 ring-1 ring-violet-300/70" style={{ width: size, height: size, fontSize: size * 0.55 }}>{u.summon?.emoji ?? "✦"}</span>;
+}
+
 function UnitRow({ u, hp, hit, down }: { u: TlUnit; hp: number; hit: boolean; down: boolean }) {
   const isAlly = u.side === "ally";
+  if (u.summon) {
+    return (
+      <li className="flex items-center gap-2 rounded-lg border border-violet-400/40 bg-violet-500/[0.06] px-2 py-1.5" title={u.summon.note}>
+        <SummonFace u={u} size={28} />
+        <div className="min-w-0 flex-1">
+          <span className="block truncate text-[11px]">{u.name}</span>
+          <span className="block truncate text-[10px] text-muted">Summon · {u.summon.bond}{u.summon.spd ? ` · ${u.summon.spd} SPD` : " · strikes at the start"}</span>
+        </div>
+      </li>
+    );
+  }
   return (
     <li className={cx("flex items-center gap-2 rounded-lg border px-2 py-1.5 transition", hit ? "border-rose-400/80 bg-rose-500/10" : "border-line bg-white/[0.02]", down && "opacity-40", u.boss && "py-2.5")}>
       {isAlly ? <Portrait name={u.name} cost={u.cost} size={28} className="!ring-1" /> : <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-[10px] font-bold", u.boss ? "bg-rose-600/50 text-rose-100" : u.elite ? "bg-amber-500/30 text-amber-100" : "bg-white/10 text-muted")}>{u.boss ? "BOSS" : u.elite ? "ELT" : "—"}</span>}
@@ -39,6 +55,7 @@ function UnitRow({ u, hp, hit, down }: { u: TlUnit; hp: number; hit: boolean; do
 }
 
 function TurnAvatar({ u, size }: { u: TlUnit; size: number }) {
+  if (u.summon) return <SummonFace u={u} size={size} />;
   if (u.side === "ally") return <Portrait name={u.name} cost={u.cost} size={size} className="!ring-1" />;
   const initials = u.name.replace(/[^A-Za-z ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
   return (
@@ -64,7 +81,7 @@ function TurnOrder({ tl, t, showAv }: { tl: Timeline; t: number; showAv: boolean
             if (!u) return null;
             return (
               <li key={`${r.id}-${r.t}-${i}`} title={`${u.name}${showAv ? ` · ${r.av} AV` : ""}`}
-                className={cx("relative flex shrink-0 items-center gap-1.5 rounded-lg border px-1 py-1 md:pr-2", r.now ? "border-cyan bg-cyan/15" : u.side === "ally" ? "border-sky-400/30 bg-sky-400/[0.06]" : "border-rose-400/30 bg-rose-400/[0.06]", u.boss && "py-1.5")}>
+                className={cx("relative flex shrink-0 items-center gap-1.5 rounded-lg border px-1 py-1 md:pr-2", r.now ? "border-cyan bg-cyan/15" : u.summon ? "border-violet-400/40 bg-violet-500/[0.08]" : u.side === "ally" ? "border-sky-400/30 bg-sky-400/[0.06]" : "border-rose-400/30 bg-rose-400/[0.06]", u.boss && "py-1.5")}>
                 <TurnAvatar u={u} size={u.boss ? 34 : 28} />
                 <span className="hidden min-w-0 flex-1 truncate text-[10px] md:block">{u.name}</span>
                 {showAv && <span className={cx("absolute bottom-0 right-0 rounded-tl-md rounded-br-lg px-1 font-mono text-[10px] font-semibold md:static md:rounded md:bg-transparent", r.now ? "bg-cyan text-black md:text-cyan" : "bg-black/70 text-text")}>{r.now ? "▶" : r.av}</span>}
@@ -109,7 +126,8 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
   const name = (id?: string) => timeline.units.find((u) => u.id === id)?.name ?? "";
   const lastHit = useMemo(() => [...timeline.events].reverse().find((e) => e.kind === "hit" && e.t <= t), [timeline, t]);
   const wave = timeline.events.filter((e) => e.kind === "wave" && e.t <= t).length + 1;
-  const allies = timeline.units.filter((u) => u.side === "ally");
+  const allies = timeline.units.filter((u) => u.side === "ally" && !u.summon);
+  const summons = timeline.units.filter((u) => u.summon);
   const enemies = timeline.units.filter((u) => u.side === "enemy" && (u.wave ?? 1) <= wave);
   const waves = Math.max(1, ...timeline.units.map((u) => u.wave ?? 1));
   const avLeft = timeline.limit === null ? null : Math.max(0, timeline.limit - t);
@@ -138,6 +156,10 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
         <div className="min-w-0">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Your squad</p>
           <ul className="space-y-1">{allies.map((u) => <UnitRow key={u.id} u={u} hp={hp.get(u.id) ?? 0} hit={recent.has(u.id)} down={(hp.get(u.id) ?? 0) <= 0 && !u.idle} />)}</ul>
+          {summons.length > 0 && <>
+            <p className="mb-1 mt-2 text-[11px] font-semibold uppercase tracking-wider text-violet-300">Summons</p>
+            <ul className="space-y-1" aria-label="Summons">{summons.map((u) => <UnitRow key={u.id} u={u} hp={0} hit={false} down={false} />)}</ul>
+          </>}
         </div>
         <div className="min-w-0">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-rose-300">Enemies</p>
@@ -148,7 +170,7 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
         {lastHit && !done && <p className="text-muted">{name(lastHit.from)} hits {name(lastHit.to)} for <b className="text-text">{lastHit.amount?.toLocaleString()}</b></p>}
         {feed.map((e, i) => <p key={`${e.t}-${i}`} className={cx(e.kind === "end" ? (timeline.won ? "font-semibold text-ok" : "font-semibold text-bad") : e.kind === "fall" ? "text-rose-300" : e.kind === "phase" || e.kind === "ultimate" ? "text-fuchsia-300" : "text-faint")}>{e.text}</p>)}
       </div>
-      <p className="mt-2 text-[10px] text-faint">A replay of the simulated result, not the game&apos;s real battle engine. Revives cost Action Value in the game; the bar here doesn&apos;t move for them.</p>
+      <Verbose><p className="mt-2 text-[10px] text-faint">A replay of the simulated result, not the game&apos;s real battle engine. Summons act on their own SPD. Revives cost Action Value in the game; the bar here doesn&apos;t move for them.</p></Verbose>
     </Panel>
     </div>
   );

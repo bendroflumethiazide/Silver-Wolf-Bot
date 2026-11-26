@@ -81,6 +81,17 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.8.0 Summons in battle, real equipment and Bond effects, Simple Mode
+
+- **Bond summons fight** and show on the turn order and in a "Summons" list in the battle viewer, acting on their own SPD (never targeted): Crimson Thorns (DoT; 200 → 300 → 500 SPD), Starskiff (Xianzhou Fleet; +20 SPD per member equipment), Quintet Joint (High-Cloud Quintet; 200–400 SPD, stacking squad DMG), Soul (AoE ATK 6+), Aha (Elation), chimeras (Beast Garden, from Chimera Energy), Svarog (Clara), each Summon-school member's summon, and Dan Heng • Permansor Terrae (Twin Dragons' Call, off-field with copied equipment), next to the Astral Express and Belobog Robot.
+- **Equipment works as written** (`combat.ts`): every stat line and every advanced item's passive is read from the wiki, e.g. Weapon Master gives the whole squad +25% strength, Meteor Wings +15% SPD, Sturdy Plate +18% DMG Mitigation, Codex of Combat ×3/×6 at 2★/3★, Decapitation Operation doubles in Encounter/Boss nodes, stacking effects, Fragility, Whatever Dice (two random items each node). Item details say what applies in battle.
+- **Bonds work as written**: each active Bond's level text becomes stats for its members or the squad (not a flat bonus for everyone any more), plus specific rules (Xianzhou Fleet's equipment conversion, Stellaron Hunters' Script Equipment, Intertwined Dreamscapes' dancers, Galaxy Ranger, Astropolis Lucky Strike, Roll-Call, Little Giant…). Opened Bonds show "In this fight".
+- **Simple Mode** switch (saved) hides explanations, assumptions, long Bond/item/store descriptions and Silver Wolf's comments.
+- Bugs fixed: summons could miss a quick fight entirely (now always act at least once); Bond bonuses applied to non-members; equipment passives (Weapon Master etc.) did nothing; two flaky E2E selectors. Enemy strength recalibrated (0.66 → 0.74) so difficulty stays the same (A0 ≈ 82%, A4 ≈ 54%).
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **211/211** · E2E **14/14** on both builds (now checking Crimson Thorns on the turn order and Simple Mode) · real data: 1,469 simulated fights, summons in 500, each acting, none targeted; all 36 advanced items' passives modelled.
+
 ## 2026-11-26 · 1.7.0 Version 4.7 mechanics: Trailblaze Store, Escapade, Plot Armor
 
 Added to the existing run simulator (nothing rebuilt or removed). Verified rules come from the HSR Wiki's 4.7 Currency Wars pages; everything else is a labelled, configurable assumption (`TSR_ASSUMED`, `ESCAPADE_ASSUMED`, `PLOT_ARMOR_CONFIG`).

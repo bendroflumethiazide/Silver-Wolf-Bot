@@ -133,6 +133,15 @@ export async function installCwWiki(page: Page) {
 |effect8   = 125 "Trailblaze Power."
 |effect10  = 225 "Trailblaze Power"! Express evolution!
 }}
+===DoT===
+{{Bond Information
+|name      = DoT
+|members   = Fx Ash, Fx Birch, Fx Cedar, Fx Dune, Fx Elm, Fx Fern, Fx Grove
+|effect    = "DoT" members' DoT Amplification increases, and "Crimson Thorns" are summoned to attack all enemy targets. Ally squad gains 20% DMG Mitigation.
+|silver    = 5
+|effect3   = 20% DoT Amplification.
+|effect5   = 50% DMG Amplification. Increases the action SPD of "Crimson Thorns" to 300
+}}
 ==Plot Armor Bonds==
 ===Deliverer===
 {{Bond Information

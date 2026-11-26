@@ -7,6 +7,7 @@ import { ESCAPADE_ASSUMED } from "@/lib/currencywars/escapade";
 import type { RunState } from "@/lib/currencywars/run";
 import { COMPANIONS, companionOf, variantOf, type CompanionCategory } from "@/lib/currencywars/voyageCompanions";
 import { Badge, Button, cx, Panel } from "../ui";
+import { useSimple } from "./simple";
 
 const WIKI = "https://honkai-star-rail.fandom.com/wiki/Currency_Wars:_Voyage_Into_the_Canvas/Voyage_Companion";
 const CATEGORY: Record<CompanionCategory, { label: string; tone: "cyan" | "gold" | "violet" }> = { equipment: { label: "Equipment", tone: "violet" }, resource: { label: "Resource", tone: "gold" }, node: { label: "Node", tone: "cyan" } };
@@ -37,6 +38,10 @@ export function useCollection(run: RunState | null | undefined) {
   return c;
 }
 
+function Assumed({ text }: { text: string }) {
+  return useSimple() ? null : <p className="text-xs text-faint">Simulator: {text}</p>;
+}
+
 function CompanionFace({ name, size = 64, className }: { name: string; size?: number; className?: string }) {
   const c = companionOf(name);
   return (
@@ -63,7 +68,7 @@ export function CompanionReveal({ run, onDone }: { run: RunState; onDone: () => 
           <div className={cx("relative mt-3 space-y-2 text-left text-sm transition-opacity duration-500", shown ? "opacity-100" : "opacity-0")}>
             <p className="flex flex-wrap items-center gap-1.5"><Badge tone={CATEGORY[v.category].tone}>{CATEGORY[v.category].label}</Badge><span className="text-xs text-muted">{v.title}</span></p>
             <p>{v.text}</p>
-            {v.assumed && <p className="text-xs text-faint">Simulator: {v.assumed}</p>}
+            {v.assumed && <Assumed text={v.assumed} />}
             <p className="text-xs text-muted">Applied automatically. {v.teaBreak ? `Look for Backstage Tea Break before the Plane ${v.teaBreak.map((p) => p + 1).join("/")} boss.` : ""}</p>
           </div>
         )}
@@ -85,7 +90,7 @@ export function CompanionCard({ run }: { run: RunState }) {
         <div className="min-w-0 space-y-1">
           <p className="flex flex-wrap items-center gap-1.5"><b className="text-sm text-text">{e.companion}</b>{v && <Badge tone={CATEGORY[v.category].tone}>{CATEGORY[v.category].label}</Badge>}</p>
           {v && <p className="text-muted">{v.text}</p>}
-          {v?.assumed && <p className="text-faint">Simulator: {v.assumed}</p>}
+          {v?.assumed && <Assumed text={v.assumed} />}
           {v?.teaBreak && <p className="flex items-center gap-1 text-cyan"><Coffee size={12} /> Tea Break: Plane {v.teaBreak.map((p) => `${p + 1}${e.done.includes(p) ? " ✓" : ""}`).join(", ")}</p>}
           {e.saveFrom !== undefined && <p className="text-muted">Protects from Plane {e.saveFrom + 1}{e.savesUsed?.length ? " (used)" : ""}.</p>}
           {e.variant === "wd-each" && <p className="text-muted">Saves used: Plane {(e.savesUsed ?? []).map((p) => p + 1).join(", ") || "none yet"}.</p>}

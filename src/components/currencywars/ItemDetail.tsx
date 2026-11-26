@@ -3,6 +3,7 @@
 import { ThumbsUp, X } from "lucide-react";
 import type { GearNeed } from "@/lib/currencywars/gear";
 import { combinations, describe, madeFrom } from "@/lib/currencywars/items";
+import { itemEffect } from "@/lib/currencywars/combat";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, cx } from "../ui";
 import { ItemIcon, WhoFaces } from "./shared";
@@ -32,6 +33,10 @@ export function ItemDetail({ pack, name, owned = [], hint, onClose, actions, nee
         {onClose && <button type="button" onClick={onClose} aria-label="Close item details" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>}
       </div>
       {d.summary && <p className="mt-1.5 text-text/90">{d.summary}</p>}
+      {(() => {
+        const fx = itemEffect(pack, name, { place: "on", stars: 1, boss: false });
+        return fx.notes.length ? <p className="mt-1 text-[11px] text-cyan">In battle: {fx.notes.join(", ")}</p> : null;
+      })()}
       {d.details.length > 0 && <ul className="mt-1 space-y-0.5 text-muted">{d.details.map((x) => <li key={x}>{x}</li>)}</ul>}
       {d.users.length > 0 && <p className="mt-1 text-muted">Good on: {d.users.join(", ")}</p>}
       {from.length > 0 && <p className="mt-1 text-muted">Made from: {from.map(([a, b]) => `${a} + ${b}`).join(" or ")}</p>}

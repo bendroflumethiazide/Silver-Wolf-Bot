@@ -10,6 +10,8 @@ import type { BondTier, CwField } from "@/lib/currencywars/parse";
 import type { BondState, CwPack } from "@/lib/currencywars/sim";
 import { useApp } from "@/lib/store";
 import { GameImage } from "../GameImage";
+import { useSimple } from "./simple";
+import type { BondEffect } from "@/lib/currencywars/combat";
 import { cx } from "../ui";
 import { TrackMark, useTracked } from "./tracking";
 
@@ -104,8 +106,9 @@ export function OddsBar({ odds }: { odds: number[] }) {
 }
 
 /** Game-style bond list: tier badge with the count, name, and every threshold. */
-export function BondList({ pack, states, have, empty = "Bonds light up as you deploy characters." }: { pack: CwPack; states: BondState[]; have?: Set<string>; empty?: string }) {
+export function BondList({ pack, states, have, empty = "Bonds light up as you deploy characters.", effects }: { pack: CwPack; states: BondState[]; have?: Set<string>; empty?: string; effects?: BondEffect[] }) {
   const { tracked } = useTracked();
+  const simple = useSimple();
   const [open, setOpen] = useState<string | null>(null);
   if (!states.length) return <p className="text-xs text-muted">{empty}</p>;
   return (
@@ -126,9 +129,10 @@ export function BondList({ pack, states, have, empty = "Bonds light up as you de
             </button>
             {isOpen && (
               <div className="mb-1 ml-9 space-y-1 text-[11px] text-muted">
-                {b.bond.summary && <p>{b.bond.summary}</p>}
-                {b.bond.levels.map((l) => <p key={l.count} className={cx(b.active?.count === l.count && "text-text")}><b className={b.count >= l.count ? "text-cyan" : "text-faint"}>({l.count})</b> {l.effect}</p>)}
-                <p className="text-faint">{b.bond.category}</p>
+                {b.bond.summary && !simple && <p>{b.bond.summary}</p>}
+                {(simple ? b.bond.levels.filter((l) => l.count === b.active?.count || l.count === b.next?.count) : b.bond.levels).map((l) => <p key={l.count} className={cx(b.active?.count === l.count && "text-text")}><b className={b.count >= l.count ? "text-cyan" : "text-faint"}>({l.count})</b> {l.effect}</p>)}
+                {(() => { const e = effects?.find((x) => x.bond === b.bond.name); return e ? <BondNow e={e} /> : null; })()}
+                {!simple && <p className="text-faint">{b.bond.category}</p>}
                 <BondMembers pack={pack} bond={b.bond.name} have={have} />
               </div>
             )}
@@ -136,6 +140,25 @@ export function BondList({ pack, states, have, empty = "Bonds light up as you de
         );
       })}
     </ul>
+  );
+}
+
+const STAT_LABEL: Record<string, string> = { on: "On-Field", off: "Off-Field", str: "strength", dmg: "DMG Amp", lucky: "Lucky Strike", luckyDmg: "Lucky DMG", spd: "SPD Amp", hp: "HP", mit: "DMG Mitigation", brk: "Break", support: "Healing/Shield", energy: "Energy", dealt: "DMG dealt" };
+const statText = (s: Partial<Record<string, number>>) => Object.entries(s).filter(([, v]) => v).map(([k, v]) => `+${Math.round((v ?? 0) * (k === "energy" ? 1 : 100))}${k === "energy" ? "" : "%"} ${STAT_LABEL[k] ?? k}`).join(", ");
+
+/** What an active Bond does in the next fight (as the simulator applies it). */
+export function BondNow({ e }: { e: BondEffect }) {
+  const parts = [
+    statText(e.members) && `members ${statText(e.members)}`,
+    statText(e.squad) && `squad ${statText(e.squad)}`,
+    e.perUnit.size ? `${e.perUnit.size} character${e.perUnit.size === 1 ? "" : "s"} boosted` : "",
+    ...e.notes,
+  ].filter(Boolean);
+  return (
+    <div className="rounded-md border border-cyan/30 bg-cyan/[0.05] px-2 py-1 text-[10px] text-cyan" aria-label={`${e.bond} in this fight`}>
+      <b>In this fight:</b> {parts.join(" · ") || "no combat effect"}
+      {e.summons.length > 0 && <span className="mt-0.5 block text-violet-200">Summons: {e.summons.map((m) => `${m.emoji} ${m.name}${m.spd ? ` (${m.spd} SPD)` : ""}`).join(", ")}</span>}
+    </div>
   );
 }
 

@@ -7,6 +7,7 @@ import type { CwPack } from "@/lib/currencywars/sim";
 import { goodLock, priceOf, TSR_ASSUMED, TSR_BOND, TSR_GOODS, TSR_RULES, tsrGood, tsrIncome, tsrOf, type TsrGood } from "@/lib/currencywars/trailblazeStore";
 import { Badge, Button, cx, Panel } from "../ui";
 import { ItemIcon, Portrait } from "./shared";
+import { useSimple } from "./simple";
 
 const TYPE_LABEL: Record<TsrGood["type"], string> = { express: "Express", enhancement: "Express Enhancement", stat: "Stat bonus", character: "Character", consumable: "Consumable", component: "Component", other: "Others" };
 const EXPRESS_NAME = ["—", "Astral Express, warp!", "Forward II", "Forward III", "Forward IV"];
@@ -20,7 +21,7 @@ function GoodCard({ pack, g, price, lock, afford, onBuy, slot }: { pack: CwPack;
         {g.character ? <Portrait name={g.character} size={22} className="!ring-1" /> : g.item ? <ItemIcon pack={pack} name={g.item} size={14} /> : g.type === "express" || g.type === "enhancement" ? <TrainFront size={14} className="text-amber-300" /> : <Zap size={14} className="text-amber-300" />}
         <b className="min-w-0 flex-1 truncate text-text">{g.name}</b>
       </span>
-      <span className="line-clamp-2 text-muted">{g.text}</span>
+      {!useSimple() && <span className="line-clamp-2 text-muted">{g.text}</span>}
       <span className="mt-auto flex flex-wrap items-center justify-between gap-x-1">
         <span className="text-[9px] uppercase tracking-wide text-faint">{TYPE_LABEL[g.type]}</span>
         {lock ? <span className="flex items-center gap-0.5 text-[10px] text-faint"><Lock size={10} className="shrink-0" /> {lock}</span> : <span className={cx("font-semibold", afford ? "text-amber-200" : "text-bad")}>{price} {g.currency === "tp" ? "TP" : "gold"}</span>}

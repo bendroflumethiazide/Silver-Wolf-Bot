@@ -18,6 +18,8 @@ export interface TlUnit {
   elite?: boolean;
   phases?: number;
   wave?: number;
+  /** A Bond summon or helper (Crimson Thorns, Astral Express…): acts on its own SPD, isn't targeted. */
+  summon?: { emoji: string; bond: string; spd: number; note?: string };
 }
 export type TlKind = "hit" | "fall" | "revive" | "kill" | "phase" | "wave" | "ultimate" | "end";
 export interface TlEvent { t: number; kind: TlKind; from?: string; to?: string; amount?: number; text?: string }
@@ -35,7 +37,9 @@ export interface Timeline {
 }
 
 export interface TimelineInput {
-  allies: { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off"; /** SPD Amplification in percent (wiki). */ spd?: number }[];
+  allies: { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off"; /** SPD Amplification in percent (wiki). */ spd?: number;
+    /** Summons act at their own SPD (10000 / SPD AV per turn; 0 = once at the start). */
+    summon?: { emoji: string; bond: string; spd: number; note?: string } }[];
   enemies: { name: string; elite?: boolean; boss?: boolean }[];
   /** Number of waves the normal enemies come in (the boss fight has one). */
   waves: number;
@@ -58,7 +62,7 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   const events: TlEvent[] = [];
   const spdOf = new Map(input.allies.map((a, i) => [`a${i}`, a.spd ?? 0]));
   const allies = input.allies.map((a, i) => {
-    const u: TlUnit = { id: `a${i}`, name: a.name, side: "ally", maxHp: Math.round((900 + 350 * a.cost) * (1 + 0.6 * (a.stars - 1))), cost: a.cost, stars: a.stars, place: a.place, idle: a.power <= 0 };
+    const u: TlUnit = { id: `a${i}`, name: a.name, side: "ally", maxHp: Math.round((900 + 350 * a.cost) * (1 + 0.6 * (a.stars - 1))), cost: a.cost, stars: a.stars, place: a.place, idle: a.power <= 0, summon: a.summon };
     units.push(u);
     return { u, power: a.power };
   });
@@ -78,6 +82,15 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   const acts: { t: number; ally: (typeof allies)[number] }[] = [];
   for (const a of allies) {
     if (a.u.idle) continue;
+    if (a.u.summon) {
+      // Summons keep their own SPD: one turn every 10000 / SPD AV (SPD 0 = a single strike at the start).
+      if (!a.u.summon.spd) { acts.push({ t: 1, ally: a }); continue; }
+      const every = 10000 / a.u.summon.spd;
+      const first = Math.min(every * (0.2 + rng() * 0.25), Math.max(1, end - 1.5));
+      // Every summon gets at least one turn, even in a quick fight.
+      for (let t = first; t < end - 0.5; t += every * (0.95 + rng() * 0.1)) acts.push({ t, ally: a });
+      continue;
+    }
     // Faster characters (higher SPD Amplification) take more turns; dampened so 300% isn't 4× the turns.
     const interval = 100 / ((0.85 + 0.1 * (a.u.stars ?? 1) + rng() * 0.35) * Math.sqrt(1 + (spdOf.get(a.u.id) ?? 0) / 100));
     for (let t = rng() * interval * 0.6 + 2; t < end - 0.5; t += interval * (0.9 + rng() * 0.2)) acts.push({ t, ally: a });
@@ -101,7 +114,7 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
     while (nextEnemyAct < until) {
       const t = nextEnemyAct;
       const attackers = alive(wave);
-      const victims = allies.filter((a) => !a.u.idle);
+      const victims = allies.filter((a) => !a.u.idle && !a.u.summon);
       if (attackers.length && victims.length) {
         const from = attackers[Math.floor(rng() * attackers.length)];
         const to = victims[Math.floor(rng() * victims.length)].u;

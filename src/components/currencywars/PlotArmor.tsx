@@ -7,12 +7,14 @@ import { eligible, freeLeft, optionById, PLOT_ARMOR_CONFIG, plotOf, refreshPrice
 import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, Button, cx, Panel } from "../ui";
 import { Portrait } from "./shared";
+import { useSimple } from "./simple";
 
 const CAT: Record<PlotCategory, { label: string; tone: "violet" | "cyan" | "gold" }> = { character: { label: "Character", tone: "violet" }, bond: { label: "Bond", tone: "cyan" }, resource: { label: "Resource", tone: "gold" } };
 const STAGE = { protagonist: "Protagonist", imagenae: "Imagenae: Plot Armor", swap: "Swap (It's A Wrap)" } as const;
 
 /** The selection screen: who gets Plot Armor, then one of two options, with refreshes. */
 export function PlotArmorPanel({ run, pack, onProtagonist, onRefresh, onChoose }: { run: RunState; pack: CwPack; onProtagonist: (uid: number) => void; onRefresh: () => void; onChoose: (i: number) => void }) {
+  const simple = useSimple();
   const p = plotOf(run);
   const cur = p.current;
   if (!cur) return null;
@@ -54,14 +56,15 @@ export function PlotArmorPanel({ run, pack, onProtagonist, onRefresh, onChoose }
                   <b className="mt-1 block">{o.name}</b>
                   <span className="mt-1 block text-xs text-muted">{o.text}</span>
                   {o.difficulty > 0 && <span className={cx("mt-1 block text-xs", freeDiff ? "text-ok line-through" : "text-bad")}>Enemy difficulty +{o.difficulty}{freeDiff ? " (waived: Bubble Wolf)" : ""}</span>}
-                  {!o.verified && <span className="mt-1 block text-[10px] text-faint">Stand-in option (the wiki has no list of Plot Armor effects).</span>}
+                  {!o.verified && !simple && <span className="mt-1 block text-[10px] text-faint">Stand-in option (the wiki has no list of Plot Armor effects).</span>}
                 </button>
               );
             })}
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-3 text-xs">
             <Button onClick={onRefresh} disabled={!free && run.gold < price}><RefreshCw size={13} /> {free ? `Refresh · free (${free} left)` : <>Refresh · <Coins size={11} className="text-amber-300" /> {price}</>}</Button>
-            <span className="text-muted">{free ? `Free refreshes: ${p.free.filter((f) => f.left).map((f) => `${f.left} from ${f.source}`).join(", ")}. ` : ""}Paid price {p.fixedCost !== undefined ? `fixed at ${p.fixedCost} (Plot Armor Procurement)` : `${price} gold next (first ${PLOT_ARMOR_CONFIG.cheapRefreshes} paid cost 1, then +${PLOT_ARMOR_CONFIG.escalation} each)`}.{p.storeChain ? ` Each refresh: +${p.storeChain} free Store refresh.` : ""} Refreshed {cur.refreshes}×.</span>
+            {!simple && <span className="text-muted">{free ? `Free refreshes: ${p.free.filter((f) => f.left).map((f) => `${f.left} from ${f.source}`).join(", ")}. ` : ""}Paid price {p.fixedCost !== undefined ? `fixed at ${p.fixedCost} (Plot Armor Procurement)` : `${price} gold next (first ${PLOT_ARMOR_CONFIG.cheapRefreshes} paid cost 1, then +${PLOT_ARMOR_CONFIG.escalation} each)`}.{p.storeChain ? ` Each refresh: +${p.storeChain} free Store refresh.` : ""} Refreshed {cur.refreshes}×.</span>}
+            {simple && <span className="text-muted">Refreshed {cur.refreshes}×</span>}
           </div>
         </>
       )}

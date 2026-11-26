@@ -263,6 +263,9 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await expect(order.locator("li").first()).toBeVisible();
   await page.getByRole("button", { name: "AV", exact: true }).click();
   await expect(page.getByRole("button", { name: "AV", exact: true })).toHaveAttribute("aria-pressed", "false");
+  // Bond summons fight too: the DoT Bond's Crimson Thorns is in the squad and on the turn order.
+  await expect(page.getByRole("list", { name: "Summons" }).getByText("Crimson Thorns")).toBeVisible();
+  await expect(order.locator("li[title^='Crimson Thorns']").first()).toBeVisible();
   await page.getByRole("radio", { name: "4×" }).click();
   await expect(page.getByRole("radio", { name: "4×" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: "Skip" }).click();
@@ -313,6 +316,13 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   // The unit is still selected after closing the details: send it to the bench.
   await page.getByRole("button", { name: "To bench" }).click();
   await expect(page.getByRole("button", { name: /^Bench slot \d: / }).first()).toBeVisible();
+  // Simple Mode hides explanations (and is remembered).
+  await expect(page.getByText("How this simulator works").first()).toBeVisible();
+  await page.getByRole("switch", { name: "Simple Mode" }).click();
+  await expect(page.getByRole("switch", { name: "Simple Mode" })).toHaveAttribute("aria-checked", "true");
+  await expect(page.getByText("How this simulator works")).toHaveCount(0);
+  await page.getByRole("switch", { name: "Simple Mode" }).click();
+  await expect(page.getByText("How this simulator works").first()).toBeVisible();
   // The run survives a reload (give IndexedDB a moment to commit the last write).
   await page.waitForTimeout(1000);
   await page.reload();
@@ -330,7 +340,7 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await expect(page.getByRole("img", { name: /Tracked bond/ })).toHaveCount(0);
   await page.getByLabel("Track a bond").selectOption("Grove Guild");
   await expect(page.getByRole("button", { name: "Stop tracking Grove Guild" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Fx Iris" }).getByRole("img", { name: "Tracked bond: Grove Guild" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Fx Iris" }).first().getByRole("img", { name: "Tracked bond: Grove Guild" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Fx Dune" }).getByRole("img", { name: /Tracked bond/ })).toHaveCount(0);
   await page.getByLabel("Search characters").fill("Fx Iris");
   await page.getByRole("button", { name: /Fx Iris/ }).first().click();

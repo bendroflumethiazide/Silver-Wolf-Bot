@@ -9,6 +9,7 @@ import { Investments } from "@/components/currencywars/Investments";
 import { RunSim } from "@/components/currencywars/RunSim";
 import { TeamBuilder } from "@/components/currencywars/TeamBuilder";
 import { TrackedProvider } from "@/components/currencywars/tracking";
+import { SimpleProvider, SimpleToggle } from "@/components/currencywars/simple";
 import { Button, ErrorBox, Notice, PageHeader, Panel, Tabs } from "@/components/ui";
 import { kvGet, kvSet } from "@/lib/db";
 import { CW_PACK_KEY, CW_PACK_SCHEMA, downloadCwPack, type CwPack } from "@/lib/currencywars/sim";
@@ -29,9 +30,10 @@ export default function CurrencyWarsPage() {
   const update = <Button size="sm" variant={outdated ? "primary" : "ghost"} onClick={get} disabled={busy}><RefreshCw size={14} className={busy ? "animate-spin" : ""} /> {busy ? "Updating…" : "Update"}</Button>;
 
   return (
+    <SimpleProvider>
     <div className="space-y-4">
       <PageHeader title="Currency Wars" subtitle={pack ? `${pack.season} (Version ${pack.version}): run simulator, team builder and every item.` : "Run simulator, team builder, equipment and investments."}
-        actions={pack ? <div className="flex gap-2"><Link href="/guides/view?g=currency-wars" className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm text-muted hover:text-text"><BookOpen size={14} /> Guide</Link>{update}</div> : undefined} />
+        actions={pack ? <div className="flex flex-wrap gap-2"><SimpleToggle /><Link href="/guides/view?g=currency-wars" className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm text-muted hover:text-text"><BookOpen size={14} /> Guide</Link>{update}</div> : undefined} />
       {err && <ErrorBox>{err}</ErrorBox>}
       {outdated && <Notice tone="warn" title="New Currency Wars data available" open>Press Update to download the latest: equipment, Emblems, Investment Environments and Strategies, opponents, difficulty ranks, and every character&apos;s stats, abilities, Eidolons and recommended equipment.</Notice>}
       {pack === undefined ? null : pack ? (
@@ -58,5 +60,6 @@ export default function CurrencyWarsPage() {
         </Panel>
       )}
     </div>
+    </SimpleProvider>
   );
 }
