@@ -87,3 +87,87 @@ export function collectErrors(page: Page) {
   page.on("console", (m) => { if (m.type() === "error" && !/Failed to load resource/.test(m.text())) errors.push(m.text()); });
   return errors;
 }
+
+/**
+ * Synthetic Currency Wars wiki pages (invented names), served by intercepting the wiki API, so the
+ * download → parse → simulator path runs without the network.
+ */
+export async function installCwWiki(page: Page) {
+  const costs: Record<number, string[]> = { 1: ["Fx Ash", "Fx Birch", "Fx Cedar"], 2: ["Fx Dune", "Fx Elm"], 3: ["Fx Fern", "Fx Grove"], 4: ["Fx Heath"], 5: ["Fx Iris"] };
+  const field: Record<string, string> = { "Fx Ash": "On Field", "Fx Birch": "Off Field", "Fx Cedar": "On/Off Field", "Fx Dune": "On Field", "Fx Elm": "Off Field", "Fx Fern": "On Field", "Fx Grove": "On/Off Field", "Fx Heath": "On Field", "Fx Iris": "Off Field" };
+  const table = (head: string, rows: string[][]) => `{| class="wikitable"\n! ${head}\n${rows.map((r) => `|-\n${r.map((c) => `| ${c}`).join("\n")}`).join("\n")}\n|}`;
+  const pages: Record<string, string> = {
+    "Currency Wars": `<gallery>\nCurrency Wars Period Fixture.png|link=Currency Wars: Fixture Season|<big>Fixture Season</big><br />Version [[9.9]] – Present\n</gallery>`,
+    "Currency Wars: Fixture Season/Characters": Object.entries(costs).map(([c, n]) => `===${c}-Cost===\n{{Card List|${n.join(", ")}|type=Currency Wars Character}}`).join("\n"),
+    "Currency Wars: Fixture Season/Bonds": `==Faction Bonds==
+===Grove Guild===
+{{Bond Information
+|name      = Grove Guild
+|members   = Fx Ash, Fx Birch, Fx Fern, Fx Iris
+|effect    = Fixture faction.
+|silver    = 3
+|effect2   = 10% strength.
+|effect3   = 20% strength.
+}}
+==School Bonds==
+===Fixture School===
+{{Bond Information
+|name      = Fixture School
+|members   = Fx Cedar, Fx Dune, Fx Elm, Fx Grove, Fx Heath
+|effect    = Fixture school.
+|gold      = 4
+|effect2   = 5% strength.
+|effect4   = 15% strength.
+}}`,
+    "Currency Wars: Fixture Season": `{| class="article-table"\n|+ Shop Odds\n! Level !! 1 !! 2 !! 3 !! 4 !! 5\n${[[1, 100, 0, 0, 0, 0], [2, 100, 0, 0, 0, 0], [3, 100, 0, 0, 0, 0], [4, 65, 25, 10, 0, 0], [5, 45, 33, 20, 2, 0], [6, 30, 40, 25, 5, 0], [7, 19, 30, 40, 10, 1], [8, 18, 25, 32, 22, 3], [9, 15, 20, 25, 30, 10], [10, 5, 10, 20, 40, 25]].map((r) => `|-\n| ${r[0]} || ${r.slice(1).map((x) => `${x}%`).join(" || ")}`).join("\n")}\n|}`,
+    "Currency Wars: Fixture Season/Equipment": `===Basic Equipment===\n${table("Equipment !! Tags !! Stats", [["[[File:Equipment Roller Skates.png|50px]]<br />Roller Skates", "SPD", "SPD Amplification: 5%"], ["[[File:Equipment Folding Knife.png|50px]]<br />Folding Knife", "On-Field", "On-Field Strength: 10%"]])}
+===Advanced/Privileged Equipment===
+${table("Equipment !! Tags !! Stats !! Effect !! Users !! Synthesis", [
+  ["[[File:Equipment Fixture Blade.png|50px]]<br />Fixture Blade", "DPS", "On-Field Strength 25%/50%", "Hits harder.", "{{Card List|Fx Ash}}", "{{nowrap|[[File:Equipment Folding Knife.png|40px]] + [[File:Equipment Roller Skates.png|40px]]}}"],
+  ["[[File:Equipment Fixture Boots.png|50px]]<br />Fixture Boots", "SPD", "SPD Amplification 25%/50%", "Runs faster.", "{{Card List|Fx Birch}}", "{{nowrap|[[File:Equipment Roller Skates.png|40px]] + [[File:Equipment Roller Skates.png|40px]]}}"],
+  ["[[File:Equipment Fixture Edge.png|50px]]<br />Fixture Edge", "DPS", "On-Field Strength 40%/80%", "Cuts.", "{{Card List|Fx Iris}}", "{{nowrap|[[File:Equipment Folding Knife.png|40px]] + [[File:Equipment Folding Knife.png|40px]]}}"],
+])}`,
+    "Currency Wars: Fixture Season/Investment Environment": `==List of Investment Environments==\n${table("Name !! Effect", [["{{Icon/Dark|a.png|50}}<br />Fixture Armory", "Starts with 2 Basic Weapon Box(es)."], ["{{Icon/Dark|b.png|50}}<br />Fixture Bank", "Gain 6 Gold Coin(s)."], ["{{Icon/Dark|c.png|50}}<br />Fixture Mint", "Gains a crystal ore worth 6/8/12 Gold Coin(s) at the start of Plane 1/2/3 respectively."]])}`,
+    "Currency Wars: Fixture Season/Investment Strategy": ["Prismatic", "Gold", "Silver"].map((r, i) => `===${r}===\n${table("Name !! Effect !! Plane of Appearance", [[`{{Icon/Dark|s${i}.png|50}}<br />${r} Plan A`, `Gain ${5 + i} Gold Coin(s).`, "Plane 1, Plane 2, Plane 3"], [`{{Icon/Dark|t${i}.png|50}}<br />${r} Plan B`, "Receives 2 free refresh(es).", "Plane 1, Plane 2, Plane 3"], [`{{Icon/Dark|u${i}.png|50}}<br />${r} Plan C`, "When a fight ends, nothing happens.", "Plane 1, Plane 2, Plane 3"]])}`).join("\n"),
+    "Currency Wars: Fixture Season/Opponent": `===Stat Modifiers===
+{| class="wikitable"
+! Difficulty Level !! Boosts !! Effects
+|-
+! colspan="3" | A0 Fixture Iron
+|-
+|A0-1
+|
+* Plane 1: ATK 1%/HP 4%/SPD 1%
+* Planes 2/3: ATK 1%/HP 5%/SPD 1%
+|
+* Enemy difficulty +1 (1)
+|-
+|A0-2
+|
+* Plane 1: ATK 2%/HP 8%/SPD 2%
+* Plane 2: ATK 2%/HP 9%/SPD 2%
+* Plane 3: ATK 2%/HP 11%/SPD 2%
+|
+* Enemy difficulty +1 (2)
+|}
+==Bosses==
+${table("Boss !! Elite !! Normal", ["North", "South", "East", "West"].map((n) => [`Fixture ${n} Co.`, `{{Card|Fixture ${n} Boss}}`, `{{Card List|${n} Elite|delim=;}}`, `{{Card List|${n} Grunt; ${n} Scout|delim=;}}`]))}`,
+  };
+  const info = (name: string, cost: number) => `{{Currency Wars Character Infobox\n|name = ${name}\n|cost = ${cost}\n|field = ${field[name]}\n|role1 = DPS\n|bond1 = Grove Guild\n}}\n{{Currency Wars Character Details\n${[1, 2, 3].map((i) => `|hp${i} = ${(i - 1) * 30}%\n|on_field${i} = ${field[name] === "Off Field" ? 100 : (90 + cost * 20) * i}\n|off_field${i} = ${field[name] === "On Field" ? 0 : (90 + cost * 20) * i}`).join("\n")}\n}}`;
+  const cost = Object.fromEntries(Object.entries(costs).flatMap(([c, ns]) => ns.map((n) => [n, Number(c)])));
+  await page.route("https://honkai-star-rail.fandom.com/api.php**", async (route) => {
+    const u = new URL(route.request().url());
+    if (u.searchParams.get("action") === "parse") {
+      const title = u.searchParams.get("page") ?? "";
+      const text = pages[title];
+      return route.fulfill({ json: text === undefined ? { error: { info: `No page ${title}` } } : { parse: { title, wikitext: { "*": text } } } });
+    }
+    const titles = (u.searchParams.get("titles") ?? "").split("|").filter(Boolean);
+    const out: Record<string, unknown> = {};
+    titles.forEach((t, i) => {
+      const name = t.replace(/ \(Fixture Season\)$/, "");
+      out[cost[name] ? String(100 + i) : String(-1 - i)] = cost[name] ? { pageid: 100 + i, title: t, revisions: [{ slots: { main: { "*": info(name, cost[name]) } } }] } : { title: t, missing: "" };
+    });
+    return route.fulfill({ json: { query: { pages: out } } });
+  });
+}

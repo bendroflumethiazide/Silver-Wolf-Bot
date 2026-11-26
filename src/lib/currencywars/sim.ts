@@ -1,9 +1,17 @@
-import { wikiText, WIKI } from "../wiki/fandom";
-import { parseBonds, parseCharacters, parseCurrentSeason, parseOdds, type BondTier, type CwBond, type CwCharacter, type CwOdds } from "./parse";
+import { wikiQueryAll, wikiText, WIKI } from "../wiki/fandom";
+import {
+  parseBonds, parseCharacters, parseCharInfo, parseCurrentSeason, parseDifficulty, parseEnvironments, parseEquipment, parseOdds,
+  parseOpponents, parseStrategies,
+  type BondTier, type CwAdvancedItem, type CwBasicItem, type CwBond, type CwCharacter, type CwCharInfo, type CwDifficulty,
+  type CwNamed, type CwOdds, type CwOpponent, type CwStrategy,
+} from "./parse";
 
 export const CW_PACK_KEY = "cwPack";
+/** Bump when CwPack gains fields, so the page can ask for a re-download. */
+export const CW_PACK_SCHEMA = 2;
 
 export interface CwPack {
+  schema?: number;
   season: string;
   version: string;
   characters: CwCharacter[];
@@ -11,20 +19,50 @@ export interface CwPack {
   odds: CwOdds[];
   /** Page the shop odds came from (the current season's page may not list them yet). */
   oddsFrom: string;
+  equipment?: { basic: CwBasicItem[]; advanced: CwAdvancedItem[] };
+  environments?: CwNamed[];
+  strategies?: CwStrategy[];
+  opponents?: CwOpponent[];
+  difficulty?: CwDifficulty[];
+  /** Per-character position, roles and strength by star, from "<Name> (<Season>)" pages. */
+  info?: Record<string, CwCharInfo>;
   fetchedAt: string;
   source: string;
   license: string;
 }
 
-/** Download the current Currency Wars season from the wiki. */
+/** Character pages in batches of 50 titles (the API limit). Missing pages are skipped. */
+async function downloadCharInfo(names: string[], season: string, fetchFn: typeof fetch): Promise<Record<string, CwCharInfo>> {
+  const out: Record<string, CwCharInfo> = {};
+  const suffix = ` (${season})`;
+  for (let i = 0; i < names.length; i += 50) {
+    const titles = names.slice(i, i + 50).map((n) => n + suffix).join("|");
+    const pages = await wikiQueryAll({ prop: "revisions", rvprop: "content", rvslots: "main", titles }, 3, fetchFn);
+    for (const p of Object.values(pages)) {
+      const rev = (p.revisions as { slots?: { main?: { "*"?: string } }; "*"?: string }[] | undefined)?.[0];
+      const text = rev?.slots?.main?.["*"] ?? rev?.["*"];
+      const title = String(p.title ?? "");
+      const info = text ? parseCharInfo(text) : null;
+      if (info && title.endsWith(suffix)) out[title.slice(0, -suffix.length)] = info;
+    }
+  }
+  return out;
+}
+
+/** Download the current Currency Wars season from the wiki (about ten requests). */
 export async function downloadCwPack(fetchFn: typeof fetch = fetch): Promise<CwPack> {
   const cur = parseCurrentSeason(await wikiText("Currency Wars", fetchFn));
   if (!cur) throw new Error("Couldn't find the current Currency Wars period on the wiki.");
   const base = `Currency Wars: ${cur.season}`;
-  const [charsText, bondsText, mainText] = await Promise.all([
+  const optional = (title: string) => wikiText(title, fetchFn).catch(() => "");
+  const [charsText, bondsText, mainText, equipText, envText, stratText, oppText] = await Promise.all([
     wikiText(`${base}/Characters`, fetchFn),
     wikiText(`${base}/Bonds`, fetchFn),
-    wikiText(base, fetchFn).catch(() => ""),
+    optional(base),
+    optional(`${base}/Equipment`),
+    optional(`${base}/Investment Environment`),
+    optional(`${base}/Investment Strategy`),
+    optional(`${base}/Opponent`),
   ]);
   const characters = parseCharacters(charsText);
   const bonds = parseBonds(bondsText);
@@ -33,12 +71,37 @@ export async function downloadCwPack(fetchFn: typeof fetch = fetch): Promise<CwP
   let oddsFrom = base;
   if (!odds.length) {
     oddsFrom = "Currency Wars: Zero-Sum Game";
-    odds = parseOdds(await wikiText(oddsFrom, fetchFn).catch(() => ""));
+    odds = parseOdds(await optional(oddsFrom));
   }
-  return { season: cur.season, version: cur.version, characters, bonds, odds, oddsFrom, fetchedAt: new Date().toISOString(), source: WIKI.name, license: WIKI.license };
+  const info = await downloadCharInfo(characters.map((c) => c.name), cur.season, fetchFn).catch(() => ({}));
+  return {
+    schema: CW_PACK_SCHEMA, season: cur.season, version: cur.version, characters, bonds, odds, oddsFrom,
+    equipment: parseEquipment(equipText), environments: parseEnvironments(envText), strategies: parseStrategies(stratText),
+    opponents: parseOpponents(oppText), difficulty: parseDifficulty(oppText), info,
+    fetchedAt: new Date().toISOString(), source: WIKI.name, license: WIKI.license,
+  };
 }
 
-export interface BoardUnit { name: string; stars: 1 | 2 | 3 }
+/** Bonds that come as per-game variants ("Phantasmoon Games: Wishpower", "…: Roll-Call"), by family. */
+export function bondVariants(bonds: CwBond[]): Record<string, string[]> {
+  const groups: Record<string, string[]> = {};
+  for (const b of bonds) { const m = /^(.+?): /.exec(b.name); if (m) (groups[m[1]] ??= []).push(b.name); }
+  return Object.fromEntries(Object.entries(groups).filter(([, v]) => v.length > 1));
+}
+
+/** Keep one variant per family: the chosen one, or the first. */
+export function withVariants(bonds: CwBond[], chosen: Record<string, string> = {}): CwBond[] {
+  const fams = bondVariants(bonds);
+  const skip = new Set(Object.entries(fams).flatMap(([f, names]) => names.filter((n) => n !== (chosen[f] && names.includes(chosen[f]) ? chosen[f] : names[0]))));
+  return bonds.filter((b) => !skip.has(b.name));
+}
+
+export interface BoardUnit {
+  name: string;
+  stars: 1 | 2 | 3;
+  /** Team builder placement; older saves have none and count as on-field. */
+  place?: "on" | "off";
+}
 
 export interface BondState {
   bond: CwBond;
@@ -83,13 +146,13 @@ export function chanceToSee(odds: CwOdds[], level: number, cost: number, slots: 
  * One shop roll for practice: each slot picks a cost by the level's odds, then a character of that
  * cost uniformly. (Per-character pool sizes aren't documented, so this is a simplification.)
  */
-export function rollShop(odds: CwOdds[], level: number, roster: CwCharacter[], rng: () => number, slots = 5): CwCharacter[] {
+export function rollShop(odds: CwOdds[], level: number, roster: CwCharacter[], rng: () => number, slots = 5, exclude?: Set<string>): CwCharacter[] {
   const row = odds.find((o) => o.level === level)?.odds ?? [1, 0, 0, 0, 0];
   const out: CwCharacter[] = [];
   for (let i = 0; i < slots; i++) {
     let r = rng(), cost = 1;
     for (let c = 0; c < 5; c++) { if (r < row[c]) { cost = c + 1; break; } r -= row[c]; }
-    const pool = roster.filter((ch) => ch.cost === cost);
+    const pool = roster.filter((ch) => ch.cost === cost && !exclude?.has(ch.name));
     if (pool.length) out.push(pool[Math.floor(rng() * pool.length)]);
   }
   return out;

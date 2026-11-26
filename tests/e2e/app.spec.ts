@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { collectErrors, installGameData, mockGameData } from "./fixtures";
+import { collectErrors, installCwWiki, installGameData, mockGameData } from "./fixtures";
 
 const ROUTES = ["/", "/terminal", "/account", "/characters", "/characters/view?id=1006", "/light-cones", "/relics", "/bosses", "/npcs", "/map", "/warp", "/warp?tab=planner", "/warp?tab=simulator", "/warp?tab=banners", "/teams", "/materials", "/game-modes", "/universe", "/story", "/events", "/achievements", "/journal", "/import", "/status", "/settings", "/guides", "/guides/view?g=warps", "/endgame", "/codes", "/currency-wars", "/universe"];
 
@@ -226,5 +226,53 @@ test("new hubs: guides, endgame, codes, Currency Wars and the SU run simulator",
   // Domain choices are random: take whichever is offered first.
   await page.getByRole("button", { name: /^(Combat|Elite|Occurrence|Respite)/ }).first().click();
   await expect(page.getByText(/Domain [12] of 13|Choose a blessing|Enhance a blessing|Where next/).first()).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Currency Wars: download, play a run, browse items", async ({ page }) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await installGameData(page);
+  await installCwWiki(page);
+  await page.goto("/currency-wars");
+  await page.getByRole("button", { name: "Download Currency Wars data" }).click();
+  await page.getByRole("button", { name: "Start run" }).click();
+  const cards = (title: RegExp) => page.locator("section").filter({ has: page.getByRole("heading", { name: title }) }).locator("div.grid > button");
+  await cards(/Choose an Investment Environment/).first().click();
+  await expect(page.getByText(/deployed/)).toBeVisible();
+  await expect(page.getByText(/Plane 1/).first()).toBeVisible();
+  // Reward node: always cleared.
+  await page.getByRole("button", { name: "Battle", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Reward node cleared" })).toBeVisible();
+  await page.getByRole("button", { name: /Next node/ }).click();
+  // Buy XP spends 4 gold; Lock toggles.
+  const gold = async () => Number((await page.getByText(/\d+ gold$/).first().innerText()).match(/\d+/)![0]);
+  const before = await gold();
+  await page.getByRole("button", { name: /Buy XP/ }).click();
+  expect(await gold()).toBe(before - 4);
+  await page.getByRole("button", { name: "Lock shop" }).click();
+  await expect(page.getByRole("button", { name: "Locked" })).toBeVisible();
+  // Select a deployed unit and send it to the bench.
+  await page.getByRole("button", { name: /^(On|Off)-Field slot \d: / }).first().click();
+  await page.getByRole("button", { name: "To bench" }).click();
+  await expect(page.getByRole("button", { name: /^Bench slot \d: / }).first()).toBeVisible();
+  // The run survives a reload (give IndexedDB a moment to commit the last write).
+  await page.waitForTimeout(300);
+  await page.reload();
+  await expect(page.getByRole("button", { name: /^Bench slot \d: / }).first()).toBeVisible();
+
+  await page.getByRole("tab", { name: "Equipment" }).click();
+  await page.getByRole("button", { name: "Folding Knife + Roller Skates: Fixture Blade" }).first().click();
+  await expect(page.getByText("Hits harder.")).toBeVisible();
+  await page.getByRole("tab", { name: "Investments" }).click();
+  await expect(page.getByText("Fixture Armory")).toBeVisible();
+  await page.getByRole("button", { name: "Prismatic", exact: true }).click();
+  await expect(page.getByText("Gold Plan A")).toHaveCount(0);
+  await page.getByRole("tab", { name: "Team builder" }).click();
+  await page.getByLabel("Search characters").fill("Fx Iris");
+  await page.getByRole("button", { name: /Fx Iris/ }).first().click();
+  await expect(page.getByText("Off-Field (1)")).toBeVisible();
+  await page.goto("/guides/view?g=currency-wars");
+  await expect(page.getByRole("heading", { name: /Every mechanic/ })).toBeVisible();
   expect(errors).toEqual([]);
 });

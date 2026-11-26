@@ -81,6 +81,18 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.3.0 Currency Wars update
+
+- **Bug fixed:** on phones the Currency Wars search box overlapped the "All" chip. Search now has its own row (checked by an E2E test).
+- **Run simulator, laid out like the game:** node track, squad HP, gold, level/XP, streak; bonds list with thresholds; On-Field (4), Off-Field and a 9-slot bench; shop of 5 with level odds, Buy XP, Refresh, Lock and Battle; item bag with combining; Environment, Strategy, Supply and Encounter choices; result and end-of-run screens with rank gain and Expected Profit goals. Seeded, saved, replayable.
+- **Rules from the wiki (4.7):** node order, Action Value, HP loss per plane, interest 1/10 up to 5, refresh 2, Experience 4, odds by level, 3-copy merges, 3 items per character, 36 recipes, Supply 1 of 5, Strategy rarity and difficulty, Encounters from A2, 3 random opponents and their bosses, 68 difficulty steps, rank gain by HP, idle wrong-position characters, per-character strength by star. Unpublished numbers (base and streak gold, XP curve except the 84 at Lv.9, Reward drops) are listed in the app as guesses.
+- **More detail:** equipment combination grid (the in-game "Weapon Combinations" table) with effects and recommended users; all ~70 Environments and ~300 Strategies; team builder with positions, strength by star and a picker for Phantasmoon Games' per-game rule.
+- **Guide:** "Currency Wars" in Guides, 10 sections with beginner/advanced and permanent/4.7 labels. "Escapade" and "Employee Bonds" from the request couldn't be found on the 4.7 wiki pages, so the guide says so instead of guessing.
+- Found and fixed while testing: a full bench could lock a Supply node; starters could be three copies of one character; Phantasmoon Games' three rule variants were counted as three bonds; table labels widened the phone layout; the last action could be lost on an instant reload.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **154/154** · E2E **13/13** on the server build and the static web edition, including a played run and phone-width checks for every Currency Wars tab. Calibration over 150 seeded runs on real wiki data: a simple bot clears A0 ~71%, A4 ~25%; a passive player never clears.
+
 ## 2026-11-26 · 1.2.1 bug sweep
 
 A scripted real-data sweep (every page and tab, Fribbels import, both wiki downloads, a full SU run, chat) found:

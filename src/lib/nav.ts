@@ -30,7 +30,7 @@ export const NAV: NavItem[] = [
 
   { id: "endgame", href: "/endgame", label: "Endgame", icon: Flame, area: "Endgame", blurb: "MoC, Pure Fiction, Apocalyptic Shadow, Anomaly Arbitration" },
   { id: "universe", href: "/universe", label: "Simulated Universe", icon: Orbit, area: "Endgame", blurb: "Blessings, curios and a run simulator" },
-  { id: "currency-wars", href: "/currency-wars", label: "Currency Wars", icon: Coins, area: "Endgame", blurb: "Team builder with bonds" },
+  { id: "currency-wars", href: "/currency-wars", label: "Currency Wars", icon: Coins, area: "Endgame", blurb: "Run simulator, team builder, items" },
 
   { id: "warp", href: "/warp", label: "Warp Planner", icon: Sparkles, area: "Tools", blurb: "Pity, odds, simulator" },
   { id: "teams", href: "/teams", label: "Builds & Teams", icon: Swords, area: "Tools", blurb: "Team builder and optimizer" },

@@ -17,7 +17,8 @@ export interface CwOdds { level: number; odds: number[] }
 
 /** Wikitext → readable text: keeps the visible part of templates and links. */
 export function cleanWikitext(s: string): string {
-  let t = s.replace(/<!--[\s\S]*?-->/g, "");
+  // "nobold=1" is a styling flag that sits before or after the coloured text.
+  let t = s.replace(/<!--[\s\S]*?-->/g, "").replace(/\|\s*nobold=1\s*(?=[|}])/g, "");
   for (let i = 0; i < 4; i++) {
     t = t
       .replace(/\{\{Color\|[^|{}]*\|([^|{}]*)(?:\|[^{}]*)?\}\}/g, "$1")
@@ -103,4 +104,187 @@ export function parseCurrentSeason(wikitext: string): { season: string; version:
   const re = /link=Currency Wars: ([^|\]]+)\|[^\n]*?Version \[\[([\d.]+)\]\]\s*–\s*Present/;
   const m = re.exec(wikitext);
   return m ? { season: m[1].trim(), version: m[2] } : null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Tables: equipment, Investment Environments/Strategies, opponents, difficulty, character pages.
+// ---------------------------------------------------------------------------------------------
+
+const ATTR = /^(?:rowspan|colspan|style|class|width|align|id)\s*=\s*"?[^|"]*"?\s*\|(?!\|)/i;
+
+/** Rows of the first wikitable at or after `from` (cells are raw wikitext; header rows are skipped). */
+export function wikiTableRows(wikitext: string, from = 0): string[][] {
+  const start = wikitext.indexOf("{|", from);
+  if (start < 0) return [];
+  const end = wikitext.indexOf("\n|}", start);
+  const body = wikitext.slice(start, end < 0 ? undefined : end);
+  const rows: string[][] = [];
+  let cur: string[] | null = null;
+  for (const raw of body.split("\n").slice(1)) {
+    const line = raw.trimEnd();
+    if (line.startsWith("|+")) continue;
+    if (line.startsWith("|-")) { if (cur?.length) rows.push(cur); cur = []; continue; }
+    if (line.startsWith("!")) { cur = null; continue; }
+    if (line.startsWith("|")) {
+      cur ??= [];
+      cur.push(...line.slice(1).split("||").map((c) => c.trim().replace(ATTR, "").trim()));
+      continue;
+    }
+    if (cur?.length) cur[cur.length - 1] += `\n${line}`;
+  }
+  if (cur?.length) rows.push(cur);
+  return rows;
+}
+
+const headingAt = (wikitext: string, title: string) => {
+  const m = new RegExp(`^=+\\s*${title.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}\\s*=+\\s*$`, "m").exec(wikitext);
+  return m ? m.index : -1;
+};
+
+/** "[[File:…|50px]]<br />Roller Skates" → "Roller Skates". */
+const nameCell = (cell: string) => cleanWikitext(cell.split(/<br\s*\/?>/i).pop() ?? cell);
+const lines = (cell: string) => cleanWikitext(cell.replace(/\{\{Icon\|[^{}]*\}\}\s*/g, "")).split("\n").map((x) => x.replace(/^\*\s*/, "").trim()).filter(Boolean);
+
+/** Names inside {{Card|X}} / {{Card List|A, B}} (comma or "delim=;" separated). */
+export function cardNames(cell: string): string[] {
+  const out: string[] = [];
+  for (const m of cell.matchAll(/\{\{Card( List)?\|([^|}]*)([^}]*)\}\}/g)) {
+    // A single {{Card}} is one name, even with commas in it ("Savage God, Mad King, …").
+    if (!m[1]) { out.push(m[2].trim()); continue; }
+    const sep = /delim=;/.test(m[3]) ? ";" : ",";
+    out.push(...m[2].split(sep).map((x) => x.trim()).filter(Boolean));
+  }
+  return out;
+}
+
+export interface CwBasicItem { name: string; tags: string[]; stats: string }
+export interface CwAdvancedItem {
+  name: string;
+  tags: string[];
+  /** "Advanced/Privileged" values, e.g. "SPD Amplification: 25%/50%". */
+  stats: string[];
+  effect: string;
+  /** Characters the wiki lists as good users. */
+  users: string[];
+  /** The two basic items it is made from. */
+  recipe: [string, string];
+}
+
+/** Equipment page: basic items and the advanced items with their two-item recipes. */
+export function parseEquipment(wikitext: string): { basic: CwBasicItem[]; advanced: CwAdvancedItem[] } {
+  const b = headingAt(wikitext, "Basic Equipment");
+  const a = headingAt(wikitext, "Advanced/Privileged Equipment");
+  const basic = b < 0 ? [] : wikiTableRows(wikitext, b).filter((r) => r.length >= 3)
+    .map((r) => ({ name: nameCell(r[0]), tags: lines(r[1]), stats: lines(r[2]).join(" · ") }));
+  const advanced: CwAdvancedItem[] = [];
+  if (a >= 0) {
+    for (const r of wikiTableRows(wikitext, a)) {
+      if (r.length < 6) continue;
+      const parts = [...r[5].matchAll(/File:Equipment ([^|\]]+?)\.png/g)].map((m) => m[1].trim());
+      if (parts.length !== 2) continue;
+      advanced.push({ name: nameCell(r[0]), tags: lines(r[1]), stats: lines(r[2]), effect: cleanWikitext(r[3]), users: cardNames(r[4]), recipe: [parts[0], parts[1]] });
+    }
+  }
+  return { basic, advanced };
+}
+
+export interface CwNamed { name: string; effect: string }
+/** Investment Environment list: name + effect. */
+export function parseEnvironments(wikitext: string): CwNamed[] {
+  return wikiTableRows(wikitext, Math.max(0, headingAt(wikitext, "List of Investment Environments")))
+    .filter((r) => r.length >= 2)
+    .map((r) => ({ name: nameCell(r[0]), effect: cleanWikitext(r[1]) }))
+    .filter((e) => e.name && e.effect);
+}
+
+export type StrategyRarity = "Silver" | "Gold" | "Prismatic";
+export interface CwStrategy extends CwNamed { rarity: StrategyRarity; planes: number[] }
+/** Investment Strategies by rarity section, with the planes they can appear on. */
+export function parseStrategies(wikitext: string): CwStrategy[] {
+  const out: CwStrategy[] = [];
+  for (const rarity of ["Prismatic", "Gold", "Silver"] as const) {
+    const at = headingAt(wikitext, rarity);
+    if (at < 0) continue;
+    for (const r of wikiTableRows(wikitext, at)) {
+      if (r.length < 2) continue;
+      const planes = [...(r[2] ?? "").matchAll(/Plane (\d)/g)].map((m) => Number(m[1]));
+      const name = nameCell(r[0]);
+      if (name) out.push({ name, effect: cleanWikitext(r[1]), rarity, planes: planes.length ? planes : [1, 2, 3] });
+    }
+  }
+  return out;
+}
+
+export interface CwOpponent { name: string; bosses: string[]; elites: string[]; normals: string[] }
+/** The "Bosses" table: each opponent faction with its boss, elite and normal enemies. */
+export function parseOpponents(wikitext: string): CwOpponent[] {
+  const at = headingAt(wikitext, "Bosses");
+  if (at < 0) return [];
+  return wikiTableRows(wikitext, at)
+    .filter((r) => r.length >= 4)
+    .map((r) => ({ name: cleanWikitext(r[0]), bosses: cardNames(r[1]), elites: cardNames(r[2]), normals: cardNames(r[3]) }))
+    .filter((o) => o.name && o.bosses.length);
+}
+
+export interface CwDifficulty {
+  /** "A0-1" */
+  id: string;
+  /** "A0 Black Iron" */
+  rank: string;
+  /** Enemy stat boosts per plane in percent. */
+  planes: { atk: number; hp: number; spd: number }[];
+  /** Running total of "enemy difficulty". */
+  difficulty: number;
+  effects: string[];
+}
+/** Difficulty steps (A0-1 … A8-20) with enemy stat boosts per plane. */
+export function parseDifficulty(wikitext: string): CwDifficulty[] {
+  const at = headingAt(wikitext, "Stat Modifiers");
+  if (at < 0) return [];
+  const end = wikitext.indexOf("\n|}", at);
+  const out: CwDifficulty[] = [];
+  let rank = "";
+  for (const chunk of wikitext.slice(at, end < 0 ? undefined : end).split(/\n\|-/)) {
+    const head = /colspan[^|]*\|\s*(A\d+\s[^\n]+)/.exec(chunk);
+    if (head) { rank = head[1].replace(/\s+/g, " ").replace(/Vi ridian/, "Viridian").trim(); continue; }
+    const id = /^\s*\n?\|\s*(A\d+-\d+)/.exec(chunk)?.[1];
+    if (!id) continue;
+    const planes: CwDifficulty["planes"] = [];
+    // Tolerates the page's typos ("SPD `4%", "ATK 40/HP", "Plane: ATK").
+    for (const m of chunk.matchAll(/Planes? ([\d/]+):\s*(?:Plane:\s*)?ATK ([\d.]+)%?\/HP ([\d.]+)%?\/SPD\s*\D?([\d.]+)%?/g)) {
+      for (const p of m[1].split("/")) planes[Number(p) - 1] = { atk: Number(m[2]), hp: Number(m[3]), spd: Number(m[4]) };
+    }
+    const effects = [...chunk.matchAll(/^\*\s*(.+)$/gm)].map((m) => cleanWikitext(m[1])).filter((e) => e && !/^Planes? \d/.test(e));
+    const difficulty = Number(/Enemy difficulty \+\d+ \((\d+)\)/.exec(chunk)?.[1] ?? 0);
+    if (planes.filter(Boolean).length === 3) out.push({ id, rank: rank || id.split("-")[0], planes, difficulty, effects: effects.filter((e) => !/^Enemy difficulty/.test(e)) });
+  }
+  return out;
+}
+
+export type CwField = "on" | "off" | "both";
+export interface CwCharInfo {
+  cost: number;
+  field: CwField;
+  roles: string[];
+  bonds: string[];
+  /** On-/Off-Field Strength at 1/2/3 stars. */
+  onField: number[];
+  offField: number[];
+  /** HP bonus in percent at 1/2/3 stars. */
+  hp: number[];
+}
+/** A "<Name> (<Season>)" character page: infobox and "Character Details". */
+export function parseCharInfo(wikitext: string): CwCharInfo | null {
+  const get = (k: string) => new RegExp(`^\\|\\s*${k}\\s*=\\s*([^\\n|]*)`, "m").exec(wikitext)?.[1].trim() ?? "";
+  const cost = Number(get("cost"));
+  const fieldText = get("field").toLowerCase();
+  if (!cost || !fieldText) return null;
+  const field: CwField = fieldText.includes("/") ? "both" : fieldText.startsWith("off") ? "off" : "on";
+  const nums = (k: string) => [1, 2, 3].map((i) => parseFloat(get(`${k}${i}`)) || 0);
+  return {
+    cost, field,
+    roles: ["role1", "role2"].map(get).map((r) => r.replace(/\s*\(.*\)$/, "")).filter(Boolean),
+    bonds: ["bond1", "bond2", "bond3"].map(get).filter(Boolean),
+    onField: nums("on_field"), offField: nums("off_field"), hp: nums("hp"),
+  };
 }

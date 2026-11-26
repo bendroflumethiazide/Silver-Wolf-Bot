@@ -8,6 +8,7 @@ import { useApp } from "@/lib/store";
 import { POOLS } from "@/lib/warp/rules";
 import { GameImage } from "../GameImage";
 import { Panel } from "../ui";
+import { CurrencyWarsGuide } from "./CurrencyWarsGuide";
 
 const H = ({ children }: { children: ReactNode }) => <h2 className="mb-2 mt-5 text-base font-semibold text-text first:mt-0">{children}</h2>;
 const List = ({ items }: { items: ReactNode[] }) => <ul className="space-y-1.5 text-sm text-muted">{items.map((x, i) => <li key={i} className="flex gap-2"><span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan" /><span>{x}</span></li>)}</ul>;
@@ -200,6 +201,7 @@ function Importing() {
 const BODY: Record<string, () => ReactNode> = {
   "start-here": StartHere, warps: Warps, leveling: Leveling, daily: Daily, elements: Elements, paths: Paths,
   "relics-101": Relics101, substats: Substats, farming: Farming, saving: Saving, import: Importing,
+  "currency-wars": CurrencyWarsGuide,
 };
 
 export function GuideContent({ slug }: { slug: string }) {
