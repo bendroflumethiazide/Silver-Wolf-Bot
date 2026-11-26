@@ -23,7 +23,9 @@ test("Currency Wars tabs fit a phone", async ({ page }) => {
   await page.goto("/currency-wars");
   await page.getByRole("button", { name: "Download Currency Wars data" }).click();
   await page.getByRole("button", { name: "Start run" }).click();
-  await page.locator("section").filter({ has: page.getByRole("heading", { name: /Choose an Investment Environment/ }) }).locator("div.grid > button").first().click();
+  await page.locator("section").filter({ has: page.getByRole("heading", { name: /Choose an Investment Environment/ }) }).locator("div.grid > button").filter({ hasText: "Fixture Armory" }).click();
+  // Two basic items in the bag; in this data any two combine, so both are outlined as craftable now.
+  await expect(page.getByText(/^Can craft now:/)).toHaveCount(2);
   for (const tab of ["Run simulator", "Team builder", "Equipment", "Investments"]) {
     await page.getByRole("tab", { name: tab }).click();
     await page.waitForTimeout(200);

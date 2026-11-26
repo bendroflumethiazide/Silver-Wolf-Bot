@@ -3,7 +3,7 @@ import { buildTimeline, hpAt, turnOrder, turnsOf } from "../currencywars/timelin
 import { bondNames, membersOf, trackedMatches } from "../currencywars/bonds";
 import { characterStats, itemBoosts, parseStatLine } from "../currencywars/stats";
 import { gearStatus, recommendedFor } from "../../components/currencywars/RecommendedGear";
-import { fillUnknown, gearMark, gearNeeds } from "../currencywars/gear";
+import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/gear";
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
@@ -864,5 +864,14 @@ describe("Equipment Tracking", () => {
     expect(fillUnknown("Elation Emblem", 'Obtains 1 "Unknown" and 1 "Sparxie."')).toBe('Obtains 1 "Elation Emblem" and 1 "Sparxie."');
     expect(fillUnknown("DoT Emblem Set", 'Obtains 1 "Unknown," 1 "Guinaifen," and 1 "Unknown."')).toBe('Obtains 1 "DoT Emblem," 1 "Guinaifen," and 1 "an item the wiki hasn\'t named."');
     expect(fillUnknown("Intern Development Plan", 'Obtain 1 "Unknown{{verify}}."')).toBe('Obtain 1 "an item the wiki hasn\'t named."');
+  });
+});
+
+describe("craftable now (blue outline)", () => {
+  it("is any recipe whose other part you already have, recommended or not", () => {
+    expect(craftableNow(PACK, "Folding Knife", ["Roller Skates"])).toEqual([{ partner: "Roller Skates", makes: "Firestorm Surge" }]);
+    expect(craftableNow(PACK, "Folding Knife", ["Red Gem"])).toEqual([{ partner: "Red Gem", makes: "Stellaron Hunters Emblem" }]);
+    expect(craftableNow(PACK, "Folding Knife", ["Lucky Star"])).toEqual([]);
+    expect(craftableNow(PACK, "Firestorm Surge", ["Roller Skates"])).toEqual([]);
   });
 });

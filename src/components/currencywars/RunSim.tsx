@@ -9,7 +9,7 @@ import {
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
 } from "@/lib/currencywars/run";
-import { fillUnknown, gearMark, gearNeeds, type GearTarget } from "@/lib/currencywars/gear";
+import { craftableNow, fillUnknown, gearMark, gearNeeds, type GearTarget } from "@/lib/currencywars/gear";
 import { isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { BattleView } from "./BattleView";
@@ -211,6 +211,15 @@ export function RunSim({ pack }: { pack: CwPack }) {
   }, [run, gearTracked]);
   const needs = useMemo(() => gearNeeds(pack, gearTargets), [pack, gearTargets]);
   const heldByTargets = gearTargets.flatMap((t) => t.held);
+  /** Items your characters hold (a bag item that combines with one of them can be crafted by equipping it). */
+  const heldByAll = run ? (["on", "off", "bench"] as const).flatMap((z) => run[z].flatMap((u) => (u && !u.npc ? u.items : []))) : [];
+  /** 👍 = a tracked character prefers it (or it's a part of what they prefer); blue = it can be crafted right now. */
+  const markOf = (item: string, others: string[]) => {
+    const want = gearMark(needs, item, [...others, ...heldByTargets]);
+    const craft = craftableNow(pack, item, [...others, ...heldByAll]);
+    const notes = [...want.notes.map((n) => `Preferred by ${n}`), ...craft.map((c) => `Craft now: ${item} + ${c.partner} → ${c.makes}`)];
+    return { wanted: want.wanted, ready: craft.length > 0, notes, preferred: want.notes, craft: craft.map((c) => `${c.partner} → ${c.makes}`) };
+  };
   if (run === undefined) return null;
   if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><Rules /></div>;
 
@@ -295,11 +304,11 @@ export function RunSim({ pack }: { pack: CwPack }) {
               <div key={i} className="flex flex-col gap-1">
                 <CharCard pack={pack} name={o.name} cost={o.cost} onClick={() => update((s) => pickSupply(s, pack, i))} footer="free" />
                 {o.item && (() => {
-                  const mark = gearMark(needs, o.item, [...run.bag, ...heldByTargets]);
+                  const mark = markOf(o.item, run.bag);
                   return (
-                    <span title={mark.notes.length ? `For ${mark.notes.join("; ")}` : o.item} className={cx("relative flex items-center justify-center gap-1 rounded-md px-1 py-0.5 text-[10px]", mark.ready ? "text-text ring-2 ring-sky-400" : "text-muted", mark.wanted && !mark.ready && "text-text")}>
+                    <span title={mark.notes.length ? mark.notes.join("\n") : o.item} className={cx("relative flex items-center justify-center gap-1 rounded-md px-1 py-0.5 text-[10px]", mark.ready ? "text-text ring-2 ring-sky-400" : "text-muted", mark.wanted && !mark.ready && "text-text")}>
                       <ItemIcon pack={pack} name={o.item} size={11} /> {o.item}
-                      {mark.wanted && <ThumbsUp size={11} className="shrink-0 text-emerald-400" aria-label={`Needed: ${mark.notes.join("; ")}`} />}
+                      {mark.wanted && <ThumbsUp size={11} className="shrink-0 text-emerald-400" aria-label={`Preferred by ${mark.preferred.join("; ")}`} />}{mark.ready && <span className="sr-only">Can craft now: {mark.craft.join("; ")}</span>}
                     </span>
                   );
                 })()}
@@ -353,17 +362,17 @@ export function RunSim({ pack }: { pack: CwPack }) {
                     <button type="button" onClick={() => toggleGear(n)} aria-label={`Stop tracking ${n}'s gear`} className="rounded-full p-0.5 hover:bg-white/10"><X size={10} /></button>
                   </span>
                 )) : <span className="text-faint">everyone deployed (select a character → Track gear to choose)</span>}
-                <span className="text-faint">· <span className="rounded px-1 ring-1 ring-sky-400">blue</span> = the other part is here, craft now</span>
+                <span className="text-faint">· 👍 preferred · <span className="rounded px-1 ring-1 ring-sky-400">blue</span> = you can craft it now</span>
               </p>
               {run.bag.length ? (
                 <div className="flex flex-wrap gap-1.5">
                   {run.bag.map((it, i) => {
-                    const mark = gearMark(needs, it, [...run.bag.filter((_, k) => k !== i), ...heldByTargets]);
+                    const mark = isOre(it) ? { wanted: false, ready: false, notes: [] as string[], preferred: [] as string[], craft: [] as string[] } : markOf(it, run.bag.filter((_, k) => k !== i));
                     return (
-                      <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={mark.notes.length ? `${it} · for ${mark.notes.join("; ")}` : it}
+                      <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={mark.notes.length ? `${it}\n${mark.notes.join("\n")}` : it}
                         className={cx("flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px]", sel?.kind === "item" && sel.index === i ? "border-cyan bg-cyan/15" : mark.ready ? "border-sky-400 ring-1 ring-sky-400" : "border-line hover:border-cyan/50", itemKind(pack, it) === "advanced" && "text-violet-200", itemKind(pack, it) === "emblem" && "text-amber-100", isOre(it) && "border-white/20 bg-white/[0.04]")}>
                         <ItemIcon pack={pack} name={it} size={13} /> {it}
-                        {mark.wanted && <ThumbsUp size={11} className="text-emerald-400" aria-label={`Needed: ${mark.notes.join("; ")}`} />}
+                        {mark.wanted && <ThumbsUp size={11} className="text-emerald-400" aria-label={`Preferred by ${mark.preferred.join("; ")}`} />}{mark.ready && <span className="sr-only">Can craft now: {mark.craft.join("; ")}</span>}
                       </button>
                     );
                   })}

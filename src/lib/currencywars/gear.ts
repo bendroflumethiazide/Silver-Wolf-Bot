@@ -2,7 +2,7 @@
  * Equipment Tracking (like the game's): which items, and which crafting components, tracked characters
  * need for their recommended equipment, and whether a component can be crafted right away.
  */
-import { madeFrom } from "./items";
+import { combinations, madeFrom } from "./items";
 import type { CwPack } from "./sim";
 
 /** Every item recommended for a character in their position (or every group when unplaced). */
@@ -48,6 +48,15 @@ export function gearMark(needs: Map<string, GearNeed[]>, item: string, have: str
     ready: ready.length > 0,
     notes: list.map((n) => (n.partner ? `${n.who}: ${n.makes} (with ${n.partner}${have.includes(n.partner) ? ", which you have" : ""})` : `${n.who}: ${n.makes}`)),
   };
+}
+
+/**
+ * What an item can be crafted into right now: combinations whose other part you already have
+ * (in the bag, or held by one of your characters — equipping onto them combines). Any recipe counts,
+ * recommended or not.
+ */
+export function craftableNow(pack: CwPack, item: string, have: string[]): { partner: string; makes: string }[] {
+  return combinations(pack, item).filter((c) => have.includes(c.partner));
 }
 
 /** Wiki text with "Unknown" items filled in: an "X Emblem (Set)" plan's first one is the X Emblem. */

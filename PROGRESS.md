@@ -81,6 +81,10 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.6.4 Clearer marks
+
+- 👍 = equipment (or a part of it) a tracked character prefers. **Blue outline** = anything you can craft right now: its other part is in your bag or held by one of your characters (equipping combines), for any recipe, recommended or not. Both show in the bag at all times and on Supply picks. Tooltips list who prefers it and what it crafts into.
+
 ## 2026-11-26 · 1.6.3 Equipment Tracking, "Unknown" fixed on plan cards
 
 - **Equipment Tracking** (like the game's): pick characters with "Track gear" (selected character or their sheet), or leave it on everyone deployed. Items in Supply and in your bag get a 👍 when they are, or are a crafting part of, a tracked character's recommended equipment (hover/long-press: who needs it and for what). A part gets a **blue outline** when you already have the other part, so you can craft right away.
