@@ -718,7 +718,7 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
     if (bond) { state = { ...state, dispatchBond: bond }; applied.push(`a ${bond} character at each Boss node`); }
   }
   if (RULE_INFO[source]) state = ruleAfterGrant(state, source, uidBefore);
-  if (skipped.length) applied.push(`not simulated: ${[...new Set(skipped)].join(", ")}`);
+  if (skipped.length) applied.push(`not simulated: ${[...new Set(skipped)].join("; ")}`);
   return [state, applied];
 }
 
@@ -2177,7 +2177,7 @@ export function effectCoverage(pack: CwPack, name: string, effect: string): Effe
   if (!base) { base = { ...newRun(pack, "coverage", "A3-1"), bench: Array(RULES.benchSlots).fill(null) }; coverageBase.set(pack, base); }
   const [, applied] = applyEffect(base, pack, effect, createRng(`coverage:${name}`), name);
   const skip = applied.find((a) => a.startsWith("not simulated: "));
-  const missing = (skip ? skip.replace(/^not simulated: /, "").split(", ") : []).filter((m) => !/bench full|you own none|you have no/i.test(m));
+  const missing = (skip ? skip.replace(/^not simulated: /, "").split("; ") : []).filter((m) => !/bench full|you own none|you have no/i.test(m));
   const done = applied.filter((a) => !a.startsWith("not simulated: "));
   if (!done.length && !skip) missing.push("the wiki text doesn't say exactly what it gives or does");
   return { status: missing.length ? (done.length ? "partial" : "none") : "full", applied: done, missing };
