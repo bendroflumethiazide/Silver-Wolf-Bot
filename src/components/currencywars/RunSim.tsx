@@ -415,7 +415,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
           </div>
 
           <div className={cx("glass space-y-2 p-3", !prep && "pointer-events-none opacity-50")} aria-disabled={!prep}>
-            <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted">Shop · Lv.{run.level} odds</span><div className="w-full sm:w-72"><OddsBar odds={odds} /></div></div>
+            <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted">Shop · Lv.{run.level} odds · {run.shopNote === "kept" ? <span className="text-amber-300">kept by Lock this node</span> : <span className="text-cyan">new stock for P{run.plane + 1}-{run.node + 1}</span>}</span><div className="w-full sm:w-72"><OddsBar odds={odds} /></div></div>
             <BondTracker pack={pack} />
             <div className="grid grid-cols-5 gap-1.5">
               {run.shop.map((slot, i) => slot
@@ -425,7 +425,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               <Button onClick={() => update(buyXp)} disabled={run.level >= ASSUMED.maxLevel}><span className="flex flex-col items-start leading-tight"><span className="text-xs">Buy XP · <Coins size={11} className="inline text-amber-300" /> {run.xpCost}</span><span className="text-[10px] text-faint">Lv.{run.level} {xpToNext(run.level) ? `${run.xp}/${xpToNext(run.level)}` : "max"}</span></span></Button>
               <Button onClick={() => update((s) => refresh(s, pack))}><RefreshCw size={14} /> {run.freeRefreshes ? `Free ×${run.freeRefreshes}` : <>Refresh · <Coins size={11} className="text-amber-300" /> {RULES.refreshCost}</>}</Button>
-              <Button variant="ghost" onClick={() => update(toggleLock)} aria-pressed={run.locked}>{run.locked ? <Lock size={14} className="text-amber-300" /> : <LockOpen size={14} />} {run.locked ? "Locked" : "Lock shop"}</Button>
+              <Button variant="ghost" onClick={() => update(toggleLock)} aria-pressed={run.locked}>{run.locked ? <Lock size={14} className="text-amber-300" /> : <LockOpen size={14} />} {run.locked ? "Locked (next node)" : "Lock shop"}</Button>
               <Button variant="primary" onClick={() => { setSel(null); setPeek(null); const before = runRef.current; update((s) => battle(s, pack)); if (runRef.current !== before && runRef.current?.last?.timeline) setWatching(runRef.current.tick); }}><Swords size={14} /> Battle</Button>
             </div>
           </div>

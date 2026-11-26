@@ -164,7 +164,10 @@ export interface RunState {
   twoStarShop: boolean;
   extraDifficulty: number;
   shop: (ShopSlot | null)[];
+  /** Lock: keep this stock through the next node's refresh (then it releases). */
   locked: boolean;
+  /** What happened to the store at the start of this node. */
+  shopNote?: "refreshed" | "kept";
   on: (Unit | null)[];
   off: (Unit | null)[];
   bench: (Unit | null)[];
@@ -676,7 +679,9 @@ export function enterNode(s0: RunState, pack: CwPack): RunState {
   if (s.xpPerNode) s = levelUp(s, s.xpPerNode);
   if (s.node === 0) s = fireTriggers(s, pack, "plane", rng);
   s = fireTriggers(s, pack, "node", rng);
-  if (!s.locked) s = { ...s, shop: rollShopSlots(s, pack, rng) };
+  // The store refreshes at the start of every node. Lock keeps it for the next node only (tutorial "Store"), then releases.
+  if (!s.locked) s = { ...s, shop: rollShopSlots(s, pack, rng), shopNote: "refreshed" };
+  else s = log({ ...s, locked: false, shopNote: "kept" }, "Store kept by Lock for this node (lock released).");
   const opp = kind === "Boss" ? s.opponents[s.plane] ?? s.opponents[0] : s.opponents.length ? pickOne(rng, s.opponents) : "";
   s = { ...s, nodeOpponent: opp ?? "", encounter: null, last: null };
   if (kind === "Strategy") {

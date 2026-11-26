@@ -81,6 +81,11 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.6.6 Store refresh every node
+
+- The store gets new stock at the start of every node: after a fight, a Supply pick or skip, a Strategy or Encounter. The shop header says so ("new stock for P1-4").
+- Lock now works like the game's tutorial says: it keeps the stock through the *next* node only, then releases itself ("kept by Lock this node"; the button reads "Locked (next node)"). Before, a lock stayed on for the rest of the run, so the store never refreshed again.
+
 ## 2026-11-26 · 1.6.5 Who it's for
 
 - Marked items (bag and Supply) show small portraits of the tracked characters they're for, next to the 👍; the blue outline's craft result counts too.

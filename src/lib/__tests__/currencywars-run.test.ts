@@ -875,3 +875,31 @@ describe("craftable now (blue outline)", () => {
     expect(craftableNow(PACK, "Firestorm Surge", ["Roller Skates"])).toEqual([]);
   });
 });
+
+describe("store refresh", () => {
+  const shopKey = (s: RunState) => s.shop.map((c) => c?.name ?? "-").join(",") + `@${s.tick}`;
+  it("refreshes at the start of every node: after a fight, a Supply pick and a skip", () => {
+    let s = chooseEnvironment(newRun(PACK, "store", "A0-1"), PACK, 1);
+    expect(s.shopNote).toBe("refreshed");
+    s = { ...s, on: [{ uid: 1, name: "Kafka", cost: 5, stars: 3, items: [] }, null, null, null] };
+    const fought = advance(battle(s, PACK), PACK);
+    expect([fought.node, fought.shopNote]).toEqual([1, "refreshed"]);
+    expect(fought.log.join(" ")).not.toMatch(/kept by Lock/);
+    const atSupply = enterNode({ ...fought, plane: 0, node: 4 }, PACK);
+    expect(atSupply.phase).toBe("supply");
+    expect(pickSupply(atSupply, PACK, 0).shopNote).toBe("refreshed");
+    expect(skipSupply(atSupply, PACK).shopNote).toBe("refreshed");
+    expect(shopKey(skipSupply(atSupply, PACK))).not.toBe(shopKey(atSupply));
+  });
+  it("Lock keeps the stock through the next node only, then releases", () => {
+    let s = chooseEnvironment(newRun(PACK, "lock", "A0-1"), PACK, 1);
+    const stock = s.shop.map((c) => c?.name);
+    s = toggleLock({ ...s, phase: "result" });
+    s = advance(s, PACK);
+    expect(s.shop.map((c) => c?.name)).toEqual(stock);
+    expect([s.locked, s.shopNote]).toEqual([false, "kept"]);
+    expect(s.log.at(-1)).toMatch(/kept by Lock/);
+    s = advance({ ...s, phase: "result" }, PACK);
+    expect(s.shopNote).toBe("refreshed");
+  });
+});

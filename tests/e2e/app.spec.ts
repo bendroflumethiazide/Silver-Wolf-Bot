@@ -280,7 +280,7 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await page.getByRole("button", { name: /Buy XP/ }).click();
   expect(await gold()).toBe(before - 4);
   await page.getByRole("button", { name: "Lock shop" }).click();
-  await expect(page.getByRole("button", { name: "Locked" })).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Locked/ })).toBeVisible();
   // Character details: stats like the game's Stats Details, and abilities by star.
   await page.getByRole("button", { name: /^(On|Off)-Field slot \d: / }).first().click();
   // Recommended equipment on the selected character (like the game's card).
