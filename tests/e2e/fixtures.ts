@@ -49,7 +49,11 @@ export function syntheticFiles(version = "9.9.0") {
     elements: Object.fromEntries(["Quantum", "Fire", "Ice", "Physical", "Wind"].map((e) => [e, { id: e, name: e, desc: "", color: "#fff", icon: "" }])),
     characters, character_ranks, character_skills, character_skill_trees, character_promotions, light_cones, light_cone_ranks, light_cone_promotions,
     relic_sets, relics: {}, relic_main_affixes: {}, relic_sub_affixes: {}, items, achievements,
-    simulated_blessings: { "1": { id: "1", name: "Test Blessing", desc: "Bless.", enhanced_desc: "" } },
+    simulated_blessings: {
+      "1": { id: "1", name: "Test Blessing", desc: "Bless.", enhanced_desc: "" },
+      // Classic SU id scheme 612 + Path digit (8 = Erudition, 5 = Destruction) + rarity digit (3/4/5) + n.
+      ...Object.fromEntries(["612820", "612830", "612840", "612841", "612850", "612851", "612852", "612853", "612540", "612550", "612551", "612552"].map((id) => [id, { id, name: id.endsWith("20") ? "Path Resonance: Erudition" : `Fixture Blessing ${id}`, desc: `Effect ${id}.`, enhanced_desc: `Better ${id}.` }])),
+    },
     simulated_curios: { "1": { id: "1", name: "Test Curio", desc: "Curious.", bg_desc: "", icon: "" } },
     simulated_events: { "1": { id: "1", name: "Test Occurrence", type: "Nihility", image: "" } },
     nickname: { characters: { "1006": ["SW"] } },

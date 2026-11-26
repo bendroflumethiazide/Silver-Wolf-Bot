@@ -3,7 +3,8 @@
 import { useLiveQuery } from "dexie-react-hooks";
 import { useSearchParams } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
-import { Suspense, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { GameImage } from "@/components/GameImage";
 import { RelicCard, VERDICT_TONE } from "@/components/RelicCard";
 import { WolfComment } from "@/components/SilverWolf";
@@ -18,6 +19,8 @@ import { MAIN_STATS_BY_SLOT, RELIC_SLOTS, SLOT_LABEL, SUB_STATS, type MainStatKe
 import { useApp } from "@/lib/store";
 import { profileFor } from "@/lib/summary";
 import type { Relic } from "@/lib/types";
+import { fribbelsBuild } from "@/lib/builds/fribbels";
+import { charHref } from "@/lib/links";
 
 type Tab = "inventory" | "best" | "profiles" | "sets";
 const isPlanar = (setId: string) => Number(setId) >= 300;
@@ -127,7 +130,11 @@ function ProfileEditor({ charId }: { charId: string }) {
 function Inner() {
   const params = useSearchParams();
   const { game, profileId } = useApp();
-  const [tab, setTab] = useState<Tab>(params.get("char") ? "profiles" : "inventory");
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = params.get("tab");
+    if (t === "inventory" || t === "best" || t === "profiles" || t === "sets") return t;
+    return params.get("char") ? "profiles" : "inventory";
+  });
   const relics = useLiveQuery(() => getDb().relics.where("profileId").equals(profileId).toArray(), [profileId]);
   const owned = useLiveQuery(() => getDb().characters.where("profileId").equals(profileId).toArray(), [profileId]);
   const saved = useRelicProfiles(profileId);
@@ -138,6 +145,26 @@ function Inner() {
   const [equip, setEquip] = useState<"" | "equipped" | "free">("");
   const [editing, setEditing] = useState<Relic | null | "new">(null);
   const [setQuery, setSetQuery] = useState("");
+  // No relics yet? Open on the set database instead of an empty inventory.
+  const opened = useRef(false);
+  useEffect(() => {
+    if (opened.current || !relics) return;
+    opened.current = true;
+    if (!relics.length && !params.get("char") && !params.get("tab")) setTab("sets");
+  }, [relics, params]);
+  const usersOfSet = useMemo(() => {
+    const m = new Map<string, string[]>();
+    if (!game) return m;
+    for (const c of Object.values(game.characters)) {
+      const b = fribbelsBuild(c.id);
+      if (!b) continue;
+      for (const name of [...(b.relicSets ?? []).flat(), ...(b.ornamentSets ?? [])]) {
+        const set = Object.values(game.relicSets).find((x) => x.name === name);
+        if (set && !(m.get(set.id) ?? []).includes(c.id)) m.set(set.id, [...(m.get(set.id) ?? []), c.id]);
+      }
+    }
+    return m;
+  }, [game]);
 
   const name = (id: string) => (game?.characters[id] ? characterDisplayName(game.characters[id]) : id);
   const scored = useMemo(() => (relics ?? []).map((r) => {
@@ -146,7 +173,7 @@ function Inner() {
     return { r, s: scoreRelic(r, profile), profile };
   }), [relics, charId, game, saved]);
 
-  if (!game) return (<><PageHeader title="Relic Database" /><WolfComment comment={noGameData()} /></>);
+  if (!game) return (<><PageHeader title="Relic Sets" /><WolfComment comment={noGameData()} /></>);
   if (!relics || !owned) return <Loading />;
 
   const filtered = scored
@@ -167,7 +194,7 @@ function Inner() {
 
   return (
     <div>
-      <PageHeader title="Relic Database" subtitle="Inventory, character-specific scoring, and every Cavern Relic and Planar Ornament set." actions={<Button variant="primary" size="sm" onClick={() => setEditing("new")}><Plus size={14} /> Add relic</Button>} />
+      <PageHeader title="Relic Sets" subtitle="Every set, your relics and their grades." actions={<Button variant="primary" size="sm" onClick={() => setEditing("new")}><Plus size={14} /> Add relic</Button>} />
       <WolfComment comment={relicInventoryComment(relics.length, keep, fodder)} className="mb-5" />
       <Tabs<Tab> value={tab} onChange={setTab} tabs={[{ id: "inventory", label: `Inventory (${relics.length})` }, { id: "best", label: "Best available" }, { id: "profiles", label: "Scoring profiles" }, { id: "sets", label: `Sets (${Object.keys(game.relicSets).length})` }]} />
 
@@ -244,12 +271,19 @@ function Inner() {
                   <ul className="mt-2 space-y-1 text-sm text-muted">
                     {s.desc.map((d, i) => <li key={i}><span className="font-mono text-[11px] text-cyan">{i === 0 ? "2pc" : "4pc"}</span> {stripMarkup(d)}</li>)}
                   </ul>
+                  {(usersOfSet.get(s.id) ?? []).length > 0 && (
+                    <div className="mt-2">
+                      <div className="mb-1 text-[11px] text-faint">Recommended for (Fribbels)</div>
+                      <div className="flex flex-wrap gap-1">{(usersOfSet.get(s.id) ?? []).slice(0, 10).map((id) => (
+                        <Link key={id} href={charHref(id)} title={name(id)}><GameImage path={game.characters[id]?.icon} alt={name(id)} className="h-8 w-8" rounded="rounded-full" /></Link>
+                      ))}</div>
+                    </div>
+                  )}
                   <div className="mt-2 text-xs text-faint">{users.length ? `Worn by: ${users.map(name).join(", ")}` : `Owned pieces: ${relics.filter((r) => r.setId === s.id).length}`}</div>
                 </Panel>
               );
             })}
           </div>
-          <p className="mt-3 text-xs text-muted">Farming locations (Cavern of Corrosion / Simulated Universe domains) are not included in the downloaded data, so they are not shown.</p>
         </>
       )}
       {editing && <RelicForm initial={editing === "new" ? null : editing} onClose={() => setEditing(null)} />}

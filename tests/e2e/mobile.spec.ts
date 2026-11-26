@@ -3,7 +3,7 @@ import { installGameData } from "./fixtures";
 
 test("mobile navigation drawer and no horizontal overflow", async ({ page }) => {
   await installGameData(page);
-  for (const r of ["/", "/warp", "/characters", "/relics", "/teams", "/map"]) {
+  for (const r of ["/", "/warp", "/characters", "/relics", "/teams", "/map", "/guides", "/guides/view?g=relics-101", "/endgame", "/codes", "/currency-wars", "/universe", "/bosses", "/characters/view?id=1006"]) {
     await page.goto(r);
     await page.locator("main h1").first().waitFor();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { collectErrors, installGameData, mockGameData } from "./fixtures";
 
-const ROUTES = ["/", "/terminal", "/account", "/characters", "/characters/view?id=1006", "/light-cones", "/relics", "/bosses", "/npcs", "/map", "/warp", "/warp?tab=planner", "/warp?tab=simulator", "/warp?tab=banners", "/teams", "/materials", "/game-modes", "/universe", "/story", "/events", "/achievements", "/journal", "/import", "/status", "/settings"];
+const ROUTES = ["/", "/terminal", "/account", "/characters", "/characters/view?id=1006", "/light-cones", "/relics", "/bosses", "/npcs", "/map", "/warp", "/warp?tab=planner", "/warp?tab=simulator", "/warp?tab=banners", "/teams", "/materials", "/game-modes", "/universe", "/story", "/events", "/achievements", "/journal", "/import", "/status", "/settings", "/guides", "/guides/view?g=warps", "/endgame", "/codes", "/currency-wars", "/universe"];
 
 test("every page renders without errors, before and after game data", async ({ page }) => {
   const errors = collectErrors(page);
@@ -23,7 +23,7 @@ test("game data download shows version and Silver Wolf comments on data", async 
   await installGameData(page);
   await expect(page.getByText("v9.9.0 · en")).toBeVisible();
   await page.goto("/");
-  await expect(page.getByText(/game data v9\.9\.0/)).toBeVisible();
+  await expect(page.getByText(/game data v9\.9\.0/i)).toBeVisible();
   await expect(page.getByLabel("Silver Wolf says").first()).toBeVisible();
 });
 
@@ -67,13 +67,15 @@ test("HSR Scanner import: preview, apply, rollback", async ({ page }) => {
   await expect(page.getByText("Silver Wolf rating")).toBeVisible();
   await expect(page.getByText("What this build lacks")).toBeVisible();
   await expect(page.getByText(/No Hands, Body, Feet, Planar Sphere, Link Rope equipped/)).toBeVisible();
-  await expect(page.getByText(/Silver Wolf's recommended build/)).toBeVisible();
+  await expect(page.getByText("Recommended build", { exact: true })).toBeVisible();
   await page.goto("/import");
   page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: "Roll back" }).click();
   await expect(page.getByText("rolled back")).toBeVisible();
-  await page.goto("/relics");
+  await page.goto("/relics?tab=inventory");
   await expect(page.getByText("No relics")).toBeVisible();
+  await page.goto("/relics");
+  await expect(page.getByLabel("Search sets")).toBeVisible(); // no relics: opens on the set database
 });
 
 test("warp: tracker button, entered pity drives planner, deterministic simulator", async ({ page }) => {
@@ -193,4 +195,37 @@ test("phone chat: floating button, small talk, family settings, history persists
   await page.goto("/terminal");
   await expect(page.getByText("love you")).toBeVisible(); // same history as the phone
   await expect(page.getByRole("button", { name: /Text Silver Wolf/ })).toHaveCount(0);
+});
+
+test("new hubs: guides, endgame, codes, Currency Wars and the SU run simulator", async ({ page }) => {
+  const errors = collectErrors(page);
+  await installGameData(page);
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+  await page.locator("main").getByRole("link", { name: /Guides Beginner to endgame/ }).click();
+  await page.getByRole("link", { name: /How Warps work/ }).click();
+  await expect(page.getByText(/guaranteed by pull/).first()).toBeVisible();
+
+  await page.goto("/endgame");
+  for (const m of ["Memory of Chaos", "Pure Fiction", "Apocalyptic Shadow", "Anomaly Arbitration"]) await expect(page.getByRole("heading", { name: m })).toBeVisible();
+
+  await page.goto("/codes");
+  await page.getByLabel("Code", { exact: true }).fill("silver-wolf 2026");
+  await page.getByRole("button", { name: "Add" }).click();
+  await expect(page.getByText("SILVERWOLF2026")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Redeem" })).toHaveAttribute("href", "https://hsr.hoyoverse.com/gift?code=SILVERWOLF2026");
+  await page.getByRole("button", { name: "Mark redeemed" }).click();
+  await expect(page.getByText("redeemed", { exact: true })).toBeVisible();
+
+  await page.goto("/currency-wars");
+  await expect(page.getByRole("button", { name: "Download Currency Wars data" })).toBeVisible();
+
+  await page.goto("/universe");
+  await page.getByRole("button", { name: /Erudition/ }).click();
+  await expect(page.getByText("Where next?")).toBeVisible();
+  await page.getByRole("button", { name: /^(Combat|Elite)/ }).first().click().catch(async () => {
+    await page.getByRole("button", { name: /^(Occurrence|Respite)/ }).first().click();
+  });
+  await expect(page.getByText(/Domain [12] of 13|Choose a blessing|Enhance a blessing|Where next/).first()).toBeVisible();
+  expect(errors).toEqual([]);
 });

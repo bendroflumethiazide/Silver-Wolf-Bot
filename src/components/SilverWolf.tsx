@@ -57,14 +57,15 @@ export function useBurst(parts: string[], animate: boolean) {
 }
 
 /** A burst of Silver Wolf messages (avatar + name on the first bubble, like the in-game chat). */
-export function WolfMessages({ parts, mood = "neutral", animate = true, light }: { parts: string[]; mood?: Mood; animate?: boolean; light?: boolean }) {
+/** Her texts. `row` lays bubbles side by side (page comments, compact); the chat keeps them stacked. */
+export function WolfMessages({ parts, mood = "neutral", animate = true, light, row }: { parts: string[]; mood?: Mood; animate?: boolean; light?: boolean; row?: boolean }) {
   const reduced = useApp((s) => s.settings.reducedMotion);
   const shown = useBurst(parts, animate && !reduced);
   return (
-    <div className="flex gap-3">
-      <WolfAvatar mood={mood} size={42} />
-      <div className="min-w-0 flex-1 space-y-1.5">
-        <div className={cx("text-xs font-medium", light ? "text-[#55555f]" : "text-muted")}>Silver Wolf</div>
+    <div className={cx("flex gap-3", row && "items-center")}>
+      <WolfAvatar mood={mood} size={row ? 36 : 42} />
+      <div className={cx("min-w-0 flex-1", row ? "flex flex-wrap items-center gap-1.5" : "space-y-1.5")}>
+        {!row && <div className={cx("text-xs font-medium", light ? "text-[#55555f]" : "text-muted")}>Silver Wolf</div>}
         {parts.slice(0, shown).map((p, i) => (
           <motion.div key={i} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}><Bubble light={light}>{p}</Bubble></motion.div>
         ))}
@@ -81,10 +82,10 @@ export function WolfComment({ comment, className }: { comment: Comment | null; c
   if (!comment || mode === "off") return null;
   const parts = bubbles(comment.line);
   return (
-    <aside className={cx("glass hud p-3 sm:p-4", className)} aria-label="Silver Wolf says">
-      <WolfMessages parts={mode === "brief" ? parts.slice(0, 2) : parts} mood={comment.mood} animate={mode === "full"} />
+    <aside className={cx("glass px-3 py-2.5 sm:px-4", className)} aria-label="Silver Wolf says">
+      <WolfMessages parts={mode === "brief" ? parts.slice(0, 2) : parts} mood={comment.mood} animate={mode === "full"} row />
       {mode === "full" && (comment.action || comment.facts.length > 0) && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 pl-[54px]">
+        <div className="mt-1.5 flex flex-wrap items-center gap-2 pl-[48px]">
           {comment.action && (
             <Link href={comment.action.href} className="rounded-md border border-cyan/40 px-2 py-0.5 font-mono text-[11px] text-cyan hover:bg-cyan/10">▸ {comment.action.label}</Link>
           )}
@@ -97,7 +98,7 @@ export function WolfComment({ comment, className }: { comment: Comment | null; c
       )}
       <AnimatePresence>
         {showFacts && mode === "full" && (
-          <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="ml-[54px] mt-2 space-y-0.5 overflow-hidden border-l border-line pl-3 font-mono text-[11px] text-muted">
+          <motion.ul initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="ml-[48px] mt-2 space-y-0.5 overflow-hidden border-l border-line pl-3 font-mono text-[11px] text-muted">
             {comment.facts.map((f) => <li key={f}>{f}</li>)}
           </motion.ul>
         )}
