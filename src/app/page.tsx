@@ -10,7 +10,7 @@ import { Badge, Button, CardGrid, Empty, ImageCard, Loading, NumberInput, Panel,
 import { GameImage } from "@/components/GameImage";
 import { HubImage } from "@/components/HubImage";
 import { navItem } from "@/lib/nav";
-import { dashboardComment } from "@/lib/companion/comments";
+import { dashboardComment, latestUpdateComment } from "@/lib/companion/comments";
 import { getDb, kvGet, nowIso } from "@/lib/db";
 import type { DailyNote } from "@/lib/connectors/hoyolab";
 import { useAccount, useProfile } from "@/lib/hooks";
@@ -226,7 +226,8 @@ export default function Home() {
         <div className="relative max-w-3xl">
           <h1 className="text-2xl font-semibold tracking-tight text-gradient sm:text-3xl">Welcome back, {profile?.name ?? "Trailblazer"}</h1>
           <p className="mt-1 text-sm text-muted">{game ? <>Game data v{game.version} · everything stays on this device</> : "Start by downloading the game data (about 5 MB)."}</p>
-          <WolfComment comment={dashboardComment(summary, !!game)} className="mt-4 !border-0 !bg-transparent !p-0" />
+          <WolfComment comment={latestUpdateComment()} className="mt-4 !border-0 !bg-transparent !p-0" />
+          <WolfComment comment={dashboardComment(summary, !!game)} className="mt-3 !border-0 !bg-transparent !p-0" />
           <div className="mt-4 flex flex-wrap gap-2">
             {!game
               ? <Link href="/settings#game-data" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-sm font-medium text-white">Download game data</Link>

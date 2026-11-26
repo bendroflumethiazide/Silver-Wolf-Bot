@@ -113,3 +113,14 @@ describe("markdown", () => {
     expect(renderMarkdown("# T\n- **a**\n- [x] done\n\n[l](https://x.y) [bad](javascript:alert(1))")).toBe('<h3>T</h3><ul><li><strong>a</strong></li><li>☑ done</li></ul><p><a href="https://x.y" target="_blank" rel="noreferrer noopener">l</a> [bad](javascript:alert(1))</p>');
   });
 });
+
+describe("latest update announcement (home page)", () => {
+  it("Silver Wolf opens with the update title and links to it", async () => {
+    const { latestUpdateComment, LATEST_UPDATE } = await import("../companion/comments");
+    const { bubbles } = await import("../companion/voice");
+    const c = latestUpdateComment();
+    expect(bubbles(c.line)[0]).toBe("Latest update: Currency Wars 2.0 Rework");
+    expect(c.action).toEqual({ label: "Play Currency Wars", href: LATEST_UPDATE.href });
+    expect(c.facts[0]).toContain(LATEST_UPDATE.version);
+  });
+});

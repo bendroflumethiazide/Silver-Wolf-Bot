@@ -25,6 +25,10 @@ test("game data download shows version and Silver Wolf comments on data", async 
   await page.goto("/");
   await expect(page.getByText(/game data v9\.9\.0/i)).toBeVisible();
   await expect(page.getByLabel("Silver Wolf says").first()).toBeVisible();
+  // The latest update is announced on the home page, and only there.
+  await expect(page.getByText("Latest update: Currency Wars 2.0 Rework")).toBeVisible();
+  await page.goto("/characters");
+  await expect(page.getByText("Latest update: Currency Wars 2.0 Rework")).toHaveCount(0);
 });
 
 test("characters: mark owned, validation, edit progress, dashboard reflects it", async ({ page }) => {

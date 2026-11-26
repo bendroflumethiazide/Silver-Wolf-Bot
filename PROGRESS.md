@@ -81,6 +81,13 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.11.1 Silver Wolf announces the update
+
+- Home page only: Silver Wolf opens with "Latest update: Currency Wars 2.0 Rework" and what changed, with a "Play Currency Wars" button and the facts under "data" (`latestUpdateComment` in `companion/comments.ts`). No other page shows it.
+
+### Test results
+- unit 247/247 · E2E 14/14 (now checks the announcement is on the home page and not elsewhere).
+
 ## 2026-11-26 · 1.11.0 Every Investment works, Advantage Layout, consumables, honest coverage
 
 - **Investment Environments and Strategies** (`rules.ts`, run.ts "named rules"): the effects the text parser couldn't turn into mechanics now work by name, from their wiki text — combat stats (Role Model, Lone Wolf, Lucky Strike strategies, Bond-count strategies, Triple Threes, Savage Growth, Early Push, star-ups such as Star Shifting, Heavy Strike / Volley of Arrows / executes), economy and node events (Growth Fund, Cashback, Twin Primes, Bare Minimum, Market Intervention, Procurement Specialist, Longtermism, Hyperinflation, Surplus Capital, Struggle Protocol, Ace in the Hole, "Get Out of Battle Free" Card, Value Investing, Batch Recruitment, Stars To Stars, Fusion Summon, Recycling Program, Free Market, Fortune's Favor, Complete Disassembly, Peppy's Cameo…) and environments (Personal Accident Insurance adds a Supply node before each Boss, War Frontier, Excess Budget, Shift Rotation, Blue Ocean, Long-Term Gains, Talent Reserve, The Sunken Arena…).
