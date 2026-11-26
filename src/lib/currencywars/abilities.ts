@@ -15,7 +15,7 @@ export const LABEL_ORDER = ["Basic ATK", "Enhanced Basic ATK", "Skill", "Ultimat
 export const normalizeLabel = (t: string) => t.replace(/\s*\((?:Change|New)\)\s*$/i, "").replace(/^Elation$/i, "Elation Skill").trim();
 
 /** The ability group for a position. */
-export function groupFor(info: CwCharInfo | undefined, place: "on" | "off" | "bench", cost?: number) {
+export function groupFor(info: CwCharInfo | null | undefined, place: "on" | "off" | "bench", cost?: number) {
   const groups = info?.abilities ?? [];
   if (!groups.length) return null;
   const want = place === "off" ? /off/i : /on/i;
@@ -29,7 +29,7 @@ const NAME_FIX: Record<string, string> = { "Blezzed Brushwork": "Blessed Brushwo
 export interface AbilityCard { name: string; labels: string[]; desc: string; energy?: number }
 
 /** The card's ability box for a character in a position. */
-export function abilityCard(info: CwCharInfo | undefined, place: "on" | "off" | "bench", cost?: number): AbilityCard | null {
+export function abilityCard(info: CwCharInfo | null | undefined, place: "on" | "off" | "bench", cost?: number): AbilityCard | null {
   if (!info) return null;
   const sums = info.summaries ?? [];
   const field = info.field;

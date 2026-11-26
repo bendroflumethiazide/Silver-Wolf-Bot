@@ -7,7 +7,7 @@ import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
-  ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
+  ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, ahaStar, equipAha, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
   nodeKind, nodeKinds, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
 import { chooseProtagonist, eligible, refreshPlot, refreshPrice, changeProtagonist, plotOf, plotOptions, PLOT_ARMOR_CONFIG } from "../currencywars/plotArmor";
@@ -17,6 +17,7 @@ import { openBox, shiftEarlier } from "../currencywars/escapade";
 import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
 import { offerGrades, shiftGrade } from "../currencywars/strategyGrades";
 import { abilityCard } from "../currencywars/abilities";
+import { ahaSpeed, PUNCHLINE, simulateElation, type ElationUnit } from "../currencywars/elation";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
 import { createRng } from "../warp/simulator";
 
@@ -1512,7 +1513,7 @@ describe("ability labels on character cards", () => {
     expect(c.desc).toMatch(/^Can use "Certified Banger" to offset DMG/);
     expect(c.energy).toBe(180);
     // All five infobox types survive parsing (the old parser kept three).
-    expect(parseCharInfo(PEARL).summaries![0].types).toHaveLength(5);
+    expect(parseCharInfo(PEARL)!.summaries![0].types).toHaveLength(5);
   });
 
   it("labels follow the position: Sunday On-Field is Ultimate · Talent, Off-Field Skill · Ultimate · Talent", () => {
@@ -1521,5 +1522,107 @@ describe("ability labels on character cards", () => {
     expect(abilityCard(info, "off")).toMatchObject({ labels: ["Skill", "Ultimate", "Talent"], desc: expect.stringMatching(/immediately take action/) });
     // No label a character doesn't have.
     expect(abilityCard(info, "on")!.labels).not.toContain("Elation Skill");
+  });
+});
+
+// --------------------------------------------------------------------------------------------- Elation: Aha Instant, Punchline, Certified Banger, Lucky Strike
+
+const eu = (uid: number, name: string, stars = 2, place: "on" | "off" = "off", power = 400): ElationUnit => ({ uid, name, stars, place, power, spdAmp: 0, lucky: 0, luckyDmg: 0, elation: 0 });
+const AHA2 = { star: 2, strength: 0.16, dmg: 0.08, lucky: 0.08, luckyDmg: 0.08, spdAmp: 0 };
+
+describe("Elation combat", () => {
+  it("uses the wiki formulas: Punchline multiplier and Aha's SPD", () => {
+    expect(PUNCHLINE.mult(0)).toBe(1);
+    expect(PUNCHLINE.mult(240)).toBe(3.5);
+    expect(ahaSpeed([150, 120, 100, 80], 0, 0)).toBe(80 + 30 + 12 + 5 + 2);
+    expect(ahaSpeed([100], 30, 0.5)).toBe((80 + 20 + 30) * 1.5);
+  });
+
+  it("nothing happens without Elation characters or Aha", () => {
+    expect(simulateElation([eu(1, "Kafka")], null, 150, "x").active).toBe(false);
+  });
+
+  it("Aha Instant: Elation Skills in Participant ID order, Aha at 199, Aeon ★ Aha last; Punchline grows during it", () => {
+    const team = [eu(1, "Silver Wolf LV.999", 2, "on"), eu(2, "Sparxie"), eu(3, "Pearl"), eu(4, "Yao Guang"), eu(5, "Aeon ★ Aha", 1, "on")];
+    const r = simulateElation(team, AHA2, 300, "order");
+    expect(r.instants).toBeGreaterThan(0);
+    const first = r.events.find((e) => e.kind === "aha")!;
+    const seq = r.events.filter((e) => e.kind === "elation" && e.t > first.t && e.t < first.t + 1).map((e) => e.who);
+    expect(seq).toEqual(["Pearl", "Yao Guang", "Sparxie", "Aha", "Silver Wolf LV.999", "Aeon ★ Aha"]);
+    // Silver Wolf LV.999 (999) acts after Aha gained Punchline in the same Instant, so her hits count more Punchline than Sparxie's.
+    const inFirst = (who: string) => r.events.find((e) => (e.kind === "hit" || e.kind === "lucky") && e.who === who && /all enemies/.test(e.text) && e.t > first.t && e.t < first.t + 1)!.punchline!;
+    expect(inFirst("Silver Wolf LV.999")).toBeGreaterThan(inFirst("Sparxie"));
+    // Aeon ★ Aha deals True DMG from the Instant's total.
+    expect(r.events.some((e) => e.who === "Aeon ★ Aha" && /True DMG/.test(e.text))).toBe(true);
+  });
+
+  it("after an Instant: Certified Banger for participants, Punchline consumed, then +1 per Elation character", () => {
+    const team = [eu(1, "Sparxie"), eu(2, "Pearl"), eu(3, "Yao Guang")];
+    const r = simulateElation(team, AHA2, 300, "banger");
+    const banger = r.events.find((e) => e.kind === "banger")!;
+    expect(banger.text).toMatch(/Certified Banger \d+ → Pearl, Yao Guang, Sparxie \(2 turns\)/);
+    const consumed = r.events.find((e) => e.kind === "punchline" && e.punchline === 0)!;
+    expect(consumed.t).toBeGreaterThan(banger.t);
+    const after = r.events.find((e) => e.kind === "punchline" && e.t > consumed.t)!;
+    expect(after.punchline).toBe(3);
+    expect(r.punchlineStart).toBe(3);
+  });
+
+  it("Lucky Strike is rolled per hit, separately from Punchline", () => {
+    const sure = simulateElation([{ ...eu(1, "Sparxie"), lucky: 0.95 }], AHA2, 300, "lucky");
+    // Without Aha (whose own hits roll the base 5%), a -100% rate never strikes.
+    const never = simulateElation([{ ...eu(1, "Sparxie"), lucky: -1 }], null, 300, "lucky");
+    expect(sure.luckyStrikes).toBeGreaterThan(10);
+    expect(sure.events.filter((e) => e.lucky).length).toBe(sure.luckyStrikes);
+    expect(never.luckyStrikes).toBe(0);
+    const sameNoAha = simulateElation([{ ...eu(1, "Sparxie"), lucky: 0.95 }], null, 300, "lucky");
+    expect(sameNoAha.punchlinePeak).toBe(never.punchlinePeak);
+    expect(sameNoAha.damage).toBeGreaterThan(never.damage);
+  });
+
+  it("Punchline with no Elation Skill users and no Aha: \"Let There Be Laughter\"", () => {
+    const r = simulateElation([eu(1, "Sparkle", 2, "on")], null, 300, "laughter");
+    expect(r.events.some((e) => e.kind === "laughter")).toBe(true);
+    expect(r.participants).toEqual([]);
+  });
+});
+
+const ELATION_NAMES: [string, number, "on" | "off" | "both"][] = [["Sparxie", 2, "both"], ["Yao Guang", 3, "off"], ["Silver Wolf LV.999", 3, "on"], ["Aventurine • Waveflair", 4, "on"], ["Sparkle", 4, "on"], ["Pearl", 1, "off"]];
+const PE: CwPack = {
+  ...P48,
+  characters: [...P48.characters, ...ELATION_NAMES.map(([name, cost]) => ({ name, cost }))].filter((c, i, a) => a.findIndex((x) => x.name === c.name) === i),
+  bonds: [...P48.bonds, { name: "Elation", category: "School", members: ["Sparxie", "Yao Guang", "Silver Wolf LV.999", "Aventurine • Waveflair", "Sparkle"], summary: "Increases the Lucky Strike Rate and SPD Amplification of Elation members.", levels: [
+    { count: 3, effect: "10% Lucky Strike Rate and 6% SPD Amplification.", tier: "bronze" }, { count: 5, effect: "20% Lucky Strike and 12% SPD Amplification. 2-Star Aha, 2 equipment slots.", tier: "silver" }, { count: 6, effect: "30% and 18%.", tier: "gold" }, { count: 8, effect: "40% and 24%.", tier: "plat" }] }],
+  info: { ...P48.info, ...Object.fromEntries(ELATION_NAMES.map(([name, cost, field]) => [name, { cost, field, roles: [], bonds: [], onField: STR[cost], offField: STR[cost], hp: [0, 30, 60] }])) },
+};
+
+describe("Elation in a run", () => {
+  it("Aha descends with 3 basic pieces when the Bond activates, takes equipment, and fights in Aha Instants", () => {
+    const pe = (uid: number, name: string) => ({ uid, name, cost: PE.characters.find((c) => c.name === name)!.cost, stars: 2 as const, items: [] as string[] });
+    let s = at47([], { plane: 1, node: 0, bag: ["Folding Knife"], on: [pe(1, "Silver Wolf LV.999"), pe(2, "Aventurine • Waveflair"), pe(3, "Sparkle"), null], off: [pe(4, "Sparxie"), pe(5, "Yao Guang"), null, null, null, null] });
+    expect(ahaStar(s, PE)).toBe(2);
+    s = settle(s, PE);
+    expect(s.aha!.items).toHaveLength(3);
+    const withKnife = { ...s, aha: { items: ["Roller Skates", "Roller Skates", "Folding Knife"] } };
+    const synth = equipAha(withKnife, PE, 0);
+    expect(synth.aha!.items).toContain("Firestorm Surge");
+    expect(synth.bag).toEqual([]);
+    const tp = teamPower(synth, PE);
+    expect(tp.elation.active).toBe(true);
+    expect(tp.elationPower).toBeGreaterThan(0);
+    const fought = battle(synth, PE);
+    const tl = fought.last!.timeline!;
+    const aha = tl.units.find((u) => u.name === "Aha")!;
+    expect(aha.summon).toMatchObject({ bond: "Elation" });
+    expect(tl.turns!.some((x) => x.id === aha.id)).toBe(true);
+    expect(tl.events.some((e) => e.kind === "aha")).toBe(true);
+    expect(tl.events.some((e) => e.kind === "punchline")).toBe(true);
+    expect(fought.last!.elation).toMatchObject({ participants: expect.arrayContaining(["Yao Guang", "Sparxie"]) });
+    expect(fought.last!.elation!.instants).toBeGreaterThan(0);
+  });
+
+  it("a squad without Elation characters is unchanged", () => {
+    const s = at47(["Kafka", "Welt"], { plane: 1, node: 0 });
+    expect(teamPower(s, PE).elation.active).toBe(false);
   });
 });

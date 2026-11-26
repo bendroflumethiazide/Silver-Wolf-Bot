@@ -12,8 +12,9 @@ import type { CwAdvancedItem, CwCharInfo, CwNamed, CwStrategy, StrategyRarity } 
 import { combineResult, emblemBond, goldOreName, isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS, oreGold, oreName, oreTier, type OreTier } from "./items";
 import { membersOf } from "./bonds";
 import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPack } from "./sim";
-import { buildTimeline, type Timeline } from "./timeline";
+import { buildTimeline, type Timeline, type TlKind } from "./timeline";
 import { GRADES, offerGrades, shiftGrade, startingRefreshes, type Grade, type GradeRules, type OfferMeta, type PendingSelection } from "./strategyGrades";
+import { AHA, simulateElation, type AhaState, type ElationResult } from "./elation";
 import { addStats, bondEffect, itemEffect, powerMult, zeroStats, type BondCtx, type Stats, type Summon } from "./combat";
 import { specialItem } from "./specialItems";
 import { afterCombat, expressPower, nodeTp, storeStats, syncTsrLevel, TSR_BOND, tsrOf, type TsrState } from "./trailblazeStore";
@@ -158,6 +159,7 @@ export interface BattleReport {
   saved?: boolean;
   trotter?: boolean;
   express?: { collisions: number; bonus: number };
+  elation?: { instants: number; ahaSpd: number; punchlineStart: number; punchlinePeak: number; luckyStrikes: number; participants: string[]; share: number; hiddenMmr?: number };
 }
 
 export interface RunState {
@@ -237,6 +239,8 @@ export interface RunState {
   nodeSelections?: number;
   /** Gold per owned Strategy when obtaining one (Strategy Master). */
   goldPerStrategy?: number;
+  /** Aha (Elation Bond): THEIR equipment (3 random basic pieces on arrival; synthesized into advanced). */
+  aha?: { items: string[] };
 }
 
 // --------------------------------------------------------------------------------------------- helpers
@@ -993,6 +997,12 @@ export function settle(s: RunState, pack: CwPack): RunState {
   const rule = s.variants?.["Phantasmoon Games"];
   out = rollCallGrant(out, count("Phantasmoon Games"), !!rule && /Roll-Call/.test(rule));
   out = checkAssignments(out);
+  // Aha descends into the preparation area once the Elation Bond is active, with 3 random basic pieces.
+  if (!out.aha && count("Elation") && ahaStar(out, pack)) {
+    const rng = createRng(`${out.seed}:aha`);
+    const items = [randomBasic(pack, rng), randomBasic(pack, rng), randomBasic(pack, rng)].filter((x): x is string => !!x);
+    out = note(log({ ...out, aha: { items } }, `Aha descends into the preparation area with ${items.join(", ")}.`), "Aha joined: drag equipment onto Aha to synthesize THEIR gear.");
+  }
   return out;
 }
 
@@ -1285,6 +1295,50 @@ export function placedBondStates(s: RunState, pack: CwPack) {
 
 export interface SummonPower extends Summon { power: number }
 
+/** Aha's star from the Elation Bond level (Bond levels 3/5/6/8 → 1★–4★; 0 = no Aha). */
+export function ahaStar(s: RunState, pack: CwPack): number {
+  const st = placedBondStates(s, pack).find((b) => b.bond.name === "Elation");
+  if (!st?.active) return 0;
+  return Math.max(1, st.bond.levels.findIndex((l) => l.count === st.active!.count) + 1);
+}
+
+/** Aha's stats: base by star plus THEIR equipment's stats (offensive effects apply during Elation Skills). */
+export function ahaStats(s: RunState, pack: CwPack, star = ahaStar(s, pack)): AhaState | null {
+  if (!star) return null;
+  const i = Math.min(3, star - 1);
+  let st = addStats(zeroStats(), { str: AHA.strength[i] / 100, dmg: AHA.dmg[i] / 100, lucky: AHA.lucky[i] / 100, luckyDmg: AHA.luckyDmg[i] / 100 });
+  for (const it of s.aha?.items ?? []) st = addStats(st, itemEffect(pack, it, { place: "on", stars: star, boss: false }).self);
+  return { star, strength: st.str + (st.on + st.off) / 2, dmg: st.dmg, lucky: st.lucky, luckyDmg: st.luckyDmg, spdAmp: st.spd };
+}
+
+/** Equipment slots Aha has for advanced pieces (= THEIR star). */
+export const ahaSlots = (star: number) => star;
+
+/** Drag an item onto Aha: a basic piece synthesizes with one of Aha's basics; advanced pieces go into a free slot. */
+export function equipAha(s0: RunState, pack: CwPack, bagIndex: number): RunState {
+  const item = s0.bag[bagIndex];
+  const star = ahaStar(s0, pack);
+  if (!item || !star || !s0.aha || s0.phase !== "prep") return note(s0, "Aha appears once the Elation Bond is active.");
+  const items = [...s0.aha.items];
+  const advanced = items.filter((x) => itemKind(pack, x) === "advanced").length;
+  const kind = itemKind(pack, item);
+  if (kind === "basic") {
+    const j = items.findIndex((x) => itemKind(pack, x) === "basic" && combineResult(pack, x, item));
+    if (j < 0) return note(s0, `${item} doesn't combine with Aha's basic equipment.`);
+    if (advanced >= ahaSlots(star)) return note(s0, `Aha (${star}★) has ${ahaSlots(star)} equipment slot${star === 1 ? "" : "s"}: raise the Elation Bond for more.`);
+    const made = combineResult(pack, items[j], item)!;
+    items[j] = made;
+    const [s] = step(s0);
+    return log({ ...s, bag: s.bag.filter((_, k) => k !== bagIndex), aha: { items } }, `Aha: ${item} synthesized into ${made}.`);
+  }
+  if (kind === "advanced") {
+    if (advanced >= ahaSlots(star)) return note(s0, `Aha's ${ahaSlots(star)} equipment slot${star === 1 ? " is" : "s are"} full.`);
+    const [s] = step(s0);
+    return log({ ...s, bag: s.bag.filter((_, k) => k !== bagIndex), aha: { items: [...items, item] } }, `Aha equips ${item}.`);
+  }
+  return note(s0, "Aha takes basic or advanced equipment.");
+}
+
 export function teamPower(s: RunState, pack: CwPack) {
   const placed = placedOf(s);
   const kind = nodeKind(s);
@@ -1296,7 +1350,10 @@ export function teamPower(s: RunState, pack: CwPack) {
   const bases = new Map(fighters.map((x) => [x.u.uid, unitBase(x.u, x.place, pack)]));
   const raw = fighters.reduce((n, x) => n + (bases.get(x.u.uid) ?? 0) * powerMult(items.get(x.u.uid)!.self, x.place), 0);
   // Equipment passives that help the whole squad (Weapon Master, Meteor Wings, Sturdy Plate…).
-  const squadItems = [...items.values()].flatMap((x) => x.squad).reduce<Stats>((a, b) => addStats(a, b), zeroStats());
+  const aStar = ahaStar(s, pack);
+  // Aha's Survival/Support equipment works for the squad all the time (Aha User Manual ⑥).
+  const ahaSquad = aStar ? (s.aha?.items ?? []).map((it) => itemEffect(pack, it, { place: "on", stars: aStar, boss }).squad) : [];
+  const squadItems = [...[...items.values()].flatMap((x) => x.squad), ...ahaSquad].reduce<Stats>((a, b) => addStats(a, b), zeroStats());
   const touched = placedBondStates(s, pack);
   const bonds = touched.filter((b) => b.tier);
   const teamBonds = bonds.filter((b) => b.bond.category !== PLOT_ARMOR_RULES.bondCategory);
@@ -1329,6 +1386,17 @@ export function teamPower(s: RunState, pack: CwPack) {
     const base = bases.get(x.u.uid) ?? 0;
     return { uid: x.u.uid, name: x.u.name, place: x.place, power: base * powerMult(st, x.place), noBonds: base * powerMult(noBonds, x.place), spd: st.spd, plot: plot.strength, stats: st };
   });
+  // Elation: Aha Instants, Punchline, Certified Banger, Lucky Strike (elation.ts).
+  const elation = simulateElation(
+    per.map((x) => ({ uid: x.uid, name: x.name, stars: fighters.find((f) => f.u.uid === x.uid)!.u.stars, place: x.place, power: x.power, spdAmp: x.spd + (pack.info?.[x.name]?.spd?.[fighters.find((f) => f.u.uid === x.uid)!.u.stars - 1] ?? 0) / 100, lucky: x.stats.lucky, luckyDmg: x.stats.luckyDmg, elation: 0 })),
+    ahaStats(s, pack, aStar), av ?? 150, `${s.seed}:${s.tick}:${s.plane}-${s.node}`,
+  );
+  // Silver Wolf LV.999: Hidden MMR at 180+ adds DMG Amplification.
+  if (elation.hiddenMmr !== undefined && elation.hiddenMmr >= 180) {
+    const sw = per.find((x) => x.name === "Silver Wolf LV.999");
+    if (sw) { const f = fighters.find((x) => x.u.uid === sw.uid)!; sw.power *= 1 + [15, 20, 25][Math.min(2, f.u.stars - 1)] / 100; }
+  }
+  const elationPower = elation.damage / Math.max(1, (av ?? 150) / 100);
   const units = per.reduce((n, x) => n + x.power, 0);
   const bonus = units / Math.max(1, per.reduce((n, x) => n + x.noBonds, 0)) - 1;
   // Bond summons fight too (Crimson Thorns, Starskiff, Quintet Joint, Soul, Aha, chimeras, Svarog, Dan Heng • Permansor Terrae…).
@@ -1345,8 +1413,8 @@ export function teamPower(s: RunState, pack: CwPack) {
   const express = expressPower(s, av, whistles);
   const robot = robotFor(s, kind);
   const robotBonus = robot ? (robot.mult / 100) * Math.max(1, Math.floor(((av ?? 150) * robot.spd) / 10000)) * 0.01 : 0;
-  const power = (units + summonPower) * (1 + express.bonus + robotBonus);
-  return { raw, bonus, power, bonds, idle, per, summons, effects, express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7, squadItems };
+  const power = (units + summonPower + elationPower) * (1 + express.bonus + robotBonus + elation.repellency * 0.5);
+  return { raw, bonus, power, bonds, idle, per, summons, effects, express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7, squadItems, elation, elationPower, ahaStar: aStar };
 }
 
 /** Average strength of a cost at a (fractional) star level, from the pack's character pages. */
@@ -1422,7 +1490,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const placed = [...s.on.map((u) => ({ u, place: "on" as const })), ...s.off.map((u) => ({ u, place: "off" as const }))].filter((x): x is { u: Unit; place: "on" | "off" } => !!x.u && !x.u.npc);
   const perOf = (uid: number) => tp.per.find((p) => p.uid === uid);
   // Bond summons, the Astral Express and Mr. Yang's Belobog Robot fight alongside the squad (and show on the turn order).
-  type Helper = { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off"; spd: number; summon?: { emoji: string; bond: string; spd: number; note?: string } };
+  type Helper = { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off"; spd: number; summon?: { emoji: string; bond: string; spd: number; note?: string; scripted?: boolean } };
   const helpers: Helper[] = [];
   const squad = tp.per.reduce((n, p) => n + p.power, 0);
   for (const m of tp.summons) {
@@ -1431,6 +1499,18 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   }
   if (tp.express.bonus > 0) helpers.push({ name: "Astral Express", cost: 5, stars: 1, power: squad * tp.express.bonus, place: "on", spd: 0, summon: { emoji: "🚂", bond: "Trailblaze Silver Rail", spd: tp.express.spd, note: tp.express.spd ? `${tp.express.spd} SPD` : "crashes in at the start" } });
   if (tp.robot) helpers.push({ name: "Belobog Robot", cost: 4, stars: 1, power: squad * tp.robot.bonus, place: "on", spd: 0, summon: { emoji: "🤖", bond: "Mr. Yang", spd: tp.robot.spd, note: `${tp.robot.mult}% base DMG` } });
+  // Elation: Aha takes part as an attacker; Elation Skills, Punchline and Certified Banger show in the fight.
+  const el: ElationResult = tp.elation;
+  let scripted: { t: number; ally: number; weight: number; text?: string; lucky?: boolean }[] = [];
+  let notes: { t: number; kind: TlKind; text: string; punchline?: number; turn?: number }[] = [];
+  if (el.active && kind !== "Reward") {
+    const ahaIndex = placed.length + helpers.length;
+    helpers.push({ name: "Aha", cost: 5, stars: (Math.max(1, tp.ahaStar) as 1), power: 1, place: "on", spd: 0, summon: { emoji: "🎭", bond: "Elation", spd: Math.round(el.ahaSpd), note: `${el.instants} Aha Instant${el.instants === 1 ? "" : "s"}`, scripted: true } });
+    const idx = (uid?: number) => (uid === undefined ? ahaIndex : placed.findIndex((x) => x.u.uid === uid));
+    scripted = el.events.filter((e) => (e.kind === "hit" || e.kind === "lucky") && (e.amount ?? 0) > 0).map((e) => ({ t: e.t, ally: idx(e.uid), weight: e.amount!, lucky: e.lucky })).filter((x) => x.ally >= 0);
+    notes = el.events.filter((e) => e.kind !== "hit" && e.kind !== "lucky").map((e) => ({ t: e.t, kind: e.kind as TlKind, text: e.text, punchline: e.punchline, turn: e.kind === "aha" ? ahaIndex : e.kind === "elation" ? idx(e.uid) : undefined }));
+    if (el.ore) ores.push(randomOre(s.plane, rng));
+  }
   const foes = kind === "Boss" ? [{ name: enemies[0] ?? "Boss", boss: true }]
     : Array.from({ length: kind === "Reward" ? 4 : 5 + (nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? 1 : 0) }, (_, k) => {
       const elite = kind !== "Reward" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node && k >= 4;
@@ -1442,10 +1522,12 @@ export function battle(s0: RunState, pack: CwPack): RunState {
     enemies: foes, waves: kind === "Boss" ? 1 : 2, won, cleared, ratio: power / Math.max(1, enemy),
     limit: kind === "Reward" ? null : RULES.actionValue[s.plane][boss ? 1 : 0], bossPhases: s.plane === 2 ? 3 : 2,
     reviveCost: rankNumber(s.rank) >= 3 ? 35 : 15,
+    scripted, notes,
   }, rng);
   if (s.oreOnKill) for (let k = 0; k < timeline.kills; k++) if (rng() < s.oreOnKill) ores.push(randomOre(s.plane, rng));
   if (trotter && won) ores.push(oreName("Blue"));
-  const report: BattleReport = { kind, won, chance, power, enemy, cleared, hpLost, gold, xp: ASSUMED.xpPerBattle, opponent: s.nodeOpponent, enemies, item, ores, timeline, saved, trotter, express: tp.express.collisions ? { collisions: tp.express.collisions, bonus: tp.express.bonus } : undefined };
+  const report: BattleReport = { kind, won, chance, power, enemy, cleared, hpLost, gold, xp: ASSUMED.xpPerBattle, opponent: s.nodeOpponent, enemies, item, ores, timeline, saved, trotter, express: tp.express.collisions ? { collisions: tp.express.collisions, bonus: tp.express.bonus } : undefined,
+    elation: el.active && kind !== "Reward" ? { instants: el.instants, ahaSpd: Math.round(el.ahaSpd), punchlineStart: el.punchlineStart, punchlinePeak: el.punchlinePeak, luckyStrikes: el.luckyStrikes, participants: el.participants, share: tp.power > 0 ? tp.elationPower / tp.power : 0, hiddenMmr: el.hiddenMmr } : undefined };
   s = {
     ...s, gold: s.gold + earned, hp: Math.max(0, s.hp - hpLost), streak, last: report, phase: "result",
     bag: [...s.bag, ...ores],

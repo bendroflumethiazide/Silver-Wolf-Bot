@@ -8,7 +8,7 @@ import {
   advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
-  choosePlotArmor, gradeRulesOf, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
+  ahaStats, choosePlotArmor, equipAha, gradeRulesOf, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
 import { openBox, specialNode } from "@/lib/currencywars/escapade";
 import { GRADE_LABEL } from "@/lib/currencywars/strategyGrades";
@@ -25,6 +25,7 @@ import type { CwPack } from "@/lib/currencywars/sim";
 import { BattleView } from "./BattleView";
 import { CharacterSheet } from "./CharacterSheet";
 import { CharacterCard } from "./CharacterCard";
+import { ElationPanel } from "./Elation";
 import { RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
@@ -141,6 +142,7 @@ function Report({ run, pack, onNext }: { run: RunState; pack: CwPack; onNext: ()
         <div><p className="text-xs text-muted">Squad</p><p className="text-xs">{r.won ? "No HP lost." : `Cleared about ${Math.round(r.cleared * 100)}% → −${r.hpLost} squad HP.`} +{r.xp} XP.</p>
           {r.saved && <p className="mt-1 text-xs text-ok">Woof Woof Dan turned this failed fight into a Perfect Clear!</p>}
           {r.trotter && <p className="mt-1 text-xs text-amber-200">Trotters! (Bubble Wolf) Easier fight, extra ore.</p>}
+          {r.elation && <p className="mt-1 text-xs text-[#ffb3a5]">Elation: {r.elation.instants} Aha Instant{r.elation.instants === 1 ? "" : "s"} (Aha SPD {r.elation.ahaSpd}), Punchline {r.elation.punchlineStart} → {r.elation.punchlinePeak}, {r.elation.luckyStrikes} Lucky Strike{r.elation.luckyStrikes === 1 ? "" : "s"}, {Math.round(r.elation.share * 100)}% of the squad&apos;s strength.</p>}
           {r.express && <p className="mt-1 text-xs text-amber-200">Astral Express: {r.express.collisions} collision{r.express.collisions === 1 ? "" : "s"} (+{Math.round(r.express.bonus * 100)}% strength).</p>}
           {run.tsr && <p className="mt-1 text-xs text-muted">Trailblaze Power now {run.tsr.tp}.</p>}</div>
       </div>
@@ -495,6 +497,9 @@ export function RunSim({ pack }: { pack: CwPack }) {
               <Button variant="primary" onClick={() => { setSel(null); setPeek(null); const before = runRef.current; update((s) => battle(s, pack)); if (runRef.current !== before && runRef.current?.last?.timeline) setWatching(runRef.current.tick); }}><Swords size={14} /> Battle</Button>
             </div>
           </div>
+          {tp?.elation.active && <ElationPanel pack={pack} elation={tp.elation} star={tp.ahaStar} items={run.aha?.items ?? []} ahaStats={ahaStats(run, pack, tp.ahaStar)}
+            giving={sel?.kind === "item" && run.bag[sel.index] && /basic|advanced/.test(itemKind(pack, run.bag[sel.index])) ? run.bag[sel.index] : null}
+            onGive={() => { if (sel?.kind === "item") { update((s) => equipAha(s, pack, sel.index)); setSel(null); } }} />}
           <TrailblazeStorePanel run={run} pack={pack} level={tsrLevel} onBuy={(id, slot) => update((s) => buyTsr(s, pack, id, tsrLevel, slot))} onRefresh={() => update((s) => refreshTsr(s, pack, tsrLevel))} />
         </div>
       </div>

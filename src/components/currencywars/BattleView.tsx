@@ -131,6 +131,12 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
   const enemies = timeline.units.filter((u) => u.side === "enemy" && (u.wave ?? 1) <= wave);
   const waves = Math.max(1, ...timeline.units.map((u) => u.wave ?? 1));
   const avLeft = timeline.limit === null ? null : Math.max(0, timeline.limit - t);
+  // Elation: live Punchline, the Aha Instant banner and who is using an Elation Skill.
+  const elationEvents = timeline.events.filter((e) => e.punchline !== undefined && e.t <= t);
+  const punchline = elationEvents.length ? elationEvents[elationEvents.length - 1].punchline : undefined;
+  const hasElation = timeline.events.some((e) => e.kind === "aha" || e.kind === "elation");
+  const instant = [...timeline.events].reverse().find((e) => e.kind === "aha" && e.t <= t && e.t > t - 4);
+  const skill = [...timeline.events].reverse().find((e) => e.kind === "elation" && e.t <= t && e.t > t - 2);
 
   return (
     <div ref={box} className="scroll-mt-20">
@@ -150,6 +156,13 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
         <span>{avLeft === null ? <>No time limit (Reward node)</> : <>Action Value left <b className="font-mono text-text">{Math.ceil(avLeft)}</b> / {timeline.limit}</>}</span>
         <span>{waves > 1 ? `Wave ${Math.min(wave, waves)} of ${waves}` : enemies.some((e) => e.boss) ? "Boss fight" : " "}</span>
       </div>
+      {hasElation && (
+        <div className={cx("mb-3 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-1.5 text-xs transition", instant ? "border-[#e8735e] bg-[#e8735e]/15" : "border-white/10 bg-black/20")} aria-label="Elation">
+          <span>Punchline <b className="font-mono text-[#ffb3a5]">{punchline ?? 0}</b></span>
+          {instant && <span className="cw-instant font-semibold text-[#ffb3a5]">AHA INSTANT!</span>}
+          {skill && <span className="text-text">{skill.text}</span>}
+        </div>
+      )}
       {timeline.limit !== null && <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-gradient-to-r from-cyan to-violet-400" style={{ width: `${(Math.min(t, timeline.limit) / timeline.limit) * 100}%` }} /></div>}
       <div className="grid gap-3 md:grid-cols-[9.5rem_minmax(0,1fr)_minmax(0,1fr)]">
         <TurnOrder tl={timeline} t={t} showAv={showAv} />
@@ -168,7 +181,7 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
       </div>
       <div className="mt-3 min-h-[5.5rem] rounded-lg border border-line bg-black/20 p-2 text-[11px]" aria-live="polite">
         {lastHit && !done && <p className="text-muted">{name(lastHit.from)} hits {name(lastHit.to)} for <b className="text-text">{lastHit.amount?.toLocaleString()}</b></p>}
-        {feed.map((e, i) => <p key={`${e.t}-${i}`} className={cx(e.kind === "end" ? (timeline.won ? "font-semibold text-ok" : "font-semibold text-bad") : e.kind === "fall" ? "text-rose-300" : e.kind === "phase" || e.kind === "ultimate" ? "text-fuchsia-300" : "text-faint")}>{e.text}</p>)}
+        {feed.map((e, i) => <p key={`${e.t}-${i}`} className={cx(e.kind === "end" ? (timeline.won ? "font-semibold text-ok" : "font-semibold text-bad") : e.kind === "fall" ? "text-rose-300" : e.kind === "phase" || e.kind === "ultimate" ? "text-fuchsia-300" : e.lucky ? "font-semibold text-yellow-300" : e.kind === "aha" || e.kind === "elation" ? "font-semibold text-[#ffb3a5]" : e.kind === "punchline" || e.kind === "banger" ? "text-[#f0a597]" : "text-faint")}>{e.text}</p>)}
       </div>
       <Verbose><p className="mt-2 text-[10px] text-faint">A replay of the simulated result, not the game&apos;s real battle engine. Summons act on their own SPD. Revives cost Action Value in the game; the bar here doesn&apos;t move for them.</p></Verbose>
     </Panel>

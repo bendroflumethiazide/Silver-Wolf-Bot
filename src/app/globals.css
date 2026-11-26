@@ -163,3 +163,8 @@ html[data-reduced-motion="true"] .glitch::after { animation: none; }
 .cw-reveal-face { animation: cw-reveal-pop 1s cubic-bezier(.2,.8,.2,1) both; }
 .cw-reveal-rays { background: conic-gradient(from 0deg, transparent 0 20deg, rgba(251,191,36,.10) 20deg 40deg, transparent 40deg 80deg, rgba(251,191,36,.08) 80deg 100deg, transparent 100deg 360deg); animation: cw-reveal-spin 12s linear infinite; inset: -50%; }
 @media (prefers-reduced-motion: reduce) { .cw-reveal, .cw-reveal-face, .cw-reveal-rays { animation: none; } }
+
+/* Aha Instant banner pulse. */
+@keyframes cw-instant { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .7; transform: scale(1.06); } }
+.cw-instant { display: inline-block; animation: cw-instant .6s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .cw-instant { animation: none; } }

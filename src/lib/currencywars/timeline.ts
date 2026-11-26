@@ -19,10 +19,10 @@ export interface TlUnit {
   phases?: number;
   wave?: number;
   /** A Bond summon or helper (Crimson Thorns, Astral Express…): acts on its own SPD, isn't targeted. */
-  summon?: { emoji: string; bond: string; spd: number; note?: string };
+  summon?: { emoji: string; bond: string; spd: number; note?: string; scripted?: boolean };
 }
-export type TlKind = "hit" | "fall" | "revive" | "kill" | "phase" | "wave" | "ultimate" | "end";
-export interface TlEvent { t: number; kind: TlKind; from?: string; to?: string; amount?: number; text?: string }
+export type TlKind = "hit" | "fall" | "revive" | "kill" | "phase" | "wave" | "ultimate" | "end" | "aha" | "elation" | "punchline" | "banger" | "dispel" | "laughter" | "ore" | "boon" | "mmr";
+export interface TlEvent { t: number; kind: TlKind; from?: string; to?: string; amount?: number; text?: string; lucky?: boolean; punchline?: number }
 export interface Timeline {
   units: TlUnit[];
   events: TlEvent[];
@@ -39,7 +39,7 @@ export interface Timeline {
 export interface TimelineInput {
   allies: { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off"; /** SPD Amplification in percent (wiki). */ spd?: number;
     /** Summons act at their own SPD (10000 / SPD AV per turn; 0 = once at the start). */
-    summon?: { emoji: string; bond: string; spd: number; note?: string } }[];
+    summon?: { emoji: string; bond: string; spd: number; note?: string; scripted?: boolean } }[];
   enemies: { name: string; elite?: boolean; boss?: boolean }[];
   /** Number of waves the normal enemies come in (the boss fight has one). */
   waves: number;
@@ -52,6 +52,10 @@ export interface TimelineInput {
   bossPhases: number;
   /** AV a revive costs (15, or 35 from Cobalt Silver). */
   reviveCost: number;
+  /** Extra hits with their own weight (Elation Skills, Aha): ally index, AV time on the `limit` scale. */
+  scripted?: { t: number; ally: number; weight: number; text?: string; lucky?: boolean }[];
+  /** Text events (Aha acts, Punchline, Certified Banger…) on the `limit` scale; `turn` marks an ally's turn. */
+  notes?: { t: number; kind: TlKind; text: string; punchline?: number; turn?: number }[];
 }
 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
@@ -79,9 +83,10 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   const end = limit === null ? 40 + 12 * enemies.length + rng() * 20 : won ? limit * clamp(0.92 - 0.45 * (ratio - 1), 0.3, 0.92) : limit;
 
   // Ally actions: each active ally acts on its own rhythm; damage per action follows strength.
-  const acts: { t: number; ally: (typeof allies)[number] }[] = [];
+  const acts: { t: number; ally: (typeof allies)[number]; w?: number; text?: string; lucky?: boolean }[] = [];
   for (const a of allies) {
     if (a.u.idle) continue;
+    if (a.u.summon?.scripted) continue;
     if (a.u.summon) {
       // Summons keep their own SPD: one turn every 10000 / SPD AV (SPD 0 = a single strike at the start).
       if (!a.u.summon.spd) { acts.push({ t: 1, ally: a }); continue; }
@@ -95,12 +100,22 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
     const interval = 100 / ((0.85 + 0.1 * (a.u.stars ?? 1) + rng() * 0.35) * Math.sqrt(1 + (spdOf.get(a.u.id) ?? 0) / 100));
     for (let t = rng() * interval * 0.6 + 2; t < end - 0.5; t += interval * (0.9 + rng() * 0.2)) acts.push({ t, ally: a });
   }
+  // Scripted hits (Elation Skills, Aha) happen at their own times, squeezed into this fight's length.
+  const span = limit ?? 150;
+  const squeeze = (t: number) => Math.min(end - 0.6, Math.max(0.5, (t / span) * end));
+  for (const x of input.scripted ?? []) { const a = allies[x.ally]; if (a && x.weight > 0) acts.push({ t: squeeze(x.t), ally: a, w: x.weight, text: x.text, lucky: x.lucky }); }
   acts.sort((x, y) => x.t - y.t);
   if (won && acts.length) acts[acts.length - 1].t = Math.max(acts[acts.length - 1].t, end - 1);
-  const weight = acts.reduce((n, x) => n + x.ally.power, 0) || 1;
+  const weight = acts.reduce((n, x) => n + (x.w ?? x.ally.power), 0) || 1;
+  for (const nt of input.notes ?? []) {
+    events.push({ t: squeeze(nt.t), kind: nt.kind, text: nt.text, punchline: nt.punchline });
+  }
 
   const hp = new Map(units.map((u) => [u.id, u.maxHp]));
-  const turns: { t: number; id: string }[] = acts.map((a) => ({ t: a.t, id: a.ally.u.id }));
+  // One turn per act (several scripted hits at the same moment are one turn).
+  const turns: { t: number; id: string }[] = [];
+  for (const a of acts) { const last = turns[turns.length - 1]; if (!(a.w !== undefined && last && last.id === a.ally.u.id && Math.abs(last.t - a.t) < 0.5)) turns.push({ t: a.t, id: a.ally.u.id }); }
+  for (const nt of input.notes ?? []) if (nt.turn !== undefined && allies[nt.turn]) turns.push({ t: squeeze(nt.t), id: allies[nt.turn].u.id });
   let dealt = 0, kills = 0, wave = 1;
   const phaseMarks = new Map<string, number>();
   const alive = (w: number) => enemies.filter((e) => e.wave === w && (hp.get(e.id) ?? 0) > 0);
@@ -137,7 +152,7 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
     enemyTurns(act.t);
     if (!ultimateShown && act.t >= ultimateAt) { events.push({ t: ultimateAt, kind: "ultimate", text: "Ultimate Instant: the squad deals 200% DMG" }); ultimateShown = true; }
     // The last action finishes the job exactly (rounding would leave a sliver of HP).
-    let amount = i === acts.length - 1 ? target - dealt : Math.round((target * act.ally.power) / weight);
+    let amount = i === acts.length - 1 ? target - dealt : Math.round((target * (act.w ?? act.ally.power)) / weight);
     while (amount > 0 && dealt < target) {
       let pool = alive(wave);
       if (!pool.length) {
@@ -151,7 +166,7 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
       hp.set(to.id, left - hit);
       dealt += hit;
       amount -= hit;
-      events.push({ t: act.t, kind: "hit", from: act.ally.u.id, to: to.id, amount: hit });
+      events.push({ t: act.t, kind: "hit", from: act.ally.u.id, to: to.id, amount: hit, lucky: act.lucky, text: act.lucky ? `${act.ally.u.name}: Lucky Strike! ${hit.toLocaleString()}` : undefined });
       if (to.boss && to.phases && to.phases > 1) {
         const broken = Math.floor(((to.maxHp - (left - hit)) / to.maxHp) * to.phases + 1e-9);
         const shown = phaseMarks.get(to.id) ?? 0;
