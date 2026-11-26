@@ -7,7 +7,7 @@ import { kvGet, kvSet } from "@/lib/db";
 import {
   advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
-  maxHpOf, refreshCostOf, toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
+  canSellItems, itemPrice, maxHpOf, refreshCostOf, sellItem, toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
   ahaStats, choosePlotArmor, equipAha, gradeRulesOf, rerollEnvironments, rerollSupply, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
 import { openBox, specialNode } from "@/lib/currencywars/escapade";
@@ -31,7 +31,7 @@ import { payRun } from "@/lib/currencywars/advantage";
 import { RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
-import { BondList, BondMembers, CharCard, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
+import { BondList, BondMembers, CharCard, COST_CARD, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
 import { BondTracker, TrackMark, useTracked } from "./tracking";
 import { useSimple, Verbose } from "./simple";
 
@@ -101,16 +101,25 @@ function Hud({ run }: { run: RunState }) {
         {comp && <span className="flex items-center gap-1 text-xs text-muted" title="Voyage Companion"><span aria-hidden>{comp.emoji}</span>{comp.name}</span>}
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
-        <span className="flex items-center gap-1.5"><Heart size={15} className="text-rose-400" /> <b>{run.hp}</b><span className="text-faint">/{maxHpOf(run)}</span></span>
-        <span className="flex items-center gap-1.5"><Coins size={15} className="text-amber-300" /> <b>{run.gold}</b> gold</span>
-        <span className="flex items-center gap-1.5">Lv.<b>{run.level}</b>{need > 0 && <span className="text-xs text-faint">{run.xp}/{need} XP</span>}</span>
-        <span className="flex items-center gap-1.5"><Swords size={14} className="text-cyan" /> {deployed(run).length}/{teamSize(run)} deployed</span>
-        <span className="flex items-center gap-1.5">Streak <b>{run.streak}</b></span>
+        <span className="cw-pill" title="Squad HP">
+          <span className="flex items-center gap-1.5"><Heart size={15} className="text-rose-400" /> <b>{run.hp}</b><span className="text-faint">/{maxHpOf(run)}</span></span>
+          <Meter value={run.hp / maxHpOf(run)} tone={run.hp / maxHpOf(run) > 0.5 ? "bg-emerald-400" : run.hp / maxHpOf(run) > 0.25 ? "bg-amber-400" : "bg-rose-500"} label="Squad HP" />
+        </span>
+        <span className="cw-pill" title="Gold Coins"><span className="flex items-center gap-1.5"><Coins size={15} className="text-amber-300" /> <b className="text-amber-100">{run.gold}</b> gold</span><span className="text-[10px] text-faint">interest +{Math.min(run.interestCap, Math.floor(run.gold / RULES.interestPer))}</span></span>
+        <span className="cw-pill" title="Store level"><span className="flex items-center gap-1.5">Lv.<b>{run.level}</b>{need > 0 && <span className="text-xs text-faint">{run.xp}/{need} XP</span>}</span>{need > 0 && <Meter value={run.xp / need} tone="bg-sky-400" label="Experience" />}</span>
+        <span className="cw-pill" title="Characters deployed"><span className="flex items-center gap-1.5"><Swords size={14} className="text-cyan" /> {deployed(run).length}/{teamSize(run)} deployed</span></span>
+        <span className="cw-pill" title="Winning streak"><span className="flex items-center gap-1.5">Streak <b className={run.streak >= 3 ? "text-amber-200" : ""}>{run.streak}</b></span></span>
         {run.tsr && <span className="flex items-center gap-1.5" title="Trailblaze Power"><Zap size={14} className="text-amber-300" /> <b>{run.tsr.tp}</b> TP</span>}
         {plotOf(run).holders.some((h) => !h.disabled) && <span className="flex items-center gap-1.5" title="Plot Armor holders"><Crown size={14} className="text-fuchsia-300" /> {plotOf(run).holders.filter((h) => !h.disabled).map((h) => h.name).join(", ")}</span>}
       </div>
     </div>
   );
+}
+
+/** A thin progress bar (squad HP, experience). */
+function Meter({ value, tone, label }: { value: number; tone: string; label: string }) {
+  const v = Math.max(0, Math.min(1, value));
+  return <span className="mt-1 block h-1 overflow-hidden rounded-full bg-white/10" role="meter" aria-label={label} aria-valuenow={Math.round(v * 100)} aria-valuemin={0} aria-valuemax={100}><span className={cx("block h-full rounded-full transition-[width]", tone)} style={{ width: `${v * 100}%` }} /></span>;
 }
 
 function UnitTile({ u, place, pack, selected, onClick, label, crowned, turbulence }: { u: Unit | null; place: Zone; pack: CwPack; selected: boolean; onClick: () => void; label: string; crowned?: boolean; turbulence?: boolean }) {
@@ -119,8 +128,8 @@ function UnitTile({ u, place, pack, selected, onClick, label, crowned, turbulenc
   const idle = place !== "bench" && unitPower(u, place, pack) === 0;
   return (
     <button type="button" onClick={onClick} aria-label={`${label}: ${u.stars}-star ${u.name}`} aria-pressed={selected}
-      className={cx("relative flex aspect-square min-w-0 flex-col items-center justify-center rounded-lg border bg-white/[0.03] p-0.5 transition", selected ? "border-cyan ring-2 ring-cyan" : idle ? "border-rose-400/70" : "border-line hover:border-cyan/50")}>
-      <span className="absolute left-1 top-0.5 text-[9px] leading-none text-amber-300">{"★".repeat(u.stars)}</span>
+      className={cx("relative flex aspect-square min-w-0 flex-col items-center justify-center rounded-lg border bg-gradient-to-b p-0.5 transition", u.npc ? "border-line bg-white/[0.03]" : COST_CARD[u.cost] ?? COST_CARD[1], selected ? "!border-cyan ring-2 ring-cyan" : idle ? "!border-rose-400/70" : "hover:brightness-125")}>
+      <span className="absolute left-1 top-0.5 text-[9px] leading-none text-amber-300 drop-shadow">{"★".repeat(u.stars)}</span>
       {crowned && <Crown size={11} className="absolute left-0.5 bottom-0.5 text-fuchsia-300" aria-label="Plot Armor" />}
       {turbulence && <span className="absolute inset-0 rounded-lg ring-2 ring-violet-400/70" title="Black Hole Turbulence Slot" aria-hidden />}
       <Portrait name={u.name} cost={u.cost} size={34} className="!ring-1" />
@@ -477,7 +486,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
               const hint = sp?.use === "box" ? "Choose the basic equipment inside:" : sp?.use === "projector" ? "Tap a character to copy them (1-star copy to the bench)." : sp?.use === "plotArmor" ? "Tap a deployed character to give them Plot Armor." : sp?.use === "wrench" ? "Tap a character to take off all their equipment." : sp?.use === "furnace" ? "Tap a character to reroll all their equipment, or tap an item here to reroll it." : sp?.use === "privilege" ? "Tap a character (their first advanced item) or an advanced item here to make it privileged." : sp?.use === "token" ? "Tap a character for one of their recommended advanced items." : kindOf === "basic" || kindOf === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it.";
               return (
                 <ItemDetail pack={pack} name={name} owned={run.bag.filter((_, i) => i !== sel.index)} needs={needs} onClose={() => setSel(null)} hint={hint}
-                  actions={sp?.use === "box" ? <span className="flex flex-wrap gap-1">{(pack.equipment?.basic ?? []).map((b) => <Button key={b.name} size="sm" variant="ghost" onClick={() => { update((s) => openBox(s, pack, sel.index, b.name)); setSel(null); }}><ItemIcon pack={pack} name={b.name} size={11} /> {b.name}</Button>)}</span> : undefined} />
+                  actions={sp?.use === "box" ? <span className="flex flex-wrap gap-1">{(pack.equipment?.basic ?? []).map((b) => <Button key={b.name} size="sm" variant="ghost" onClick={() => { update((s) => openBox(s, pack, sel.index, b.name)); setSel(null); }}><ItemIcon pack={pack} name={b.name} size={11} /> {b.name}</Button>)}</span>
+                    : canSellItems(run) && itemPrice(pack, name) !== null ? <Button size="sm" variant="ghost" onClick={() => { update((s) => sellItem(s, pack, sel.index)); setSel(null); }}><Coins size={12} /> Sell +{itemPrice(pack, name)} (Equipment Liquidation)</Button> : undefined} />
               );
             })()}
             {peek && !sel && <ItemDetail pack={pack} name={peek} owned={run.bag} needs={needs} onClose={() => setPeek(null)} />}
@@ -492,7 +502,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
                     : <Button size="sm" onClick={() => { const free = run.bench.findIndex((x) => !x); if (free >= 0) update((s) => moveUnit(s, sel.spot, { zone: "bench", index: free })); setSel(null); }}><ArrowDownToLine size={13} /> To bench</Button>}
                   {pack.info?.[selUnit.name]?.recommended?.length ? <Button size="sm" variant="ghost" aria-pressed={gearTracked.includes(selUnit.name)} onClick={() => toggleGear(selUnit.name)}><ThumbsUp size={13} className={gearTracked.includes(selUnit.name) ? "text-emerald-400" : ""} /> {gearTracked.includes(selUnit.name) ? "Tracking gear" : "Track gear"}</Button> : null}
                   {pack.info?.[selUnit.name] && <Button size="sm" variant="ghost" onClick={() => setSheet({ name: selUnit.name, stars: selUnit.stars, items: selUnit.items, place: sel.spot.zone })}><Search size={13} /> Details</Button>}
-                  <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { update((s) => sell(s, sel.spot)); setSel(null); }}><Coins size={13} /> Sell +{ASSUMED.sellRefund(selUnit.cost, selUnit.stars)}</Button>
+                  <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { update((s) => sell(s, sel.spot, pack)); setSel(null); }}><Coins size={13} /> Sell +{ASSUMED.sellRefund(selUnit.cost, selUnit.stars)}</Button>
                 </>} />
             )}
             {selUnit && sel?.kind === "unit" && <RecommendedGear pack={pack} name={selUnit.name} place={sel.spot.zone} held={selUnit.items} bag={run.bag} compact />}

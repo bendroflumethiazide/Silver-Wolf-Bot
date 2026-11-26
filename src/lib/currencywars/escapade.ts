@@ -175,7 +175,9 @@ export function shiftEarlier(kinds: NodeKind[], kind: NodeKind): NodeKind[] {
 export function addBasics(s: RunState, items: string[]): RunState {
   if (!items.length) return s;
   // "Exclusive Endorsement": its components arrive as the advanced item.
-  const got = s.endorsed ? items.map((i) => (s.endorsed!.parts.includes(i) ? s.endorsed!.item : i)) : items;
+  // "Free Market": basic equipment arrives as a Basic Weapon Box (the box itself is opened later).
+  const market = s.strategies.some((x) => x.name === "Free Market");
+  const got = (s.endorsed ? items.map((i) => (s.endorsed!.parts.includes(i) ? s.endorsed!.item : i)) : items).map((i) => (market && i !== s.endorsed?.item ? "Basic Weapon Box" : i));
   return { ...s, bag: [...s.bag, ...(hasVariant(s, "mc-box") ? got.map((i) => (s.endorsed?.item === i ? i : "Basic Weapon Box")) : got)] };
 }
 

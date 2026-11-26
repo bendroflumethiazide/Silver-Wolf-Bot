@@ -38,6 +38,12 @@ export const RULE_ASSUMED = {
   overheatLoot: 1.5,
   /** "Executes" below 16% HP: share of enemy HP skipped. */
   executeAt: 0.16,
+  /** Combat Power Level Up/Surge: "a random stat bonus" per node, as strength (size not on the wiki). */
+  randomStat: 0.02,
+  /** Complete Disassembly: Molecular Solvent's 3 extra DMG instances and %Max HP True DMG, as its holder's DMG dealt. */
+  solventDealt: 0.2,
+  /** Equipment Liquidation: gold for selling an item (prices not on the wiki). */
+  sellItem: { basic: 1, advanced: 3, privileged: 5, emblem: 2, gem: 2 } as Record<string, number>,
 } as const;
 
 /** One deployed character as combat rules see it. */
@@ -67,6 +73,10 @@ export interface CombatCtx {
   since: (name: string) => number;
   /** Strength a unit gains from an extra/privileged item (Onboarding Package, Rise Above All). */
   itemGain?: (u: CombatUnit, kind: "recommended" | "privilege") => Partial<Stats>;
+  /** A rule counter (e.g. "dae:<uid>" for Diamonds Are Eternal, "cp:<uid>" for Combat Power). */
+  num?: (key: string) => number;
+  /** Whether a unit holds Diamond (gem) or gem-synthesized equipment, per item. */
+  gemItems?: (u: CombatUnit) => number;
 }
 
 export interface RuleCombat {
@@ -158,7 +168,15 @@ export function combatRules(names: readonly string[], c: CombatCtx): RuleCombat 
   if (has.has("Elite Talent Investment")) for (const u of c.units.filter((x) => x.cost === 5)) unit(u.uid, { str: 0.15, dmg: 0.15 });
   if (has.has("Intern Development Plan")) for (const u of c.units.filter((x) => x.cost === 1)) unit(u.uid, { str: 0.08 });
   if (has.has("Eidolon Ascension")) for (const u of on) unit(u.uid, { on: RULE_ASSUMED.eidolonStr });
-  if (has.has("Tactical Eyepiece")) squad({ energy: RULE_ASSUMED.eyepieceEnergy * (c.boss ? 1.5 : 1) });
+  if (has.has("Tactical Eyepiece") || has.has("Tactical Eyepiece+") || has.has("Tactical Eyepiece++")) squad({ energy: RULE_ASSUMED.eyepieceEnergy * (c.boss ? 1.5 : 1) });
+  if (has.has("Middle Class")) { const twos = c.units.filter((u) => u.stars === 2).length; squad({ mit: 0.05 * twos, str: 0.15 * twos }); }
+  for (const u of c.units) {
+    const dae = c.num?.(`dae:${u.uid}`) ?? 0;
+    if (dae) unit(u.uid, { dmg: dae });
+    const cp = c.num?.(`cp:${u.uid}`) ?? 0;
+    if (cp) unit(u.uid, { str: RULE_ASSUMED.randomStat * cp });
+  }
+  if (has.has("Complete Disassembly")) for (const u of c.units) { const n = u.items.filter((i) => i === "Molecular Solvent").length; if (n) { squad({ mit: 0.04 * n }); unit(u.uid, { dealt: RULE_ASSUMED.solventDealt * n }); } }
   if (has.has("Folding Knife Blessing")) squad({ on: 0.3, dmg: 0.05 });
   if (has.has("Lucky Star Blessing")) squad({ lucky: 0.15, spd: 0.05 });
   if (has.has("Peace Pistol Blessing")) squad({ off: 0.3, energy: RULE_ASSUMED.initialEnergy });
@@ -223,6 +241,47 @@ export const RULE_INFO: Record<string, RuleInfo> = {
   "Intern Development Plan": { label: "1-cost +8% strength", handled: [/On\/Off-Field Strength of ally 1-Cost/i] },
   "Eidolon Ascension": { label: "on-field characters Eidolon +1", handled: ALL, approx: `counted as +${RULE_ASSUMED.eidolonStr * 100}% On-Field Strength` },
   "Tactical Eyepiece": { label: "Energy on defeating enemies", handled: ALL, approx: "as squad Energy" },
+  "Tactical Eyepiece+": { label: "Energy on defeating enemies", handled: [/When ally squad defeats/i], approx: "as squad Energy" },
+  "Tactical Eyepiece++": { label: "Energy on defeating enemies", handled: [/When ally squad defeats/i], approx: "as squad Energy" },
+  "Middle Class": { label: "+5% Mitigation, +15% strength per 2-star character", handled: [/For each 2-star character/i] },
+  "Diamonds Are Eternal": { label: "+3% DMG per node for each Diamond item a character wears", handled: [/For each Diamond/i] },
+  "Complete Disassembly": { label: "advanced equipment becomes Molecular Solvent (extra hits, +4% Mitigation each)", handled: [/In this run, all your advanced equipment/i, /It will deal 3 additional/i], approx: "Solvent's extra hits as +20% DMG dealt" },
+  "Combat Power Level Up": { label: "the 2-star character gains a random stat each node", handled: [/When entering a new Node, this character permanently/i], approx: `+${RULE_ASSUMED.randomStat * 100}% strength per node` },
+  "Combat Power Surge": { label: "the 2-star character gains a random stat each node", handled: [/When entering a new Node, this character permanently/i], approx: `+${RULE_ASSUMED.randomStat * 100}% strength per node` },
+  "Heroic Entrance": { label: "perfect victories bring the 5-cost character 1 node sooner", handled: [/After a perfect victory in combat, deployment Node/i] },
+  "Rookie Veterans": { label: "a Perfect Projector at two 3-star 1-cost characters", handled: [/The first time you simultaneously have 2 3-star/i] },
+  "The Sunken Arena": { label: "a Wealth Gem at the first 5-win streak", handled: ALL },
+  "Surplus Capital": { label: "1 free refresh per 10 gold above 50 at each node (up to 3)", handled: [/Each time you enter a new Node, if you have more than 50/i] },
+  "Surplus Capital+": { label: "1 free refresh per 10 gold above 50 at each node (up to 3)", handled: [/Each time you enter a new Node, if you have more than 50/i] },
+  "IPC Armory Update: Prismatic": { label: "items in your inventory reroll each node", handled: [/When entering a new Node, equipment in the inventory/i] },
+  "IPC Armory Update: Gold": { label: "items in your inventory reroll each node", handled: [/When entering a new Node, equipment in the inventory/i] },
+  "IPC Armory Update: Silver": { label: "items in your inventory reroll each node", handled: [/When entering a new Node, equipment in the inventory/i] },
+  "Resolution: Planet of Entertainment": { label: "double squad DMG taken; at 180 gold the rest of the run becomes Reward nodes", handled: [/Takes double DMG/i, /When entering combat, if you have 180/i] },
+  "Value Investing: Prismatic": { label: "a 1-star copy each node, 2 more after each Supply", handled: [/Upon entering a new Node/i] },
+  "Value Investing: Gold": { label: "a 1-star copy each node, 2 more after each Supply", handled: [/Upon entering each new Node/i] },
+  "Peppy's Cameo": { label: "Peppy joins for 5 nodes, picking up advanced equipment on Perfect Clears", handled: ALL },
+  "Fusion Summon": { label: "2 identical advanced items on a character fuse into the privileged one", handled: [/When a character equips 2 identical/i] },
+  "Equipment Liquidation": { label: "equipment can be sold; a basic item each plane", handled: [/Equipment can be sold/i, /can be sold\.?$/i], approx: "sale prices assumed" },
+  "Equipment Liquidation+": { label: "equipment can be sold; a basic item each plane", handled: [/Equipment can be sold/i, /can be sold\.?$/i], approx: "sale prices assumed" },
+  "Sturdy Relay": { label: "a 3-cost character at each node", handled: [/When entering a new Node, obtain 1 more/i] },
+  "Batch Recruitment": { label: "3 4-cost characters at the next Boss node", handled: [/Upon entering a Boss Node/i] },
+  "Guns Ready": { label: "a basic item after each Boss", handled: [/After the boss battle/i] },
+  "Guns Ready+": { label: "a basic item after each Boss", handled: [/After the boss battle/i] },
+  "Obstinate": { label: "losses keep the win streak (+5 squad DMG taken)", handled: [/When combat fails/i] },
+  "Empty Stock": { label: "+2 XP at a node with no equipment in stock", handled: [/When entering a new Node, if there is no equipment/i] },
+  "Empty Stock+": { label: "+2 XP at a node with no equipment in stock", handled: [/When entering a new Node, if there is no equipment/i] },
+  "Top 500": { label: "30 gold when a character reaches 500 strength", handled: [/When an ally character first reaches 500/i] },
+  "Recycling Program": { label: "sold characters' advanced items break into basics; a basic item after 5 nodes", handled: ALL },
+  "Recycling Program+": { label: "sold characters' advanced items break into basics; a basic item after 4 nodes", handled: ALL },
+  "Fortune's Favor": { label: "synthesizing advanced equipment gives a Good Fortune Token instead", handled: [/When synthesizing and obtaining/i] },
+  "Aha is Amused": { label: "Aha +40% DMG", handled: [/When the "Elation" Bond is activated/i, /Replaces Aha's equipment template/i], approx: "Aha's equipment choice isn't modelled" },
+  "Personnel Changes": { label: "rightmost 3 bench characters reroll each node", handled: [/When entering a new Node, the 3 characters/i] },
+  "Combine Like Terms": { label: "+1 gold when a refresh shows a pair", handled: [/When refreshing the Store, if 2 identical/i] },
+  "Cleared With No DMG Taken": { label: "+1 gold after a fight with no knock-downs", handled: [/After combat, if no character was knocked down/i] },
+  "Fortune Puppy": { label: "+1 gold per Peppy after a win", handled: [/After winning a combat without losing/i] },
+  "Free Market": { label: "basic equipment arrives as Basic Weapon Boxes", handled: [/Whenever you are about to gain one piece of basic/i] },
+  "Stars To Stars": { label: "+5 gold per 3-star merge", handled: [/Upon merging a 3-star character/i] },
+  "Diamond Dealer": { label: "a Wealth Gem at level 9", handled: ALL },
   "Folding Knife Blessing": { label: "+30% On-Field Strength, +5% DMG", handled: [/ally squad gains 30% On-Field/i] },
   "Lucky Star Blessing": { label: "+15% Lucky Strike Rate, +5% SPD", handled: [/ally squad gains 15% Lucky/i] },
   "Peace Pistol Blessing": { label: "+30% Off-Field Strength, 15 initial Energy", handled: [/ally squad gains 30% Off-Field/i] },

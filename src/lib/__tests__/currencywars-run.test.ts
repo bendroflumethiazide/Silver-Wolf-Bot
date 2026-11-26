@@ -7,7 +7,7 @@ import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
-  addToBag, effectCoverage, levelUp, maxHpOf, refreshCostOf,
+  addToBag, effectCoverage, levelUp, maxHpOf, refreshCostOf, sellItem,
   ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, ahaStar, equipAha, promoteAeonAha, placedBondStates, rerollEnvironments, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
   nodeKind, nodeKinds, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
@@ -324,7 +324,8 @@ describe("Currency Wars run simulator", () => {
     const [c] = applyEffect(s, PACK, "You no longer gain Interest. Instantly gain 15 Gold Coins. Gain 4 Experience whenever you enter a new Node.", createRng("x"));
     expect([c.gold - s.gold, c.interestCap, c.xpPerNode]).toEqual([15, 0, 4]);
     const [d, appliedD] = applyEffect(s, PACK, "When a fight ends, gain 1 Gold Coin(s).", createRng("x"));
-    expect([d.gold, appliedD]).toEqual([s.gold, []]);
+    // A condition nothing handles is reported, not dropped silently.
+    expect([d.gold, appliedD]).toEqual([s.gold, ["not simulated: When a fight ends, gain 1 Gold Coin(s)"]]);
     const [e] = applyEffect(s, PACK, "Gains a crystal ore worth 6/8/12 Gold Coin(s) at the start of Plane 1/2/3 respectively.", createRng("x"));
     expect(e.planeGold).toEqual([6, 8, 12]);
   });
@@ -1852,5 +1853,45 @@ describe("Named Environment and Strategy rules (rules.ts) and consumables", () =
     const part = effectCoverage(P47, "Chimera Growth Log", "When the Store levels up, obtains 2 \"Chimera Energy\" and 6 Gold Coins. Obtains 1 \"Welt\" and 1 \"Chimera Projector.\"");
     expect(part.status).toBe("partial");
     expect(part.missing).toEqual(["Chimera Projector"]);
+  });
+
+  it("conditional grants wait for their condition: The Sunken Arena, Diamond Dealer, Stars To Stars, Value Investing", () => {
+    const s0 = newRun(P47, "cond", "A0-1");
+    const sunk = chooseEnvironment({ ...s0, offers: { environments: [{ name: "The Sunken Arena", effect: 'Obtain a "Wealth Gem" upon achieving the first 5-win streak in this round.' }] } }, P47, 0);
+    expect(sunk.bag).not.toContain("Wealth Gem");
+    const fight = battle(prep({ ...sunk, streak: 4, plane: 0, node: 3, on: [u47(1, "Kafka", 3), u47(2, "Jade", 3), null, null], off: Array(6).fill(null) }), P47);
+    if (fight.last!.won) expect(fight.bag).toContain("Wealth Gem");
+    const s = at47(["Welt"], { level: 8, xp: 0 });
+    const dd = strat(s, "Diamond Dealer", 'Gains "Wealth Gem" upon reaching Lv. 9.');
+    expect(dd.bag).not.toContain("Wealth Gem");
+    expect(levelUp(dd, 200).bag).toContain("Wealth Gem");
+    const st = strat(s, "Stars To Stars", 'Upon merging a 3-star character, obtain 5 Gold Coin(s). Immediately obtain 1 "Staff Projector."');
+    const three = merge({ ...st, bench: [u47(70, "Pearl", 2), u47(71, "Pearl", 2), u47(72, "Pearl", 2), ...Array(6).fill(null)] });
+    expect(three.gold).toBe(st.gold + 5);
+    const vi = strat(at47(["Welt"]), "Value Investing: Gold", "Obtain 1 random 2-star 1-cost character. Upon entering each new Node, get a 1-star version of this character, and after getting supplies, get 2 more, lasting until the end of this run.");
+    const name = vi.ruleText?.value;
+    expect(name).toBeTruthy();
+    const next = advance({ ...vi, phase: "result" }, P47);
+    expect(next.log.join(" ")).toContain(`Value Investing: ${name} joins.`);
+  });
+
+  it("Fusion Summon, Recycling Program, Obstinate, Free Market, Equipment Liquidation", () => {
+    const s = at47(["Welt", "Kafka"]);
+    const fs = strat(s, "Fusion Summon", 'When a character equips 2 identical advanced equipment, they will be synthesized into corresponding privileged equipment. Obtain 1 "Basic Weapon Box."');
+    const worn = { ...prep(fs), on: [{ ...fs.on[0]!, items: ["Firestorm Surge"] }, fs.on[1], null, null], bag: ["Firestorm Surge"] };
+    expect(equip(worn, P47, 0, { zone: "on", index: 0 }).on[0]!.items).toEqual(["Firestorm Surge: Privilege"]);
+    const rp = strat(s, "Recycling Program", "When selling a character, advanced equipment will be broken down into basic equipment. Gains 1 piece(s) of advanced equipment, and gains 1 piece(s) of random basic equipment after 5 Nodes.");
+    expect(rp.triggers?.some((t) => t.source === "Recycling Program" && t.after === 5)).toBe(true);
+    const sold = sell({ ...prep(rp), bag: [], on: [{ ...rp.on[0]!, items: ["Firestorm Surge"] }, rp.on[1], null, null] }, { zone: "on", index: 0 }, P47);
+    expect(sold.bag.sort()).toEqual(["Folding Knife", "Roller Skates"]);
+    const ob = strat(s, "Obstinate", "When combat fails, increases the ally squad's DMG taken by 5, but maintains the original win streak. Gain 6 Gold Coin(s).");
+    const lost = battle(prep({ ...ob, streak: 3, plane: 2, node: 6, on: [u47(1, "Welt"), null, null, null], off: Array(6).fill(null) }), P47);
+    if (!lost.last!.won) expect(lost.streak).toBe(3);
+    const fm = strat(s, "Free Market", "Whenever you are about to gain one piece of basic equipment, gains 1 \"Basic Weapon Box\" instead. Gains 1 piece(s) of random basic equipment.");
+    expect(fm.bag).toEqual(["Basic Weapon Box"]);
+    const el = strat(s, "Equipment Liquidation", 'Equipment can be sold. Immediately obtains 2 "Basic Weapon Box." At the start of each plane, obtains 1 random piece(s) of basic equipment.');
+    const withKnife = prep({ ...el, bag: ["Folding Knife"] });
+    expect(sellItem(withKnife, P47, 0).gold).toBe(withKnife.gold + 1);
+    expect(el.triggers?.some((t) => t.on === "plane" && t.repeat)).toBe(true);
   });
 });

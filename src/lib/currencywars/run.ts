@@ -256,6 +256,8 @@ export interface RunState {
   chimeraEnergy?: number;
   /** Counters and flags of named Environment/Strategy rules (rules.ts), by key. */
   rule?: Record<string, number>;
+  /** Names a named rule tracks (Value Investing's character). */
+  ruleText?: Record<string, string>;
   /** "Exclusive Endorsement": its components arrive as this advanced item. */
   endorsed?: { item: string; parts: [string, string] };
 }
@@ -338,6 +340,7 @@ export function merge(s: RunState, trimBench = false): RunState {
     next[trio[0].spot.zone][trio[0].spot.index] = kept;
     state = remapHolders(next, trio.slice(1).map((t) => t.u.uid), kept.uid);
     state = log(state, `${"★".repeat(kept.stars)} ${kept.name}: three copies merged.`);
+    if (kept.stars === 3 && state.strategies.some((x) => x.name === "Stars To Stars")) state = log({ ...state, gold: state.gold + 5 }, "Stars To Stars: +5 gold.");
   }
   if (trimBench && state.bench.length > RULES.benchSlots) {
     const bench = state.bench.filter((u, i) => u || i < RULES.benchSlots).slice(0, RULES.benchSlots);
@@ -355,6 +358,7 @@ export function levelUp(s: RunState, xp: number): RunState {
   let out = { ...s, level, xp: cur };
   if (level > s.level) {
     out = log(out, `Level ${level}: you can deploy ${ASSUMED.teamSize(level)}.`);
+    if (owns(out, "Diamond Dealer") && level >= 9 && !ruleN(out, "dealer")) out = log(setRule({ ...out, bag: [...out.bag, "Wealth Gem"] }, "dealer", 1), "Diamond Dealer: Wealth Gem.");
     if (owns(out, "Growth Fund") && level >= 9 && s.level < 9) out = log({ ...out, gold: out.gold + 36 }, "Growth Fund: +36 gold.");
     if (owns(out, "The Joy of Growth") && level >= 8 && !ruleN(out, "joy")) out = log(setRule({ ...out, xpCost: Math.max(1, out.xpCost - 1) }, "joy", 1), `The Joy of Growth: Experience costs ${Math.max(1, out.xpCost - 1)}.`);
     if (owns(out, "Chimera Growth Log")) { const n = level - s.level; out = log({ ...out, gold: out.gold + 6 * n, chimeraEnergy: (out.chimeraEnergy ?? 0) + 2 * n }, `Chimera Growth Log: +${2 * n} Chimera Energy, +${6 * n} gold.`); }
@@ -402,12 +406,19 @@ export function recipe(pack: CwPack, a: string, b: string): CwAdvancedItem | und
 }
 export const isBasic = (pack: CwPack, name: string) => basicNames(pack).includes(name);
 
+/** "Complete Disassembly": every advanced item becomes Molecular Solvent. */
+const solvent = (s: RunState, pack: CwPack, item: string) => (itemKind(pack, item) === "advanced" && s.strategies.some((x) => x.name === "Complete Disassembly") ? "Molecular Solvent" : item);
+
+/** Basic equipment names (4.7), for "Free Market" (basic → Basic Weapon Box). */
+const BASIC_ICONS_NAMES = new Set(["Roller Skates", "Folding Knife", "Peace Pistol", "Lucky Star", "Flower of Life", "Batch Produced Armor", "Aether Drill", "Photon Cell"]);
+
 /** Add items to the bag. A Disassembly Wrench while holding a Precision Disassembly Wrench is 1 Gold Coin instead (wiki). */
 export function addToBag(s: RunState, items: string[]): RunState {
   let out = s;
   for (const it of items) {
     if (it === "Disassembly Wrench" && out.bag.includes("Precision Disassembly Wrench")) out = { ...out, gold: out.gold + 1 };
     else if (out.endorsed?.parts.includes(it)) out = { ...out, bag: [...out.bag, out.endorsed.item] };
+    else if (owns(out, "Free Market") && BASIC_ICONS_NAMES.has(it)) out = { ...out, bag: [...out.bag, "Basic Weapon Box"] };
     else out = { ...out, bag: [...out.bag, it] };
   }
   return out;
@@ -455,13 +466,14 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
   const text = [...handled, ...gradeHandled, ...ruled].reduce((t, h) => t.replace(h, ""), text0).trim();
   let state = gradeState;
   const applied: string[] = [...plotApplied, ...gradeApplied];
+  const uidBefore = gradeState.nextUid;
   if (RULE_INFO[source]) { const [st, got] = ruleOnPick(state, pack, source, rng); state = st; applied.push(...got); }
   const skipped: string[] = [];
   let lastEmblem: string | null = null;
   const roster = shopRoster(pack);
   const eq = pack.equipment;
   const isItem = (n: string) => !!specialItem(n) || !!(eq?.basic.some((x) => x.name === n) || eq?.advanced.some((x) => x.name === baseItem(n)) || eq?.emblems?.some((x) => x.name === n) || eq?.gems?.some((x) => x.name === n));
-  const addItem = (n: string) => { state = addToBag(state, [n]); if (emblemBond(pack, n)) lastEmblem = n; };
+  const addItem = (n: string) => { state = addToBag(state, [solvent(state, pack, n)]); if (emblemBond(pack, n)) lastEmblem = n; };
   const addUnit = (name: string, cost: number, stars: 1 | 2 | 3, items: string[] = [], npc = false) => {
     const [s2, u] = makeUnit(state, name, cost, stars, items);
     const after = gain(s2, npc ? { ...u, npc: true } : u);
@@ -561,7 +573,7 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
       return;
     }
     if (/^"?Emblem Codex"?/i.test(desc)) { for (const e of emblems(n)) { addItem(e); applied.push(`${e} (Emblem Codex: you'd pick one; random here)`); } return; }
-    if (/^(?:random )?privileged equipment/i.test(desc)) { for (let i = 0; i < n; i++) { const a = randomAdvanced(); if (a) addItem(a); } applied.push(`${n} advanced equipment (privileged versions aren't modelled)`); return; }
+    if (/^(?:random )?privileged equipment/i.test(desc)) { for (let i = 0; i < n; i++) { const a = randomAdvanced(); if (a) { addItem(privileged(a)); applied.push(privileged(a)); } } return; }
     if (/^(?:random )?basic weapons?(\(s\))?$/i.test(desc) || /^Random Basic Weapon/i.test(desc)) { for (let i = 0; i < n; i++) { const b = randomBasic(pack, rng); if (b) addItem(b); } applied.push(`${n} basic equipment`); return; }
     if (/^Privilege Weapon Box/i.test(desc)) { for (let i = 0; i < n; i++) { const a = randomAdvanced(); if (a) addItem(a); } applied.push(`${n} advanced equipment (Privilege Weapon Box)`); return; }
     if ((g = /Employment Contract: Cost (\d)|(\d)-Cost Employment Contract/i.exec(desc))) { randomUnits(n, Number(g[1] ?? g[2]), 1); applied.push(`(Employment Contract used as a random ${g[1] ?? g[2]}-cost character)`); return; }
@@ -602,7 +614,10 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
   const consumed = new Set<string>();
   const schedule = (t: Trigger, sentence: string, label: string) => { state = { ...state, triggers: [...(state.triggers ?? []), t] }; consumed.add(sentence); applied.push(label); };
   const planeNames: Record<string, number> = { first: 0, second: 1, third: 2 };
-  const sentences = text.replace(/"([^"]*?)([,.])"/g, '"$1"$2').replace(/\s+when the round starts/gi, "").split(/(?<=[.!])\s+/).map((x) => x.trim());
+  const sentences = text.replace(/"([^"]*?)([,.])"/g, '"$1"$2').replace(/\s+when the round starts/gi, "").split(/(?<=[.!])(?<!\bLv\.)\s+/).map((x) => x.trim()).filter(Boolean);
+  // Sentences some rule handled (so a conditional one that nothing handled can be reported, not dropped silently).
+  const seen = new Set<string>();
+  const KNOWN = [/crystal ore worth/i, /Crystal Ore .*next Reward Node/i, /chance to obtain a crystal ore/i, /When opening a crystal ore/i, /Experience whenever you enter a new Node/i, /the Express deals/i, /2-star characters may appear in the Store/i, /Each time you enter a Boss Node, receive a random character with the corresponding Bond/i, /interest cap|maximum Interest/i, /no longer gain Interest/i];
   const halfBond = /half of the members of "([^"]+)"/i.exec(text)?.[1];
   sentences.forEach((sen, idx) => {
     let m: RegExpExecArray | null;
@@ -620,6 +635,8 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
     } else if ((m = /^At the start of the First, Second, and Third Planes, respectively, gain (\d+), (\d+), and (\d+) (.+?)\.?$/i.exec(sen))) {
       [m[1], m[2], m[3]].forEach((n, pl) => { state = { ...state, triggers: [...(state.triggers ?? []), { on: "plane", plane: pl, text: `Gain ${n} ${m![4]}`, source }] }; });
       consumed.add(sen); applied.push(`${m[1]}/${m[2]}/${m[3]} ${m[4]} at the start of each plane`);
+    } else if ((m = /^At the start of each plane,\s*(.+)$/i.exec(sen))) {
+      schedule({ on: "plane", repeat: true, text: m[1], source }, sen, `at the start of each plane: ${m[1].replace(/^(Gains?|Obtains?)\s+/i, "").replace(/[.]$/, "")}`);
     } else if ((m = /^(?:Now|Immediately) and at the start of each plane,\s*(.+)$/i.exec(sen))) {
       state = { ...state, triggers: [...(state.triggers ?? []), { on: "plane", repeat: true, text: m[1], source }] };
       applied.push("again at the start of each plane");
@@ -660,7 +677,8 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
       state = { ...state, streak: Number(m[1]), stats: { ...state.stats, bestStreak: Math.max(state.stats.bestStreak, Number(m[1])) } }; consumed.add(sen); applied.push(`win streak set to ${m[1]}`);
     } else if ((m = /^Loses (\d+) Squad HP/i.exec(sen))) {
       state = { ...state, hp: Math.max(1, state.hp - Number(m[1])) }; applied.push(`−${m[1]} squad HP`);
-    }
+    } else return;
+    seen.add(sen);
   });
 
   // Grants: every "obtain / gain / get / receive / start with …" clause in a sentence that isn't conditional.
@@ -682,17 +700,24 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
       const startAt = (h.index ?? 0) + h[0].length;
       const end = k + 1 < hits.length ? hits[k + 1].index ?? sen.length : sen.length;
       let chunk = sen.slice(startAt, end).replace(/[,\s]+(?:and)?\s*$/i, "");
-      // Future or conditional grants stay text ("at the next Reward Node", "each time …").
-      if (/\b(next|each|every|when|after|whenever|per|if|for each|at the start of)\b/i.test(chunk.replace(/\bof (?:every|each)\b/gi, "")) && !/^(\d+|an?)\s+"?Peppy/i.test(chunk)) return;
+      // Future or conditional grants stay text ("at the next Reward Node", "each time …"); they're reported below unless handled.
+      if (/\b(next|each|every|when|after|whenever|per|if|for each|at the start of|upon|once)\b/i.test(chunk.replace(/\bof (?:every|each)\b/gi, "")) && !/^(\d+|an?)\s+"?Peppy/i.test(chunk)) return;
+      seen.add(sen);
       chunk = chunk.replace(/\s+(?:instead|in total|immediately)$/i, "");
       for (const piece of chunk.split(/,\s*(?:and\s+)?|\s+and\s+(?=(?:\d+|an?|one|two|three)\s|")/i)) grantPart(piece);
     });
   }
 
+  // Conditional sentences nothing above handled: report them instead of dropping them.
+  for (const sen of sentences) {
+    if (consumed.has(sen) || seen.has(sen) || KNOWN.some((re) => re.test(sen)) || UNMODELLED.test(sen)) continue;
+    if (CONDITIONAL.test(sen) || /\b(upon|once|until|whenever|each time|every time)\b/i.test(sen)) skipped.push(sen.replace(/[.!]$/, "").slice(0, 90));
+  }
   if (/Each time you enter a Boss Node, receive a random character with the corresponding Bond/i.test(text) && lastEmblem) {
     const bond = emblemBond(pack, lastEmblem);
     if (bond) { state = { ...state, dispatchBond: bond }; applied.push(`a ${bond} character at each Boss node`); }
   }
+  if (RULE_INFO[source]) state = ruleAfterGrant(state, source, uidBefore);
   if (skipped.length) applied.push(`not simulated: ${[...new Set(skipped)].join(", ")}`);
   return [state, applied];
 }
@@ -803,10 +828,45 @@ function ruleOnPick(s0: RunState, pack: CwPack, name: string, rng: () => number)
     case "Personal Accident Insurance": s = { ...s, layout: RULES.planes.map((_, p) => { const k = [...nodeKinds(p, s)]; k.splice(k.lastIndexOf("Boss"), 0, "Supply"); return k; }) }; break;
     case "War Frontier": s = { ...s, layout: RULES.planes.map((_, p) => nodeKinds(p, s).map((k) => (p === 2 && k === "Combat" ? "Encounter" : k))) }; break;
     case "Success Experience": s = setRule(s, "success", 3); break;
+    case "Diamond Dealer": if (s.level >= 9) { s = setRule({ ...s, bag: [...s.bag, "Wealth Gem"] }, "dealer", 1); got.push("Wealth Gem"); } break;
+    case "Peppy's Cameo": { gainUnit("Peppy", 0, [], true); const p = units(s).filter((u) => u.npc && u.name === "Peppy").at(-1); if (p) s = setRule(setRule(s, "cameo", 5), "cameoUid", p.uid); break; }
+    case "Complete Disassembly": {
+      const solve = (it: string) => (itemKind(pack, it) === "advanced" ? "Molecular Solvent" : it);
+      const fix = (u: Unit | null) => (u ? { ...u, items: u.items.map(solve) } : u);
+      s = { ...s, bag: s.bag.map(solve), on: s.on.map(fix), off: s.off.map(fix), bench: s.bench.map(fix) };
+      break;
+    }
+    case "Recycling Program": case "Recycling Program+": {
+      const a = randomAdvancedName(pack, rng);
+      if (a) { s = addToBag(s, [a]); got.push(a); }
+      const after = name === "Recycling Program" ? 5 : 4;
+      s = { ...s, triggers: [...(s.triggers ?? []), { on: "node", after, text: "Obtains 1 random basic equipment.", source: name }] };
+      got.push(`a basic item after ${after} nodes`);
+      break;
+    }
     case "Market Chaos": case "Economic Hyperheat": case "Shift Rotation": case "Excess Budget": break;
     default: break;
   }
   return [s, got];
+}
+
+/** After a rule's text granted units: remember which one a rule follows (Combat Power, Value Investing). */
+function ruleAfterGrant(s: RunState, name: string, uidBefore: number): RunState {
+  const fresh = units(s).filter((u) => u.uid >= uidBefore && !u.npc);
+  if (!fresh.length) return s;
+  if (name === "Combat Power Level Up" || name === "Combat Power Surge") return setRule(s, "cpUid", fresh[0].uid);
+  if (name.startsWith("Value Investing")) return { ...s, ruleText: { ...s.ruleText, value: fresh[0].name } };
+  return s;
+}
+
+/** A random character of a cost joins (bench), or a log line if the bench is full. */
+function joinRandom(s: RunState, pack: CwPack, cost: number, rng: () => number, source: string, name?: string): RunState {
+  const pool = name ? shopRoster(pack).filter((c) => c.name === name) : shopRoster(pack).filter((c) => c.cost === cost);
+  if (!pool.length) return s;
+  const c = pickOne(rng, pool);
+  const [s2, u] = makeUnit(s, c.name, c.cost);
+  const after = gain(s2, u);
+  return after ? log(after, `${source}: ${c.name} joins.`) : log(s, `${source}: ${c.name} couldn't join (bench full).`);
 }
 
 /** Named rules when entering a node (before the store restocks). */
@@ -840,6 +900,39 @@ function ruleOnNode(s0: RunState, pack: CwPack, kind: NodeKind, rng: () => numbe
   if (ruleN(s, "success") > 0 && s.level >= 8) { s = setRule(levelUp(s, 12), "success", ruleN(s, "success") - 1); say("Success Experience: +12 XP."); }
   if (owns(s, "Elite Talent Investment")) s = levelUp(s, 2);
   if (kind === "Supply" && owns(s, "Final Payment") && lastSupply(s) && !ruleN(s, "final")) { s = setRule({ ...s, gold: s.gold + 30 }, "final", 1); say("Final Payment: +30 gold."); }
+  for (const n of ["Surplus Capital", "Surplus Capital+"]) if (owns(s, n) && s.gold > 50) { const k = Math.min(3, Math.floor((s.gold - 50) / 10)); if (k) { s = { ...s, freeRefreshes: s.freeRefreshes + k }; say(`${n}: ${k} free refresh${k === 1 ? "" : "es"}.`); } }
+  if (["IPC Armory Update: Prismatic", "IPC Armory Update: Gold", "IPC Armory Update: Silver"].some((n) => owns(s, n))) {
+    const bag = s.bag.map((it) => (specialItem(it) || isOre(it) ? it : smelt(s, pack, it, rng)));
+    if (bag.some((it, i) => it !== s.bag[i])) { s = { ...s, bag }; say("IPC Armory Update: inventory equipment rerolled."); }
+  }
+  const value = s.ruleText?.value;
+  if (value && (owns(s, "Value Investing: Prismatic") || owns(s, "Value Investing: Gold"))) s = joinRandom(s, pack, 0, rng, "Value Investing", value);
+  if (owns(s, "Sturdy Relay")) s = joinRandom(s, pack, 3, rng, "Sturdy Relay");
+  if (kind === "Boss" && owns(s, "Batch Recruitment") && !ruleN(s, "batch")) { s = setRule(s, "batch", 1); for (let i = 0; i < 3; i++) s = joinRandom(s, pack, 4, rng, "Batch Recruitment"); }
+  for (const n of ["Empty Stock", "Empty Stock+"]) if (owns(s, n)) {
+    const gear = (it: string) => !specialItem(it) && !isOre(it);
+    if (!s.bag.some(gear) && !s.bench.some((u) => u?.items.some(gear))) { s = levelUp(s, 2); say(`${n}: +2 XP.`); }
+  }
+  if (owns(s, "Diamonds Are Eternal")) for (const u of units(s)) {
+    const k = u.items.filter((it) => itemKind(pack, it) === "gem" || (itemKind(pack, it) === "emblem" && /Gem/.test(pack.equipment?.emblems?.find((e) => e.name === it)?.recipe?.join(" ") ?? ""))).length;
+    if (k) s = setRule(s, `dae:${u.uid}`, ruleN(s, `dae:${u.uid}`) + 0.03 * k);
+  }
+  if (owns(s, "Personnel Changes")) {
+    const idx = s.bench.map((u, i) => (u && !u.npc ? i : -1)).filter((i) => i >= 0).slice(-3);
+    if (idx.length) {
+      const bench = [...s.bench];
+      for (const i of idx) { const u = bench[i]!; const pool = shopRoster(pack).filter((c) => c.cost === u.cost && c.name !== u.name); if (pool.length) bench[i] = { ...u, name: pickOne(rng, pool).name }; }
+      s = merge({ ...s, bench }); say(`Personnel Changes: ${idx.length} bench character${idx.length === 1 ? "" : "s"} rerolled.`);
+    }
+  }
+  if (ruleN(s, "cpUid") && units(s).some((u) => u.uid === ruleN(s, "cpUid"))) s = setRule(s, `cp:${ruleN(s, "cpUid")}`, ruleN(s, `cp:${ruleN(s, "cpUid")}`) + 1);
+  if (ruleN(s, "cameo") > 0) {
+    s = setRule(s, "cameo", ruleN(s, "cameo") - 1);
+    if (!ruleN(s, "cameo")) {
+      const uid = ruleN(s, "cameoUid"); const p = units(s).find((u) => u.uid === uid);
+      if (p) { const spot = findUnit(s, uid)!; const zone = [...s[spot.zone]]; zone[spot.index] = null; s = log({ ...s, [spot.zone]: zone, bag: [...s.bag, ...p.items] }, `Peppy's Cameo: Arlan takes Peppy away${p.items.length ? `, leaving ${p.items.join(", ")}` : ""}.`); }
+    }
+  }
   if (owns(s, "Shift Rotation")) { const c = 1 + Math.floor(rng() * 5); s = setRule(s, "shift", c); say(`Shift Rotation: ${c}-cost characters drop twice as often this node.`); }
   return s;
 }
@@ -852,7 +945,7 @@ function shopOdds(s: RunState, pack: CwPack): CwPack["odds"] {
 }
 
 /** After a fight: named rules that pay out or heal (before the run can end). */
-function ruleAfterFight(s0: RunState, pack: CwPack, ctx: { kind: NodeKind; won: boolean; avLeft: number; idle: number; bonds: number; last: boolean }): RunState {
+function ruleAfterFight(s0: RunState, pack: CwPack, ctx: { kind: NodeKind; won: boolean; avLeft: number; idle: number; bonds: number; last: boolean; falls: number; maxPower: number }): RunState {
   let s = s0;
   const say = (line: string) => { s = log(s, line); };
   if (s.hp <= 0 && owns(s, "Ace in the Hole") && !ruleN(s, "ace")) { s = setRule(levelUp({ ...s, hp: 40, gold: s.gold + 80 }, 30), "ace", 1); say("Ace in the Hole: immune to the final blow, HP 40, +30 XP, +80 gold."); }
@@ -866,6 +959,17 @@ function ruleAfterFight(s0: RunState, pack: CwPack, ctx: { kind: NodeKind; won: 
     if (owns(s, "Lifetime Employment")) { const bind = (u: Unit | null) => (u && !u.npc ? { ...u, bound: true } : u); s = { ...s, on: s.on.map(bind), off: s.off.map(bind) }; }
   }
   if (ctx.kind === "Boss" && owns(s, "Struggle Protocol")) { s = heal(s, 50); say("Struggle Protocol: +50 squad HP."); }
+  if (owns(s, "The Sunken Arena") && s.streak >= 5 && !ruleN(s, "sunken")) { s = setRule({ ...s, bag: [...s.bag, "Wealth Gem"] }, "sunken", 1); say("The Sunken Arena: Wealth Gem for a 5-win streak."); }
+  if (owns(s, "Heroic Entrance") && ctx.won && ctx.kind !== "Reward") s = { ...s, triggers: (s.triggers ?? []).map((t) => (t.source === "Heroic Entrance" && (t.after ?? 0) > 1 ? { ...t, after: t.after! - 1 } : t)) };
+  if (ctx.kind === "Boss") for (const n of ["Guns Ready", "Guns Ready+"]) if (owns(s, n)) { const b = randomBasicName(pack, createRng(`${s.seed}:guns:${s.tick}`)); if (b) { s = addBasics(s, [b]); say(`${n}: ${b}.`); } }
+  if (ctx.kind !== "Reward" && owns(s, "Cleared With No DMG Taken") && !ctx.falls) { s = { ...s, gold: s.gold + 1 }; say("Cleared With No DMG Taken: +1 gold."); }
+  if (ctx.kind !== "Reward" && ctx.won && owns(s, "Fortune Puppy")) { const k = units(s).filter((u) => u.npc && /^Pepp/.test(u.name)).length; if (k) { s = { ...s, gold: s.gold + k }; say(`Fortune Puppy: +${k} gold.`); } }
+  if (ctx.kind === "Combat" && ctx.won && ruleN(s, "cameo") > 0) {
+    const uid = ruleN(s, "cameoUid"); const spot = findUnit(s, uid); const p = spot && at(s, spot);
+    const a = randomAdvancedName(pack, createRng(`${s.seed}:cameo:${s.tick}`));
+    if (spot && p && a && p.items.length < RULES.itemsPerUnit) { const zone = [...s[spot.zone]]; zone[spot.index] = { ...p, items: [...p.items, a] }; s = log({ ...s, [spot.zone]: zone }, `Peppy's Cameo: Peppy equips ${a}.`); }
+  }
+  if (owns(s, "Top 500") && ctx.maxPower >= 500 && !ruleN(s, "top500")) { s = setRule({ ...s, gold: s.gold + 30 }, "top500", 1); say("Top 500: a character reached 500 strength, +30 gold."); }
   if (ctx.last && owns(s, "Restore Vitality")) { s = heal(s, 40); say("Restore Vitality: +40 squad HP."); }
   return s;
 }
@@ -1275,6 +1379,8 @@ export function settle(s: RunState, pack: CwPack): RunState {
   out = checkAssignments(out);
   // Aeon ★ Aha becomes 5-cost, then 7-cost (Master of Phantasia's unlock criteria).
   out = promoteAeonAha(out, states);
+  // Rookie Veterans: a Perfect Projector the first time you have two 3-star 1-cost characters.
+  if (owns(out, "Rookie Veterans") && !ruleN(out, "rookie") && units(out).filter((u) => !u.npc && u.cost === 1 && u.stars === 3).length >= 2) out = log(setRule({ ...out, bag: [...out.bag, "Perfect Projector"] }, "rookie", 1), "Rookie Veterans: Perfect Projector.");
   // Economies of Scale: a Perfect Projector the first time you own 8 copies of one character.
   if (owns(out, "Economies of Scale") && !ruleN(out, "scale")) {
     const copies = new Map<string, number>();
@@ -1333,6 +1439,9 @@ export function pickSupply(s0: RunState, pack: CwPack, index: number): RunState 
     const got = gain(s2, u2);
     next = got ? log({ ...got, bag: x.item ? [...got.bag, x.item] : got.bag }, `Supply bonus: ${x.name}${x.item ? ` with ${x.item}` : ""}.`) : log({ ...s2, bag: x.item ? [...s2.bag, x.item] : s2.bag }, `Supply bonus: ${x.name} couldn't join (bench full); kept ${x.item || "nothing"}.`);
   }
+  // Value Investing: 2 more copies of its character after each Supply.
+  const value = next.ruleText?.value;
+  if (value && (owns(next, "Value Investing: Prismatic") || owns(next, "Value Investing: Gold"))) for (let k = 0; k < 2; k++) next = joinRandom(next, pack, 0, rng, "Value Investing", value);
   return advance({ ...next, offers: {} }, pack);
 }
 
@@ -1372,7 +1481,7 @@ export function buy(s0: RunState, pack: CwPack, index: number): RunState {
   return talentRefill(out, pack, index, slot.cost, createRng(`${s0.seed}:talent:${s0.tick}`));
 }
 
-export function sell(s0: RunState, spot: Spot): RunState {
+export function sell(s0: RunState, spot: Spot, pack?: CwPack): RunState {
   const u = at(s0, spot);
   // Allowed at Supply too, so a full bench never blocks taking a character.
   if (!u || (s0.phase !== "prep" && s0.phase !== "supply")) return s0;
@@ -1380,7 +1489,10 @@ export function sell(s0: RunState, spot: Spot): RunState {
   const [s] = step(s0);
   const zone = [...s[spot.zone]]; zone[spot.index] = null;
   const refund = ASSUMED.sellRefund(u.cost, u.stars);
-  return log({ ...s, [spot.zone]: zone, gold: s.gold + refund, bag: [...s.bag, ...u.items] }, `Sold ${"★".repeat(u.stars)} ${u.name} for ${refund}.`);
+  // Recycling Program: advanced equipment breaks down into its basic parts.
+  const recycle = pack && (owns(s, "Recycling Program") || owns(s, "Recycling Program+"));
+  const back = recycle ? u.items.flatMap((it) => (itemKind(pack, it) === "advanced" ? [...(pack.equipment?.advanced.find((a) => a.name === baseItem(it))?.recipe ?? [it])] : [it])) : u.items;
+  return log({ ...s, [spot.zone]: zone, gold: s.gold + refund, bag: [...s.bag, ...back] }, `Sold ${"★".repeat(u.stars)} ${u.name} for ${refund}.`);
 }
 
 /** Move or swap. Deploying from the bench needs a free team slot (team size = level). */
@@ -1422,6 +1534,7 @@ export function refresh(s0: RunState, pack: CwPack): RunState {
   let out: RunState = { ...s, gold: paid ? s.gold - cost : s.gold, freeRefreshes: free ? s.freeRefreshes - 1 : s.freeRefreshes, shop: rollShopSlots(s, pack, rng), stats: { ...s.stats, refreshes: s.stats.refreshes + 1 } };
   if (free && ruleN(out, "chaos") > 0) out = setRule(out, "chaos", ruleN(out, "chaos") - 1);
   if (lucky) out = log(out, "Probability Event: free refresh.");
+  if (owns(out, "Combine Like Terms")) { const names = out.shop.filter((x): x is ShopSlot => !!x).map((x) => x.name); if (names.some((n, i) => names.indexOf(n) !== i)) out = log({ ...out, gold: out.gold + 1 }, "Combine Like Terms: +1 gold."); }
   if (paid) {
     out = spent(setRule(out, "paidRefresh", ruleN(out, "paidRefresh") + 1));
     if (owns(out, "Goldgrubber")) out = levelUp(out, 2);
@@ -1467,6 +1580,22 @@ export function buyXp(s0: RunState, pack?: CwPack): RunState {
 
 export const toggleLock = (s: RunState): RunState => ({ ...s, locked: !s.locked });
 
+/** Equipment Liquidation: sell an item from the inventory (prices assumed: RULE_ASSUMED.sellItem). */
+export const canSellItems = (s: RunState) => owns(s, "Equipment Liquidation") || owns(s, "Equipment Liquidation+");
+export function itemPrice(pack: CwPack, item: string): number | null {
+  const k = itemKind(pack, item);
+  if (item === "Wealth Gem") return RULE_ASSUMED.sellItem.gem;
+  if (k === "advanced") return isPrivileged(item) ? RULE_ASSUMED.sellItem.privileged : RULE_ASSUMED.sellItem.advanced;
+  return k === "basic" || k === "emblem" ? RULE_ASSUMED.sellItem[k] : null;
+}
+export function sellItem(s0: RunState, pack: CwPack, bagIndex: number): RunState {
+  const it = s0.bag[bagIndex];
+  const price = it ? itemPrice(pack, it) : null;
+  if (!it || price === null || !canSellItems(s0) || s0.phase !== "prep") return s0;
+  const [s] = step(s0);
+  return log({ ...s, gold: s.gold + price, bag: s.bag.filter((_, i) => i !== bagIndex) }, `Equipment Liquidation: sold ${it} for ${price}.`);
+}
+
 /** Equip a bag item. A basic item on a unit holding a basic item combines into the advanced one. Consumables are used on the unit. */
 export function equip(s0: RunState, pack: CwPack, bagIndex: number, spot: Spot): RunState {
   const item = s0.bag[bagIndex];
@@ -1497,16 +1626,25 @@ export function equip(s0: RunState, pack: CwPack, bagIndex: number, spot: Spot):
   if (isOre(item)) return note(s0, "Tap an ore to open it.");
   if (isComponent(pack, item)) {
     const i = items.findIndex((x) => isComponent(pack, x) && combineResult(pack, x, item));
-    if (i >= 0) { made = combineResult(pack, items[i], item)!; items[i] = made; }
+    if (i >= 0) { made = solvent(s0, pack, combineResult(pack, items[i], item)!); items[i] = made; }
   }
   if (!made) {
     if (items.length >= RULES.itemsPerUnit) return note(s0, `${u.name} already holds ${RULES.itemsPerUnit} items.`);
     items = [...items, item];
   }
   const [s] = step(s0);
+  let bag = s.bag.filter((_, i) => i !== bagIndex);
+  let fused: string | null = null;
+  // Fortune's Favor: synthesizing advanced equipment gives a Good Fortune Token instead.
+  if (made && itemKind(pack, made) === "advanced" && owns(s, "Fortune's Favor")) { items = items.filter((x) => x !== made); bag = [...bag, "Good Fortune Token"]; }
+  // Fusion Summon: two identical advanced items on one character fuse into the privileged one.
+  if (owns(s, "Fusion Summon")) {
+    const dup = items.find((x, i) => itemKind(pack, x) === "advanced" && !isPrivileged(x) && items.indexOf(x) !== i);
+    if (dup) { items = [...items.filter((x) => x !== dup), privileged(dup)]; fused = privileged(dup); }
+  }
   const zone = [...s[spot.zone]]; zone[spot.index] = { ...u, items };
-  const bag = s.bag.filter((_, i) => i !== bagIndex);
-  const out = { ...s, [spot.zone]: zone, bag };
+  const out0 = { ...s, [spot.zone]: zone, bag };
+  const out = fused ? log(out0, `Fusion Summon: ${u.name}'s two ${baseItem(fused)} → ${fused}.`) : out0;
   return made ? afterSynthesis(log(out, `${u.name}: ${item} combined into ${made}.`), [u.items.find((x) => isComponent(pack, x) && combineResult(pack, x, item)) ?? item, item].filter((x) => isBasic(pack, x))) : out;
 }
 
@@ -1568,10 +1706,12 @@ export function combineBag(s0: RunState, pack: CwPack, i: number, j: number): Ru
     const bag = [...s.bag]; bag[gi] = out;
     return log({ ...s, bag: bag.filter((_, k) => k !== ti) }, `${t}: ${g} → ${out}.`);
   }
-  const r = a && b && i !== j && isComponent(pack, a) && isComponent(pack, b) ? combineResult(pack, a, b) : null;
+  const r0 = a && b && i !== j && isComponent(pack, a) && isComponent(pack, b) ? combineResult(pack, a, b) : null;
+  const r = r0 && solvent(s0, pack, r0);
   if (!r) return note(s0, "Those two don't combine.");
   const [s] = step(s0);
-  return afterSynthesis(log({ ...s, bag: [...s.bag.filter((_, k) => k !== i && k !== j), r] }, `${a} + ${b} → ${r}.`), [a, b].filter((x) => isBasic(pack, x)));
+  const favor = itemKind(pack, r) === "advanced" && owns(s, "Fortune's Favor");
+  return afterSynthesis(log({ ...s, bag: [...s.bag.filter((_, k) => k !== i && k !== j), favor ? "Good Fortune Token" : r] }, `${a} + ${b} → ${r}.`), [a, b].filter((x) => isBasic(pack, x)));
 }
 
 /** Phases when you can open ores (any time you're in the run, not on its end screen). */
@@ -1696,7 +1836,9 @@ export function ahaStats(s: RunState, pack: CwPack, star = ahaStar(s, pack)): Ah
   const i = Math.min(3, star - 1);
   let st = addStats(zeroStats(), { str: AHA.strength[i] / 100, dmg: AHA.dmg[i] / 100, lucky: AHA.lucky[i] / 100, luckyDmg: AHA.luckyDmg[i] / 100 });
   for (const it of s.aha?.items ?? []) st = addStats(st, itemEffect(pack, it, { place: "on", stars: star, boss: false }).self);
-  return { star, strength: st.str + (st.on + st.off) / 2, dmg: st.dmg, lucky: st.lucky, luckyDmg: st.luckyDmg, spdAmp: st.spd };
+  // Aha is Amused: with the Elation Bond active (Aha is only here then), Aha gains 40% DMG Amplification.
+  const amused = s.strategies.some((x) => x.name === "Aha is Amused") ? 0.4 : 0;
+  return { star, strength: st.str + (st.on + st.off) / 2, dmg: st.dmg + amused, lucky: st.lucky, luckyDmg: st.luckyDmg, spdAmp: st.spd };
 }
 
 /** Equipment slots Aha has for advanced pieces (= THEIR star). */
@@ -1871,6 +2013,11 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const [s1, rng] = step(s0);
   let s = s1;
   const kind = nodeKind(s);
+  // Resolution: Planet of Entertainment: entering combat with 180 gold turns the rest of the run's non-Boss nodes into Reward nodes.
+  if (owns(s, "Resolution: Planet of Entertainment") && s.gold >= 180 && !ruleN(s, "planet")) {
+    const at0 = { plane: s.plane, node: s.node };
+    s = log(setRule({ ...s, layout: RULES.planes.map((_, p) => nodeKinds(p, s).map((k, i) => (k !== "Boss" && (p > at0.plane || (p === at0.plane && i > at0.node)) ? "Reward" : k))) }, "planet", 1), "Resolution: Planet of Entertainment: the remaining non-Boss nodes become Reward nodes.");
+  }
   const tp = teamPower(s, pack);
   const { power } = tp;
   // Bubble Wolf's Trotters (own RNG stream, so other rolls stay the same).
@@ -1885,8 +2032,9 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const boss = kind === "Boss";
   const base = RULES.hpLoss[s.plane][boss ? 1 : 0];
   const cleared = won ? 1 : Math.max(0.05, Math.min(0.95, (power / Math.max(1, enemy)) * 0.9));
-  const hpLost = won ? 0 : Math.round((base + Math.round((1 - cleared) * base)) * (s.advantage?.includes("safety") ? 0.9 : 1) * (owns(s, "Cost of Expansion") ? 2 : 1));
-  const streak = kind === "Reward" ? s.streak : won ? s.streak + 1 : 0;
+  const hpLost = won ? 0 : Math.round((base + Math.round((1 - cleared) * base)) * (s.advantage?.includes("safety") ? 0.9 : 1) * (owns(s, "Cost of Expansion") ? 2 : 1) * (owns(s, "Resolution: Planet of Entertainment") ? 2 : 1)) + (owns(s, "Obstinate") ? 5 : 0);
+  // Obstinate: a lost fight keeps the win streak.
+  const streak = kind === "Reward" ? s.streak : won ? s.streak + 1 : owns(s, "Obstinate") ? s.streak : 0;
   const interest = Math.min(s.interestCap, Math.floor(s.gold / RULES.interestPer));
   const adv = s.advantage ?? [];
   let streakGold: number = won && kind !== "Reward" ? ASSUMED.streakBonus[Math.min(streak, ASSUMED.streakBonus.length - 1)] : 0;
@@ -1969,7 +2117,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
     s = afterFight(s, won);
   }
   const finalNode = s.plane === RULES.planes.length - 1 && s.node === nodeKinds(s.plane, s).length - 1;
-  s = ruleAfterFight(s, pack, { kind, won, avLeft: won && timeline.limit ? Math.max(0, timeline.limit - timeline.end) : 0, idle: tp.idle.length + deployed(s).filter((u) => u.npc).length, bonds: tp.bonds.length, last: finalNode });
+  s = ruleAfterFight(s, pack, { kind, won, avLeft: won && timeline.limit ? Math.max(0, timeline.limit - timeline.end) : 0, idle: tp.idle.length + deployed(s).filter((u) => u.npc).length, bonds: tp.bonds.length, last: finalNode, falls: timeline.events.filter((e) => e.kind === "fall").length, maxPower: Math.max(0, ...tp.per.map((p) => p.power)) });
   // Advantage Layout after-fight effects.
   // Safety first: at 0 HP the run is over unless the Safety Mechanism catches it; healing never revives.
   if (adv.includes("safety") && s.hp <= 0 && !(s.advantageUsed ?? []).includes("safety")) s = log({ ...s, hp: 1, advantageUsed: [...(s.advantageUsed ?? []), "safety"] }, "Safety Mechanism: squad HP stays at 1.");
