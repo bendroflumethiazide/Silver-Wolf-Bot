@@ -1,14 +1,14 @@
 import { wikiQueryAll, wikiText, WIKI } from "../wiki/fandom";
 import {
-  parseBonds, parseCharacters, parseCharInfo, parseCurrentSeason, parseDifficulty, parseEnvironments, parseEquipment, parseOdds,
+  parseBonds, parseCharacters, parseCharInfo, parseCurrentSeason, parseDifficulty, parseEnvironments, parseEquipment, parseOdds, parseRareEquipment,
   parseOpponents, parseStrategies,
-  type BondTier, type CwAdvancedItem, type CwBasicItem, type CwBond, type CwCharacter, type CwCharInfo, type CwDifficulty,
+  type BondTier, type CwAdvancedItem, type CwBasicItem, type CwEmblem, type CwGem, type CwBond, type CwCharacter, type CwCharInfo, type CwDifficulty,
   type CwNamed, type CwOdds, type CwOpponent, type CwStrategy,
 } from "./parse";
 
 export const CW_PACK_KEY = "cwPack";
 /** Bump when CwPack gains fields, so the page can ask for a re-download. */
-export const CW_PACK_SCHEMA = 2;
+export const CW_PACK_SCHEMA = 3;
 
 export interface CwPack {
   schema?: number;
@@ -19,7 +19,7 @@ export interface CwPack {
   odds: CwOdds[];
   /** Page the shop odds came from (the current season's page may not list them yet). */
   oddsFrom: string;
-  equipment?: { basic: CwBasicItem[]; advanced: CwAdvancedItem[] };
+  equipment?: { basic: CwBasicItem[]; advanced: CwAdvancedItem[]; emblems?: CwEmblem[]; gems?: CwGem[] };
   environments?: CwNamed[];
   strategies?: CwStrategy[];
   opponents?: CwOpponent[];
@@ -76,7 +76,7 @@ export async function downloadCwPack(fetchFn: typeof fetch = fetch): Promise<CwP
   const info = await downloadCharInfo(characters.map((c) => c.name), cur.season, fetchFn).catch(() => ({}));
   return {
     schema: CW_PACK_SCHEMA, season: cur.season, version: cur.version, characters, bonds, odds, oddsFrom,
-    equipment: parseEquipment(equipText), environments: parseEnvironments(envText), strategies: parseStrategies(stratText),
+    equipment: { ...parseEquipment(equipText), ...parseRareEquipment(equipText) }, environments: parseEnvironments(envText), strategies: parseStrategies(stratText),
     opponents: parseOpponents(oppText), difficulty: parseDifficulty(oppText), info,
     fetchedAt: new Date().toISOString(), source: WIKI.name, license: WIKI.license,
   };

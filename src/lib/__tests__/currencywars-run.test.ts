@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { cardNames, cleanWikitext, parseCharInfo, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
+import { buildTimeline, hpAt } from "../currencywars/timeline";
+import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
+import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
-  ASSUMED, advance, applyEffect, skipSupply, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
+  ASSUMED, advance, applyEffect, enterNode, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
   nodeKind, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState,
 } from "../currencywars/run";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
@@ -205,7 +207,18 @@ const PACK: CwPack = {
   ],
   odds: [[1, [1, 0, 0, 0, 0]], [2, [1, 0, 0, 0, 0]], [3, [1, 0, 0, 0, 0]], [4, [0.65, 0.25, 0.1, 0, 0]], [5, [0.45, 0.33, 0.2, 0.02, 0]], [6, [0.3, 0.4, 0.25, 0.05, 0]], [7, [0.19, 0.3, 0.4, 0.1, 0.01]], [8, [0.18, 0.25, 0.32, 0.22, 0.03]], [9, [0.15, 0.2, 0.25, 0.3, 0.1]], [10, [0.05, 0.1, 0.2, 0.4, 0.25]]].map(([level, odds]) => ({ level: level as number, odds: odds as number[] })),
   oddsFrom: "test",
-  equipment: eq,
+  equipment: {
+    ...eq,
+    emblems: [
+      { name: "Stellaron Hunters Emblem", bond: "Stellaron Hunters", stats: ["DMG Mitigation 15%"], effect: 'Grants wearer the "Stellaron Hunters" Bond.', users: [], recipe: ["Red Gem", "Folding Knife"] },
+      { name: "Heal Emblem", bond: "Heal", stats: [], effect: 'Grants the wearer the "Heal" Bond.', users: [], recipe: null },
+    ],
+    gems: [
+      { name: "Red Gem", effect: "Used to synthesize Faction Emblems.", recipes: [] },
+      { name: "Blue Gem", effect: "Used to synthesize School Emblems.", recipes: [] },
+      { name: "Wealth Gem", effect: "Owning a Gem increases the team size limit by 1.", recipes: [["Red Gem", "Red Gem"], ["Red Gem", "Blue Gem"]] },
+    ],
+  },
   environments: parseEnvironments(ENV),
   strategies: parseStrategies(STRAT),
   opponents: parseOpponents(OPP),
@@ -234,7 +247,16 @@ function autoplay(seed: string, rank = "A0-1", smart = true): RunState {
           const free = s[zone].findIndex((x) => !x);
           if (free >= 0) s = moveUnit(s, { zone: "bench", index: i }, { zone, index: free });
         }
-        while (s.bag.length) { const target = deployed(s).find((u) => u.items.length < 3); if (!target) break; const spot = (["on", "off"] as const).map((z) => ({ zone: z, index: s[z].findIndex((x) => x?.uid === target.uid) })).find((x) => x.index >= 0)!; const n = equip(s, PACK, 0, spot); if (n === s) break; s = n; }
+        for (let g = 0; g < 20; g++) { const i = s.bag.findIndex((x) => /Crystal Ore/.test(x)); if (i < 0) break; const n = openOre(s, PACK, i); if (n.bag.length >= s.bag.length && n.gold === s.gold) break; s = n; }
+        for (let g = 0; g < 20; g++) {
+          const bi = s.bag.findIndex((x) => !/Crystal Ore/.test(x));
+          const target = deployed(s).find((u) => u.items.length < 3);
+          if (bi < 0 || !target) break;
+          const spot = (["on", "off"] as const).map((z) => ({ zone: z, index: s[z].findIndex((x) => x?.uid === target.uid) })).find((x) => x.index >= 0)!;
+          const n = equip(s, PACK, bi, spot);
+          if (n.bag.length >= s.bag.length) break;
+          s = n;
+        }
       }
       s = battle(s, PACK);
     }
@@ -386,5 +408,139 @@ describe("Currency Wars run simulator", () => {
     expect(autoplay("s3")).toEqual(smart[3]);
     const goals = objectives(smart[0], PACK);
     expect(goals).toHaveLength(6);
+  });
+});
+
+describe("emblems, gems and Crystal Ores", () => {
+  const RARE = `====Diamond & Treasure Gem====
+{|class="wikitable"
+! Equipment !! Tags !! Effect !! Synthesis
+|-
+| [[File:Equipment Red Gem.png|50px]]<br />Red Gem
+| Diamond
+| Used to synthesize Faction Emblems.<br /><br />''"quote"''
+| N/A
+|-
+| [[File:Equipment Wealth Gem.png|50px]]<br />Wealth Gem
+| Diamond
+| Owning a Gem increases the team size limit by 1.
+| {{nowrap|[[File:Equipment Red Gem.png|40px]] + [[File:Equipment Red Gem.png|40px]]}}<br />{{nowrap|[[File:Equipment Red Gem.png|40px]] + [[File:Equipment Blue Gem.png|40px]]}}
+|}
+====Emblem====
+{|class="wikitable"
+! Equipment !! Tags !! Stats !! Effect !! Users !! Synthesis
+|-
+| [[File:Equipment A Emblem.png|50px]]<br />Galactic Voyager Emblem
+| Emblem
+| {{Icon|Break Efficiency}} Break Efficiency 40%
+| Grants the wearer the "Galactic Voyager" Bond.
+| {{Card List|Fugue|type=x}}
+| {{nowrap|[[File:Equipment Red Gem.png|40px]] + [[File:Equipment Aether Drill.png|40px]]}}
+|-
+| [[File:Equipment A Emblem.png|50px]]<br />Galactic Voyager Emblem
+| Emblem
+| x
+| Grants wearer the "Galactic Voyager" Bond.
+| x
+| N/A
+|-
+| [[File:Equipment B Emblem.png|50px]]<br />Astropolis Merchant Guild Emblem
+| Emblem
+| {{Icon|DMG Amplification}} DMG Amplification 15%
+| Grants wearer the "Astropolis Merchant Guild" Bond.
+| {{Card List|Jade|type=x}}
+| N/A
+|}`;
+
+  it("parses emblems (both wordings, no duplicates) and gem recipes", () => {
+    const r = parseRareEquipment(RARE);
+    expect(r.emblems.map((e) => [e.name, e.bond, e.recipe])).toEqual([["Galactic Voyager Emblem", "Galactic Voyager", ["Red Gem", "Aether Drill"]], ["Astropolis Merchant Guild Emblem", "Astropolis Merchant Guild", null]]);
+    expect(r.gems.map((g) => [g.name, g.recipes.length])).toEqual([["Red Gem", 0], ["Wealth Gem", 2]]);
+    expect(r.gems[0].effect).toBe("Used to synthesize Faction Emblems.");
+  });
+
+  it("Labor Dispatch Contract gives an emblem and a Bond character at each Boss node", () => {
+    const s = chooseEnvironment(newRun(PACK, "ld", "A0-1"), PACK, 1);
+    const [a, applied] = applyEffect(s, PACK, "Gain a random emblem. Each time you enter a Boss Node, receive a random character with the corresponding Bond.", createRng("e"));
+    const emblem = a.bag.find((x) => x.endsWith("Emblem"))!;
+    expect(emblem).toBeTruthy();
+    expect(a.dispatchBond).toBe(emblem.replace(" Emblem", ""));
+    expect(applied.join(" ")).toMatch(/Boss node/);
+    const atBoss = enterNode({ ...a, plane: 0, node: 8, phase: "result", dispatchBond: "Stellaron Hunters" }, PACK);
+    expect(atBoss.log.at(-1) ?? "").toBeDefined();
+    expect(atBoss.log.some((l) => /Labor Dispatch: (Kafka|Welt|Pearl)/.test(l))).toBe(true);
+  });
+
+  it("an equipped Emblem joins its Bond; gems combine; a Wealth Gem raises team size", () => {
+    let s = chooseEnvironment(newRun(PACK, "em", "A0-1"), PACK, 1);
+    s = { ...s, on: [{ uid: 1, name: "Kafka", cost: 5, stars: 1, items: [] }, { uid: 2, name: "Robin", cost: 2, stars: 1, items: [] }, null, null], off: Array(6).fill(null), bench: Array(9).fill(null), bag: ["Stellaron Hunters Emblem"] };
+    expect(teamPower(s, PACK).bonds.map((b) => b.bond.name)).toEqual([]);
+    s = equip(s, PACK, 0, { zone: "on", index: 1 });
+    expect(teamPower(s, PACK).bonds.map((b) => [b.bond.name, b.count])).toEqual([["Stellaron Hunters", 2]]);
+    expect(combineResult(PACK, "Folding Knife", "Red Gem")).toBe("Stellaron Hunters Emblem");
+    expect(combineBag({ ...s, bag: ["Red Gem", "Folding Knife"] }, PACK, 0, 1).bag).toEqual(["Stellaron Hunters Emblem"]);
+    expect(combineBag({ ...s, bag: ["Red Gem", "Blue Gem"] }, PACK, 0, 1).bag).toEqual(["Wealth Gem"]);
+    expect(combinations(PACK, "Folding Knife").map((c) => c.makes)).toEqual(["Firestorm Surge", "Stellaron Hunters Emblem"]);
+    expect(teamSize({ ...s, bag: ["Wealth Gem"] })).toBe(teamSize(s) + 1);
+  });
+
+  it("opens ores: fixed-gold ores pay exactly, tier ores give something and count as opened", () => {
+    let s = chooseEnvironment(newRun(PACK, "ore", "A0-1"), PACK, 1);
+    s = { ...s, bag: [goldOreName(8), oreName("Blue")], gold: 0 };
+    const a = openOre(s, PACK, 0);
+    expect(a.gold).toBe(8);
+    expect(a.bag).toEqual([oreName("Blue")]);
+    expect(a.stats.goldEarned).toBe(s.stats.goldEarned + 8);
+    const b = openOre(a, PACK, 0);
+    expect(b.bag.filter(isOre)).toHaveLength(0);
+    expect(b.stats.oresOpened).toBe(2);
+    expect(b.note).toMatch(/^Opened Blue Crystal Ore: .+/);
+    expect(describeItem(PACK, oreName("Prismatic")).details.length).toBeGreaterThan(0);
+  });
+
+  it("Reward nodes drop ores; Prismatic Ore and Gold Miner strategies work; Print More Money gives an ore", () => {
+    let s = chooseEnvironment(newRun(PACK, "rw", "A0-1"), PACK, 1);
+    const [st] = applyEffect(s, PACK, "Get an extra Prismatic Crystal Ore that is packed with valuable treasures at the next Reward Node.", createRng("p"));
+    s = { ...st, phase: "prep", plane: 0, node: 0 };
+    const r = battle(s, PACK);
+    expect(r.last!.kind).toBe("Reward");
+    expect(r.last!.ores!.length).toBe(ASSUMED.rewardOres + 1);
+    expect(r.bag).toContain(oreName("Prismatic"));
+    expect(r.pendingOres).toEqual([]);
+    const [gm] = applyEffect(s, PACK, "When opening a crystal ore, there is a 50% chance to obtain a crystal ore of one tier lower, with a very small chance to obtain a Prismatic Crystal Ore. Immediately obtains a Gold Crystal Ore.", createRng("g"));
+    expect(gm.oreEcho).toBe(true);
+    expect(gm.bag).toContain(oreName("Gold"));
+    const [pm] = applyEffect(s, PACK, "Gains a crystal ore worth 6/8/12 Gold Coin(s) at the start of Plane 1/2/3 respectively.", createRng("m"));
+    const p2 = enterNode({ ...pm, plane: 1, node: 0 }, PACK);
+    expect(p2.bag).toContain(goldOreName(8));
+  });
+});
+
+describe("battle timeline", () => {
+  const allies = [{ name: "Kafka", cost: 5, stars: 2 as const, power: 600, place: "on" as const }, { name: "Pearl", cost: 1, stars: 1 as const, power: 0, place: "on" as const }];
+  const foes = Array.from({ length: 5 }, (_, i) => ({ name: `Grunt ${i}` }));
+  it("a win ends with every enemy at 0 HP before the limit, and idle allies never act", () => {
+    const tl = buildTimeline({ allies, enemies: foes, waves: 2, won: true, cleared: 1, ratio: 1.3, limit: 150, bossPhases: 2, reviveCost: 15 }, createRng("w"));
+    const end = hpAt(tl, tl.end);
+    expect(tl.units.filter((u) => u.side === "enemy").every((u) => end.get(u.id) === 0)).toBe(true);
+    expect(tl.end).toBeLessThan(150);
+    expect(tl.kills).toBe(5);
+    expect(tl.events.some((e) => e.kind === "wave")).toBe(true);
+    expect(tl.events.filter((e) => e.kind === "hit" && e.from === "a1")).toHaveLength(0);
+    expect(tl.events.every((e, i) => i === 0 || tl.events[i - 1].t <= e.t)).toBe(true);
+  });
+  it("a loss runs out of Action Value with the same share cleared", () => {
+    const tl = buildTimeline({ allies, enemies: foes, waves: 2, won: false, cleared: 0.4, ratio: 0.6, limit: 125, bossPhases: 2, reviveCost: 15 }, createRng("l"));
+    const end = hpAt(tl, tl.end);
+    const enemies = tl.units.filter((u) => u.side === "enemy");
+    const max = enemies.reduce((n, u) => n + u.maxHp, 0), left = enemies.reduce((n, u) => n + (end.get(u.id) ?? 0), 0);
+    expect(tl.end).toBe(125);
+    expect(1 - left / max).toBeCloseTo(0.4, 1);
+    expect(tl.events.at(-1)!.text).toBe("Out of Action Value");
+  });
+  it("a boss breaks through its phases on a win", () => {
+    const tl = buildTimeline({ allies, enemies: [{ name: "Big Boss", boss: true }], waves: 1, won: true, cleared: 1, ratio: 1.2, limit: 150, bossPhases: 3, reviveCost: 35 }, createRng("b"));
+    expect(tl.events.filter((e) => e.kind === "phase")).toHaveLength(2);
+    expect(tl.events.some((e) => e.kind === "kill")).toBe(true);
   });
 });

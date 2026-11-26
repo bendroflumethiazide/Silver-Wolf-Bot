@@ -20,6 +20,7 @@ export const GUIDES: GuideMeta[] = [
   { slug: "paths", section: "Game knowledge", title: "Paths", blurb: "What each role does", image: { kind: "path" } },
   { slug: "modes", section: "Game knowledge", title: "Game modes", blurb: "What each mode is for", image: { kind: "item", id: "33" }, href: "/game-modes" },
   { slug: "currency-wars", section: "Game knowledge", title: "Currency Wars", blurb: "Every mechanic, 4.7 changes, rewards", image: { kind: "item", id: "252" } },
+  { slug: "crystal-ores", section: "Game knowledge", title: "Crystal Ores", blurb: "Currency Wars orbs: tiers, sources, value", image: { kind: "item", id: "252" } },
   { slug: "endgame", section: "Game knowledge", title: "Endgame", blurb: "Your endgame hub", image: { kind: "item", id: "241" }, href: "/endgame" },
 
   { slug: "relics-101", section: "Gearing", title: "Relics 101", blurb: "Slots, sets, main stats", image: { kind: "relicSet", id: "114" } },

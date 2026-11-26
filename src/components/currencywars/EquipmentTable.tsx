@@ -79,6 +79,34 @@ export function EquipmentTable({ pack }: { pack: CwPack }) {
         </ul>
         <div className="mt-3"><Notice>Each character holds up to 3 items. A Disassembly Wrench takes items off; a Smelting Furnace rerolls an item into another of the same quality.</Notice></div>
       </Panel>
+
+      {(eq.emblems?.length ?? 0) > 0 && (
+        <Panel title={`Emblems (${eq.emblems!.length})`}>
+          <p className="mb-3 text-xs text-muted">An Emblem puts its wearer in that Bond and counts toward it. Red Gem + a basic item makes a Faction Emblem; Blue Gem + a basic item makes a School Emblem.</p>
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {eq.emblems!.map((e) => (
+              <li key={e.name} className="rounded-lg border border-amber-200/25 p-2.5">
+                <div className="flex items-center gap-2"><ItemIcon pack={pack} name={e.name} size={18} /><b className="text-sm">{e.name}</b></div>
+                <p className="mt-1 text-xs text-muted">{e.effect}</p>
+                <p className="mt-1 text-[11px] text-faint">{e.stats.join(" · ")}{e.recipe ? ` · ${e.recipe[0]} + ${e.recipe[1]}` : " · not craftable"}</p>
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
+      {(eq.gems?.length ?? 0) > 0 && (
+        <Panel title="Gems">
+          <ul className="grid gap-2 sm:grid-cols-3">
+            {eq.gems!.map((g) => (
+              <li key={g.name} className="rounded-lg border border-line p-2.5">
+                <div className="flex items-center gap-2"><ItemIcon pack={pack} name={g.name} size={18} /><b className="text-sm">{g.name}</b></div>
+                <p className="mt-1 text-xs text-muted">{g.effect}</p>
+                {g.recipes.length > 0 && <p className="mt-1 text-[11px] text-faint">From {g.recipes.map(([a, b]) => `${a} + ${b}`).join(" or ")}</p>}
+              </li>
+            ))}
+          </ul>
+        </Panel>
+      )}
     </div>
   );
 }

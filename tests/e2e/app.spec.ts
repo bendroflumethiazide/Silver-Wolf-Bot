@@ -238,12 +238,35 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await page.getByRole("button", { name: "Download Currency Wars data" }).click();
   await page.getByRole("button", { name: "Start run" }).click();
   const cards = (title: RegExp) => page.locator("section").filter({ has: page.getByRole("heading", { name: title }) }).locator("div.grid > button");
-  await cards(/Choose an Investment Environment/).first().click();
+  // Labor Dispatch-style environment: the emblem must show up in Items (bug fix).
+  await cards(/Choose an Investment Environment/).filter({ hasText: "Fixture Dispatch" }).click();
   await expect(page.getByText(/deployed/)).toBeVisible();
   await expect(page.getByText(/Plane 1/).first()).toBeVisible();
-  // Reward node: always cleared.
+  const emblem = page.getByRole("button", { name: "Grove Guild Emblem" });
+  await expect(emblem).toBeVisible();
+  // Item details: what it does and what it's made from.
+  await emblem.click();
+  const details = page.getByRole("region", { name: "Grove Guild Emblem details" });
+  await expect(details.getByText(/Grants the wearer the "Grove Guild" Bond/)).toBeVisible();
+  await expect(details.getByText(/Made from: Red Gem \+ Folding Knife/)).toBeVisible();
+  await details.getByRole("button", { name: "Close item details" }).click();
+  // Battle viewer: HP bars, elapsed time, speed, skip.
   await page.getByRole("button", { name: "Battle", exact: true }).click();
+  await expect(page.getByText(/Elapsed/)).toBeVisible();
+  await expect(page.getByText("Your squad")).toBeVisible();
+  await page.getByRole("radio", { name: "4×" }).click();
+  await expect(page.getByRole("radio", { name: "4×" })).toHaveAttribute("aria-checked", "true");
+  await page.getByRole("button", { name: "Skip" }).click();
+  await expect(page.getByText("All enemies defeated")).toBeVisible();
+  await page.getByRole("button", { name: /See results/ }).click();
   await expect(page.getByRole("heading", { name: "Reward node cleared" })).toBeVisible();
+  // Reward nodes drop Crystal Ores: tap one to open it.
+  const ore = page.getByRole("button", { name: /Crystal Ore$/ }).first();
+  await expect(ore).toBeVisible();
+  const oresBefore = await page.getByRole("button", { name: /Crystal Ore$/ }).count();
+  await ore.click();
+  await expect(page.getByRole("status")).toContainText(/Opened .* Crystal Ore/);
+  expect(await page.getByRole("button", { name: /Crystal Ore$/ }).count()).toBe(oresBefore - 1);
   await page.getByRole("button", { name: /Next node/ }).click();
   // Buy XP spends 4 gold; Lock toggles.
   const gold = async () => Number((await page.getByText(/\d+ gold$/).first().innerText()).match(/\d+/)![0]);
@@ -274,5 +297,7 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await expect(page.getByText("Off-Field (1)")).toBeVisible();
   await page.goto("/guides/view?g=currency-wars");
   await expect(page.getByRole("heading", { name: /Every mechanic/ })).toBeVisible();
+  await page.goto("/guides/view?g=crystal-ores");
+  await expect(page.getByRole("heading", { name: /Every Crystal Ore/ })).toBeVisible();
   expect(errors).toEqual([]);
 });

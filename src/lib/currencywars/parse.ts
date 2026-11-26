@@ -170,6 +170,38 @@ export interface CwAdvancedItem {
   recipe: [string, string];
 }
 
+export interface CwEmblem {
+  name: string;
+  /** The Bond it grants its wearer. */
+  bond: string;
+  stats: string[];
+  effect: string;
+  users: string[];
+  recipe: [string, string] | null;
+}
+export interface CwGem { name: string; effect: string; recipes: [string, string][] }
+
+const pairs = (cell: string): [string, string][] => {
+  const names = [...cell.matchAll(/File:Equipment[ _]([^|\]]+?)\.png/g)].map((m) => m[1].replace(/_/g, " ").trim());
+  const out: [string, string][] = [];
+  for (let i = 0; i + 1 < names.length; i += 2) out.push([names[i], names[i + 1]]);
+  return out;
+};
+
+/** Emblems (each grants a Bond) and the Diamond gems, from the "Other Equipment" tables. */
+export function parseRareEquipment(wikitext: string): { emblems: CwEmblem[]; gems: CwGem[] } {
+  const e = headingAt(wikitext, "Emblem");
+  const g = headingAt(wikitext, "Diamond & Treasure Gem");
+  const emblems: CwEmblem[] = e < 0 ? [] : wikiTableRows(wikitext, e).filter((r) => r.length >= 4).map((r) => {
+    const effect = cleanWikitext(r[3]);
+    return { name: nameCell(r[0]), bond: /Grants (?:the )?wearer the "([^"]+)" Bond/.exec(effect)?.[1] ?? "", stats: lines(r[2]), effect, users: cardNames(r[4] ?? ""), recipe: pairs(r[5] ?? "")[0] ?? null };
+  }).filter((x, i, all) => x.name && x.bond && all.findIndex((y) => y.name === x.name) === i);
+  const gems: CwGem[] = g < 0 ? [] : wikiTableRows(wikitext, g).filter((r) => r.length >= 3)
+    .map((r) => ({ name: nameCell(r[0]), effect: cleanWikitext(r[2]).split("\n")[0], recipes: pairs(r[3] ?? "") }))
+    .filter((x) => x.name);
+  return { emblems, gems };
+}
+
 /** Equipment page: basic items and the advanced items with their two-item recipes. */
 export function parseEquipment(wikitext: string): { basic: CwBasicItem[]; advanced: CwAdvancedItem[] } {
   const b = headingAt(wikitext, "Basic Equipment");

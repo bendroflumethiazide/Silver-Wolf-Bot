@@ -81,6 +81,19 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.4.0 Currency Wars items, ores and battle viewer
+
+- **Bug fixed:** Investment Environments that grant Emblems (e.g. "Labor Dispatch Contract": "Gain a random emblem…") gave nothing, because Emblems weren't modelled. Emblems are now parsed from the wiki (21), land in Items, put their wearer in their Bond (counting toward it), and Labor Dispatch Contract also gives a character of that Bond at each Boss node. "Obtain a X Emblem" environments and Lottery Purchase work too.
+- **Gems:** Red/Blue Gem + a basic item makes an Emblem; two gems make a Wealth Gem, which raises team size by 1 (wiki).
+- **Crystal Ores:** White, Blue, Gold and Prismatic orbs in Items; tap to open. Reward nodes drop them; Print More Money, Prismatic Ore(+), Bursting Ore, Cracked Quartz and Gold Miner work as written. What's inside a random ore isn't published, so the contents are listed in the app as guesses.
+- **Item details:** tap an item for what it does, what it's made from, and every combination (ones you can make now first, each result expandable).
+- **Battle viewer:** every Battle plays out with squad and enemy HP bars, waves, boss phases, Ultimate Instant, falls and revives, elapsed time, Action Value left, 1×/2×/4× speed, pause and skip. It replays the simulated result, so the outcome always matches.
+- **Crystal Ore guide** (8 sections) in Guides, separating what the wiki confirms from what it doesn't.
+- Found and fixed while testing: Gold Miner's text gave a Prismatic ore instead of the Gold one; a boss hit crossing two phase lines showed one phase change; the battle viewer and ore results appeared off-screen on phones.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **162/162** · E2E **13/13** on the server build and the static web edition (emblem environment, item details, battle viewer at 4× with skip, opening ores; phone-width checks). Calibration over 150 seeded runs on real wiki data: a simple bot clears A0 ~81%, A4 ~29%; a passive player never clears.
+
 ## 2026-11-26 · 1.3.0 Currency Wars update
 
 - **Bug fixed:** on phones the Currency Wars search box overlapped the "All" chip. Search now has its own row (checked by an E2E test).

@@ -8,6 +8,7 @@ import { useApp } from "@/lib/store";
 import { POOLS } from "@/lib/warp/rules";
 import { GameImage } from "../GameImage";
 import { Panel } from "../ui";
+import { CrystalOreGuide } from "./CrystalOreGuide";
 import { CurrencyWarsGuide } from "./CurrencyWarsGuide";
 
 const H = ({ children }: { children: ReactNode }) => <h2 className="mb-2 mt-5 text-base font-semibold text-text first:mt-0">{children}</h2>;
@@ -201,7 +202,7 @@ function Importing() {
 const BODY: Record<string, () => ReactNode> = {
   "start-here": StartHere, warps: Warps, leveling: Leveling, daily: Daily, elements: Elements, paths: Paths,
   "relics-101": Relics101, substats: Substats, farming: Farming, saving: Saving, import: Importing,
-  "currency-wars": CurrencyWarsGuide,
+  "currency-wars": CurrencyWarsGuide, "crystal-ores": CrystalOreGuide,
 };
 
 export function GuideContent({ slug }: { slug: string }) {

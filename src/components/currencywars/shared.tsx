@@ -1,6 +1,7 @@
 "use client";
 
-import { Clover, Coins, Crosshair, Flower2, Footprints, Pickaxe, Shield, Sparkles, Sword, Zap, type LucideIcon } from "lucide-react";
+import { Award, Clover, Coins, Crosshair, Flower2, Footprints, Gem, Pickaxe, Shield, Sparkles, Sword, Zap, type LucideIcon } from "lucide-react";
+import { emblemBond, oreGold, oreTier } from "@/lib/currencywars/items";
 import { useState } from "react";
 import { cwCharacterId } from "@/lib/currencywars/names";
 import type { BondTier, CwField } from "@/lib/currencywars/parse";
@@ -118,10 +119,22 @@ const BASIC_TONE: Record<string, string> = {
   "Flower of Life": "text-pink-300", "Batch Produced Armor": "text-amber-200", "Aether Drill": "text-orange-300", "Photon Cell": "text-yellow-300",
 };
 
-/** Icon for an item: basic items have their own; advanced items show their two parts. */
+/** Crystal Ore orbs by tier (White, Blue, Gold, Prismatic). */
+const ORE_ORB: Record<string, string> = {
+  White: "bg-[radial-gradient(circle_at_35%_30%,#fff,#a1a1aa)] text-zinc-200",
+  Blue: "bg-[radial-gradient(circle_at_35%_30%,#e0f2fe,#3b82f6_60%,#1e3a8a)] text-sky-400",
+  Gold: "bg-[radial-gradient(circle_at_35%_30%,#fef9c3,#f59e0b_60%,#92400e)] text-amber-400",
+  Prismatic: "bg-[conic-gradient(from_0deg,#f472b6,#facc15,#4ade80,#38bdf8,#a78bfa,#f472b6)] text-fuchsia-300",
+};
+
+/** Icon for an item: basic items have their own; advanced items show their two parts; ores are orbs. */
 export function ItemIcon({ pack, name, size = 16 }: { pack: CwPack; name: string; size?: number }) {
   const Basic = BASIC_ICON[name];
   if (Basic) return <Basic size={size} className={BASIC_TONE[name]} aria-hidden />;
+  const tier = oreTier(name) ?? (oreGold(name) !== null ? "Gold" : null);
+  if (tier) return <span aria-hidden className={cx("inline-block shrink-0 rounded-full shadow-[0_0_8px_currentColor] ring-1 ring-white/50", ORE_ORB[tier])} style={{ width: size, height: size }} />;
+  if (name === "Red Gem" || name === "Blue Gem" || name === "Wealth Gem") return <Gem size={size} className={name === "Red Gem" ? "text-rose-400" : name === "Blue Gem" ? "text-sky-400" : "text-amber-300"} aria-hidden />;
+  if (emblemBond(pack, name)) return <Award size={size} className="text-amber-200" aria-hidden />;
   const adv = pack.equipment?.advanced.find((a) => a.name === name);
   if (!adv) return <Sparkles size={size} className="text-violet-300" aria-hidden />;
   const [A, B] = adv.recipe.map((r) => BASIC_ICON[r] ?? Sparkles);

@@ -5,11 +5,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { WolfComment } from "@/components/SilverWolf";
 import { kvGet, kvSet } from "@/lib/db";
 import {
-  advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, isBasic, lineupValue,
+  advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
 } from "@/lib/currencywars/run";
+import { isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
+import { BattleView } from "./BattleView";
+import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Notice, Panel } from "../ui";
 import { BondList, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
 
@@ -106,7 +109,8 @@ function Report({ run, pack, onNext }: { run: RunState; pack: CwPack; onNext: ()
       <div className="grid gap-3 text-sm sm:grid-cols-3">
         <div><p className="text-xs text-muted">Fight</p><p>{r.opponent || "Enemies"}{r.enemies.length ? <span className="block text-xs text-faint">{r.enemies.join(", ")}</span> : null}</p>
           {r.kind !== "Reward" && <p className="mt-1 text-xs text-muted">Your strength {Math.round(r.power)} vs {Math.round(r.enemy)} · estimated win chance {Math.round(r.chance * 100)}%</p>}</div>
-        <div><p className="text-xs text-muted">Gold +{total}</p><p className="text-xs">Base {r.gold.base} · streak {r.gold.streak} · interest {r.gold.interest}{r.gold.drops ? ` · drops ${r.gold.drops}` : ""}</p>{r.item && <p className="mt-1 flex items-center gap-1 text-xs">Dropped <ItemIcon pack={pack} name={r.item} size={12} /> {r.item}</p>}</div>
+        <div><p className="text-xs text-muted">Gold +{total}</p><p className="text-xs">Base {r.gold.base} · streak {r.gold.streak} · interest {r.gold.interest}{r.gold.drops ? ` · drops ${r.gold.drops}` : ""}</p>{r.item && <p className="mt-1 flex items-center gap-1 text-xs">Dropped <ItemIcon pack={pack} name={r.item} size={12} /> {r.item}</p>}
+          {r.ores && r.ores.length > 0 && <p className="mt-1 flex flex-wrap items-center gap-1 text-xs">Ores: {r.ores.map((o, i) => <span key={i} className="inline-flex items-center gap-1"><ItemIcon pack={pack} name={o} size={11} />{o.replace(" Crystal Ore", "")}</span>)} <span className="text-faint">(in Items: tap to open)</span></p>}</div>
         <div><p className="text-xs text-muted">Squad</p><p className="text-xs">{r.won ? "No HP lost." : `Cleared about ${Math.round(r.cleared * 100)}% → −${r.hpLost} squad HP.`} +{r.xp} XP.</p></div>
       </div>
     </Panel>
@@ -147,11 +151,13 @@ function Rules() {
         <li>Shop odds by level, 3 copies merge into the next star, 3 items per character, 2 basic items combine by the wiki recipe table.</li>
         <li>Supply: 1 of 5 characters carrying a basic item. Strategies after the first fight of each plane; Gold/Prismatic raise enemy difficulty. Encounters from Jade Steel (A2). 3 random opponents, one boss per plane.</li>
         <li>Characters placed in the wrong position don&apos;t act (shown as IDLE); each character&apos;s On-/Off-Field Strength by star comes from their wiki page.</li>
+        <li>Emblems put their wearer in that Bond and count toward it; Red/Blue Gem + a basic item makes an Emblem; owning a Wealth Gem raises the team size by 1. Ore strategies (Prismatic Ore, Bursting Ore, Cracked Quartz, Gold Miner) work as written.</li>
       </ul>
       <p className="font-medium text-text">Not published, so guessed here:</p>
       <ul className="list-disc pl-4">
         <li>Base gold {ASSUMED.baseIncome} per fight, streak bonus {ASSUMED.streakBonus.join("/")}, Reward drops {ASSUMED.rewardGold.join("–")} gold, sell price = what you paid.</li>
         <li>{ASSUMED.xpPerBuy} XP per purchase, {ASSUMED.xpPerBattle} XP per fight, start at level {ASSUMED.startLevel}, deploy = level, XP to level up {lv} (the 84 matches the game).</li>
+        <li>Crystal Ores: tiers White, Blue, Gold and Prismatic are real, and ores hold gold, characters or equipment, but what&apos;s inside isn&apos;t published. Here: {ORE_TIERS.map((t) => `${t}: ${ORE_REWARDS[t].map((r) => r.label).join(" / ")}`).join("; ")}. Reward nodes drop {ASSUMED.rewardOres} ores (plane 1 odds {ORE_DROP_ODDS[0].map((x) => `${Math.round(x * 100)}%`).join("/")}).</li>
         <li>Up to {ASSUMED.onFieldSlots} On-Field slots. Fights are a strength comparison (stats, stars, items, bonds) with a win chance, not a real battle. Environment/Strategy effects the simulator can&apos;t model are listed as “not simulated”.</li>
       </ul>
     </Notice>
@@ -161,6 +167,10 @@ function Rules() {
 export function RunSim({ pack }: { pack: CwPack }) {
   const [run, setRun] = useState<RunState | null | undefined>(undefined);
   const [sel, setSel] = useState<Sel>(null);
+  /** An equipped item whose details are open. */
+  const [peek, setPeek] = useState<string | null>(null);
+  /** The fight being watched (by tick), so a reload shows the result instead of replaying. */
+  const [watching, setWatching] = useState<number | null>(null);
   useEffect(() => { let live = true; void kvGet<RunState | null>(RUN_KEY, null).then((r) => { if (live) setRun(r); }); return () => { live = false; }; }, []);
   // The ref keeps rapid clicks consistent; the save starts right away (not inside a state updater).
   const runRef = useRef<RunState | null | undefined>(undefined);
@@ -202,8 +212,16 @@ export function RunSim({ pack }: { pack: CwPack }) {
     if (at(run, spot)) setSel({ kind: "unit", spot });
   };
   const clickItem = (index: number) => {
+    const it = run.bag[index];
+    // Ores open on tap, any time during the run.
+    if (it && isOre(it)) { setSel(null); update((s) => openOre(s, pack, index)); return; }
     if (!prep) return;
-    if (sel?.kind === "item" && sel.index !== index) { update((s) => combineBag(s, pack, sel.index, index)); setSel(null); return; }
+    setPeek(null);
+    if (sel?.kind === "item" && sel.index !== index) {
+      const a = run.bag[sel.index];
+      const both = [itemKind(pack, a), itemKind(pack, it)];
+      if (both.every((k) => k === "basic" || k === "gem")) { update((s) => combineBag(s, pack, sel.index, index)); setSel(null); return; }
+    }
     setSel(sel?.kind === "item" && sel.index === index ? null : { kind: "item", index });
   };
   const zoneRow = (zone: Zone, title: string, cols: string) => (
@@ -222,7 +240,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
         : { mood: chance >= 0.6 ? "smug" : "neutral", line: prep ? `${NODE_LABEL[kind]} next|I give u ${Math.round(chance * 100)}%${tp?.idle.length ? `|${tp.idle[0]} is IDLE there btw` : ""}` : "Pick one|Choices matter", facts: [`Seed ${run.seed}, ${run.rank}.`] }} />
 
       <Hud run={run} />
-      {run.note && <p role="status" className="rounded-lg border border-amber-300/40 bg-amber-300/10 px-3 py-2 text-sm text-amber-100">{run.note}</p>}
+      {run.note && <p role="status" className={cx("rounded-lg border px-3 py-2 text-sm", run.note.startsWith("Opened") ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-amber-300/40 bg-amber-300/10 text-amber-100")}>{run.note}</p>}
 
       {run.phase === "environment" && (
         <Panel title="Choose an Investment Environment">
@@ -271,8 +289,12 @@ export function RunSim({ pack }: { pack: CwPack }) {
           </div>
         </Panel>
       )}
-      {run.phase === "result" && run.last && <Report run={run} pack={pack} onNext={() => { setSel(null); update((s) => advance(s, pack)); }} />}
-      {run.phase === "over" && <Summary run={run} pack={pack} onNew={quit} />}
+      {watching === run.tick && run.last?.timeline && (run.phase === "result" || run.phase === "over")
+        ? <BattleView key={run.tick} timeline={run.last.timeline} title={`P${run.plane + 1}-${run.node + 1} ${NODE_LABEL[run.last.kind]}${run.last.opponent ? ` vs ${run.last.opponent}` : ""}`} onDone={() => setWatching(null)} />
+        : <>
+          {run.phase === "result" && run.last && <Report run={run} pack={pack} onNext={() => { setSel(null); update((s) => advance(s, pack)); }} />}
+          {run.phase === "over" && <Summary run={run} pack={pack} onNew={quit} />}
+        </>}
 
       <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
         <Panel title={`Bonds${tp?.bonds.length ? ` (${tp.bonds.length} active)` : ""}`}>
@@ -297,20 +319,26 @@ export function RunSim({ pack }: { pack: CwPack }) {
                 <div className="flex flex-wrap gap-1.5">
                   {run.bag.map((it, i) => (
                     <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={it}
-                      className={cx("flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px]", sel?.kind === "item" && sel.index === i ? "border-cyan bg-cyan/15" : "border-line hover:border-cyan/50", !isBasic(pack, it) && "text-violet-200")}>
+                      className={cx("flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px]", sel?.kind === "item" && sel.index === i ? "border-cyan bg-cyan/15" : "border-line hover:border-cyan/50", itemKind(pack, it) === "advanced" && "text-violet-200", itemKind(pack, it) === "emblem" && "text-amber-100", isOre(it) && "border-white/20 bg-white/[0.04]")}>
                       <ItemIcon pack={pack} name={it} size={13} /> {it}
                     </button>
                   ))}
                 </div>
-              ) : <p className="text-xs text-faint">Reward and Supply nodes give items.</p>}
+              ) : <p className="text-xs text-faint">Reward and Supply nodes give items and Crystal Ores.</p>}
+              {run.note?.startsWith("Opened") && <p className="mt-1.5 text-xs text-cyan">{run.note}</p>}
             </div>
-            {sel?.kind === "item" && <p className="text-xs text-cyan">Tap a character to equip it, or another basic item to combine.</p>}
+            {sel?.kind === "item" && run.bag[sel.index] && (
+              <ItemDetail pack={pack} name={run.bag[sel.index]} owned={run.bag.filter((_, i) => i !== sel.index)} onClose={() => setSel(null)}
+                hint={itemKind(pack, run.bag[sel.index]) === "basic" || itemKind(pack, run.bag[sel.index]) === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it."} />
+            )}
+            {peek && !sel && <ItemDetail pack={pack} name={peek} owned={run.bag} onClose={() => setPeek(null)} />}
             {selUnit && sel?.kind === "unit" && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/[0.06] p-2 text-xs">
                 <Portrait name={selUnit.name} cost={selUnit.cost} size={30} />
                 <span className="min-w-0 flex-1">
                   <b className="text-text">{"★".repeat(selUnit.stars)} {selUnit.name}</b> <FieldTag field={pack.info?.[selUnit.name]?.field} />
-                  <span className="block text-muted">{bondsOf(pack, selUnit.name).join(" · ")} · On-Field {Math.round(unitPower(selUnit, "on", pack))} / Off-Field {Math.round(unitPower(selUnit, "off", pack))}{selUnit.items.length ? ` · ${selUnit.items.join(", ")}` : ""}</span>
+                  <span className="block text-muted">{bondsOf(pack, selUnit.name).join(" · ")} · On-Field {Math.round(unitPower(selUnit, "on", pack))} / Off-Field {Math.round(unitPower(selUnit, "off", pack))}</span>
+                  {selUnit.items.length > 0 && <span className="mt-1 flex flex-wrap gap-1">{selUnit.items.map((it, i) => <button key={i} type="button" onClick={() => { setPeek(it); setSel(null); }} className="inline-flex items-center gap-1 rounded border border-line px-1 py-0.5 hover:border-cyan/50"><ItemIcon pack={pack} name={it} size={11} />{it}</button>)}</span>}
                   <span className="block text-faint">Tap a slot to move it there.</span>
                 </span>
                 {sel.spot.zone === "bench"
@@ -333,7 +361,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
               <Button onClick={() => update(buyXp)} disabled={run.level >= ASSUMED.maxLevel}><span className="flex flex-col items-start leading-tight"><span className="text-xs">Buy XP · <Coins size={11} className="inline text-amber-300" /> {run.xpCost}</span><span className="text-[10px] text-faint">Lv.{run.level} {xpToNext(run.level) ? `${run.xp}/${xpToNext(run.level)}` : "max"}</span></span></Button>
               <Button onClick={() => update((s) => refresh(s, pack))}><RefreshCw size={14} /> {run.freeRefreshes ? `Free ×${run.freeRefreshes}` : <>Refresh · <Coins size={11} className="text-amber-300" /> {RULES.refreshCost}</>}</Button>
               <Button variant="ghost" onClick={() => update(toggleLock)} aria-pressed={run.locked}>{run.locked ? <Lock size={14} className="text-amber-300" /> : <LockOpen size={14} />} {run.locked ? "Locked" : "Lock shop"}</Button>
-              <Button variant="primary" onClick={() => { setSel(null); update((s) => battle(s, pack)); }}><Swords size={14} /> Battle</Button>
+              <Button variant="primary" onClick={() => { setSel(null); setPeek(null); const before = runRef.current; update((s) => battle(s, pack)); if (runRef.current !== before && runRef.current?.last?.timeline) setWatching(runRef.current.tick); }}><Swords size={14} /> Battle</Button>
             </div>
           </div>
         </div>
