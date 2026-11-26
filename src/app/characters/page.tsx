@@ -65,7 +65,7 @@ export default function CharactersPage() {
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           <div className="flex flex-wrap gap-1" role="group" aria-label="Element">
             {Object.values(game.elements).map((e) => (
-              <button key={e.id} onClick={() => setElement(element === e.id ? "" : e.id)} aria-pressed={element === e.id} title={elementName(e.id)}
+              <button key={e.id} onClick={() => setElement(element === e.id ? "" : e.id)} aria-pressed={element === e.id} aria-label={elementName(e.id)} title={elementName(e.id)}
                 className={cx("rounded-lg border p-1.5 transition", element === e.id ? "border-cyan bg-cyan/15" : "border-line opacity-70 hover:opacity-100")}>
                 <GameImage path={e.icon} alt={elementName(e.id)} className="h-6 w-6 object-contain" rounded="rounded-none" />
               </button>
@@ -73,7 +73,7 @@ export default function CharactersPage() {
           </div>
           <div className="flex flex-wrap gap-1" role="group" aria-label="Path">
             {Object.values(game.paths).map((p) => (
-              <button key={p.id} onClick={() => setPath(path === p.id ? "" : p.id)} aria-pressed={path === p.id} title={pathName(p.id)}
+              <button key={p.id} onClick={() => setPath(path === p.id ? "" : p.id)} aria-pressed={path === p.id} aria-label={pathName(p.id)} title={pathName(p.id)}
                 className={cx("rounded-lg border p-1.5 transition", path === p.id ? "border-cyan bg-cyan/15" : "border-line opacity-70 hover:opacity-100")}>
                 <GameImage path={p.icon} alt={pathName(p.id)} className="h-6 w-6 object-contain" rounded="rounded-none" />
               </button>

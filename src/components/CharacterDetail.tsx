@@ -37,7 +37,7 @@ export function CharacterDetail({ id }: { id: string }) {
   const ranks = useMemo(() => (c && game ? c.ranks.map((r) => game.characterRanks[r]).filter(Boolean) : []), [c, game]);
 
   if (!game) return (<><PageHeader title="Character" /><WolfComment comment={noGameData()} /></>);
-  if (!c) return <Empty title="Unknown character">No character with id {id} in game data v{game.version}. <Link href="/characters" className="text-cyan">Back to archive</Link></Empty>;
+  if (!c) return (<><PageHeader title="Character not found" /><Empty title="Not in your game data">No character with id {id} in game data v{game.version}. It may be from a newer patch: update game data in Settings. <Link href="/characters" className="text-cyan">Back to Characters</Link></Empty></>);
 
   const name = characterDisplayName(c);
   const promo = game.characterPromotions[id]?.values;

@@ -80,3 +80,11 @@ See docs/08-roadmap.md → "Next tasks".
 ### Not possible / limits
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
+
+## 2026-11-26 · 1.2.1 bug sweep
+
+A scripted real-data sweep (every page and tab, Fribbels import, both wiki downloads, a full SU run, chat) found:
+- **Enemy pictures never loaded**: the wiki's image host answers 404 to requests from other sites (hotlink protection). Not worked around; cards now show type and large weakness icons, and link to the wiki page for the picture.
+- Missing guide / unknown character pages had no heading or way back: fixed.
+- Element, Path and weakness icon buttons had no accessible names: fixed.
+No other console errors, crashes or failed requests.

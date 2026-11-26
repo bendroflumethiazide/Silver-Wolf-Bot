@@ -10,7 +10,7 @@
 | HoYoLAB cookies, Anthropic API key | `.env.local`, or OS-encrypted (safeStorage) in the desktop app | Only to hoyolab.com / api.anthropic.com by the local server; never to the browser, never in backups |
 | Chat questions + compact facts (roster, pity, resources, build grades) | Built in the browser per question | Claude mode: sent to the Claude API; no UID, nickname, signature or notes. Built-in AI and quick replies: never leave the device |
 | Built-in AI model (Qwen3 1.7B, about 1 GB) | Cache Storage of the app window | Downloaded once from huggingface.co (weights) and raw.githubusercontent.com (WebGPU kernels); nothing is uploaded. Delete it in the chat settings |
-| Enemy and Currency Wars packs | IndexedDB | Downloaded on request from honkai-star-rail.fandom.com (public API, anonymous); pictures from static.wikia.nocookie.net. Nothing is uploaded |
+| Enemy and Currency Wars packs | IndexedDB | Downloaded on request from honkai-star-rail.fandom.com (public API, anonymous). Nothing is uploaded |
 | Update check | Desktop app only | On launch (can be turned off) the app asks api.github.com for this repo's latest release; nothing about you is sent. Updates download from github.com and are installed only if their SHA-256 matches the one GitHub publishes |
 
 There is no analytics, no telemetry, and no account system. The Next.js telemetry flag is disabled in scripts used here.

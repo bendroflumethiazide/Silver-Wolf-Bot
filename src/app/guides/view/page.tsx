@@ -22,7 +22,12 @@ function View() {
           <div><div className="text-xs uppercase tracking-wider text-faint">{g.section}</div><h1 className="text-2xl font-semibold text-gradient">{g.title}</h1></div>
         </header>
       )}
-      <GuideContent slug={slug} />
+      {g ? <GuideContent slug={slug} /> : (
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold text-gradient">Guide not found</h1>
+          <p className="text-sm text-muted">That guide doesn&apos;t exist (maybe an old link). <Link href="/guides" className="text-cyan hover:underline">See all guides</Link>.</p>
+        </div>
+      )}
       {same.length > 0 && (
         <div className="flex flex-wrap gap-2 text-sm"><span className="text-faint">More {g!.section.toLowerCase()}:</span>{same.map((x) => <Link key={x.slug} href={`/guides/view?g=${x.slug}`} className="text-cyan hover:underline">{x.title}</Link>)}</div>
       )}

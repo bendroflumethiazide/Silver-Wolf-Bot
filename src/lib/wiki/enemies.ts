@@ -31,8 +31,8 @@ export function parseEnemyPages(pages: Record<string, RawPage>): WikiEnemy[] {
 export async function downloadEnemyPack(fetchFn: typeof fetch = fetch): Promise<EnemyPack> {
   const pages = await wikiQueryAll({
     generator: "categorymembers", gcmtitle: "Category:Enemies", gcmtype: "page", gcmlimit: "50",
-    prop: "categories|pageimages", clcategories: ENEMY_CATEGORIES.map((c) => `Category:${c}`).join("|"), cllimit: "max",
-    piprop: "thumbnail", pithumbsize: "320",
+    // No pictures: the wiki's image host refuses requests from other sites (hotlink protection).
+    prop: "categories", clcategories: ENEMY_CATEGORIES.map((c) => `Category:${c}`).join("|"), cllimit: "max",
   }, 40, fetchFn);
   const enemies = parseEnemyPages(pages as Record<string, RawPage>);
   if (!enemies.length) throw new Error("The wiki returned no enemies.");

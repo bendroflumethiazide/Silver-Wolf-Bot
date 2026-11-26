@@ -23,7 +23,7 @@ export const NAV: NavItem[] = [
   { id: "characters", href: "/characters", label: "Characters", icon: Users, area: "Database", blurb: "Kits, builds, your roster" },
   { id: "light-cones", href: "/light-cones", label: "Light Cones", icon: Disc3, area: "Database", blurb: "Every Light Cone and who uses it" },
   { id: "relics", href: "/relics", label: "Relic Sets", icon: Gem, area: "Database", blurb: "Sets, your relics, ratings" },
-  { id: "bosses", href: "/bosses", label: "Enemies", icon: Skull, area: "Database", blurb: "Bosses and enemies with pictures" },
+  { id: "bosses", href: "/bosses", label: "Enemies", icon: Skull, area: "Database", blurb: "Bosses, enemies and their weaknesses" },
   { id: "npcs", href: "/npcs", label: "NPCs & Lore", icon: BookUser, area: "Database", blurb: "Who's who" },
   { id: "banners", href: "/warp?tab=banners", label: "Banners", icon: CalendarRange, area: "Database", blurb: "Current and upcoming Warps" },
   { id: "codes", href: "/codes", label: "Codes", icon: Ticket, area: "Database", blurb: "Redeem codes you've used" },

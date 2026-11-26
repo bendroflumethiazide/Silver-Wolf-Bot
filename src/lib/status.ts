@@ -27,7 +27,7 @@ export const FEATURES: FeatureStatus[] = [
   { area: "Account", feature: "HoYoLAB Battle Chronicle sync (stats, real-time note, MoC/PF/AS)", status: "implemented", note: "Fixture-tested; live HoYoLAB blocked in dev sandbox; unofficial endpoints" },
   { area: "Archive", feature: "Character database, filters, detail pages, kits", status: "implemented" },
   { area: "Archive", feature: "Community builds (Fribbels): sets, main stats, substats, Light Cone, teammates, with pictures", status: "tested", note: "96 characters; references validated against game data" },
-  { area: "Archive", feature: "Enemies with pictures, type and weaknesses (HSR Wiki pack)", status: "tested", note: "Parser and API client unit-tested; live download checked" },
+  { area: "Archive", feature: "Enemies with type and weaknesses (HSR Wiki pack)", status: "tested", note: "Pictures stay on the wiki: its image host blocks other sites" },
   { area: "Archive", feature: "Codes tracker with official redeem links", status: "tested" },
   { area: "Endgame", feature: "Endgame hub with best runs and last teams", status: "tested" },
   { area: "Endgame", feature: "Simulated Universe run simulator", status: "tested", note: "Offer odds are stated assumptions (not published)" },

@@ -1,9 +1,6 @@
 "use client";
 
-import { useLiveQuery } from "dexie-react-hooks";
 import type { LucideIcon } from "lucide-react";
-import { kvGet } from "@/lib/db";
-import { ENEMY_PACK_KEY, type EnemyPack } from "@/lib/wiki/enemies";
 import type { GameData } from "@/lib/gamedata/types";
 import { NAV } from "@/lib/nav";
 import { useApp } from "@/lib/store";
@@ -34,7 +31,7 @@ function pathFor(id: string, game: GameData): { path?: string; contain?: boolean
     case "events": return { path: item("3"), contain: true };
     case "achievements": return { path: item("22"), contain: true };
     case "import": return { path: item("235"), contain: true };
-    case "bosses": return {};
+    case "bosses": return { path: item("241"), contain: true };
     default: return {};
   }
 }
@@ -43,9 +40,7 @@ export function HubImage({ id, override }: { id: string; override?: string | nul
   const game = useApp((s) => s.game);
   const nav = NAV.find((n) => n.id === id);
   const Icon: LucideIcon | undefined = nav?.icon;
-  const pack = useLiveQuery(() => (id === "bosses" ? kvGet<EnemyPack | null>(ENEMY_PACK_KEY, null) : Promise.resolve(null)), [id]);
-  const boss = pack?.enemies.find((e) => e.type === "Echo of War" && e.image)?.image;
-  const pick = override ? { path: override, contain: false } : boss ? { path: boss, contain: true } : game ? pathFor(id, game) : {};
+  const pick = override ? { path: override, contain: false } : game ? pathFor(id, game) : {};
   if (pick.path) return <GameImage path={pick.path} alt="" className={cx("h-full w-full", pick.contain ? "object-contain p-2" : "object-cover")} rounded="rounded-none" />;
   return (
     <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-violet-900/50 to-cyan-900/30">
