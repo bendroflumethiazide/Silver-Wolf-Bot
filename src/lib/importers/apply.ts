@@ -26,14 +26,15 @@ export interface ScanPlan {
  * Compare a parsed scan with stored inventory.
  * - Characters merge by id (a scan may cover only some characters; missing ones are kept).
  * - Light Cones and relics are treated as a full inventory snapshot: items missing from the scan
- *   are proposed for removal (upgraded items show as one removal + one addition).
+ *   are proposed for removal (upgraded items show as one removal + one addition). Pass
+ *   `lightConesAreFullInventory: false` for files that only list equipped Light Cones (Fribbels).
  */
-export function planScan(existing: { characters: OwnedCharacter[]; lightCones: OwnedLightCone[]; relics: Relic[] }, scan: ParsedScan): ScanPlan {
+export function planScan(existing: { characters: OwnedCharacter[]; lightCones: OwnedLightCone[]; relics: Relic[] }, scan: ParsedScan, opts: { lightConesAreFullInventory?: boolean } = {}): ScanPlan {
   const characters = diffByKey(existing.characters, scan.characters, (c) => c.charId, ["level", "ascension", "eidolon", "skills", "traces"], { removeMissing: false });
 
   const lcKeysOld = keyByOccurrence(existing.lightCones, lightConeFingerprint);
   const lcKeysNew = keyByOccurrence(scan.lightCones, lightConeFingerprint);
-  const lightCones = diffByKey(existing.lightCones, scan.lightCones, (l) => lcKeysOld.get(l) ?? lcKeysNew.get(l)!, ["location", "lock"], { removeMissing: true });
+  const lightCones = diffByKey(existing.lightCones, scan.lightCones, (l) => lcKeysOld.get(l) ?? lcKeysNew.get(l)!, ["location", "lock"], { removeMissing: opts.lightConesAreFullInventory ?? true });
 
   const rKeysOld = keyByOccurrence(existing.relics, relicFingerprint);
   const rKeysNew = keyByOccurrence(scan.relics, relicFingerprint);
@@ -47,6 +48,7 @@ export interface ApplyOptions {
   /** Keys of conflict rows the user explicitly approved. */
   approvedConflicts: Set<string>;
   fileName?: string;
+  kind?: "hsr-scanner" | "fribbels";
 }
 
 type Undo = ImportHistoryEntry["undo"];
@@ -89,7 +91,7 @@ export async function applyScanPlan(plan: ScanPlan, opts: ApplyOptions): Promise
   });
   const historyId = newId("import");
   await db.importHistory.put({
-    id: historyId, kind: "hsr-scanner", fileName: opts.fileName, importedAt: nowIso(),
+    id: historyId, kind: opts.kind ?? "hsr-scanner", fileName: opts.fileName, importedAt: nowIso(),
     summary: `${written} written, ${removed} removed (${Object.entries(opts.categories).filter(([, v]) => v).map(([k]) => k).join(", ")})`,
     undo,
   });

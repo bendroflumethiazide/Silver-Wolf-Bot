@@ -12,6 +12,7 @@ import { characterDisplayName } from "@/lib/gamedata/types";
 import { applyScanPlan, planScan, rollbackImport, type ScanPlan } from "@/lib/importers/apply";
 import { countDiff, type DiffRow } from "@/lib/importers/diff";
 import { parseHsrScanner, type ParsedScan } from "@/lib/importers/hsrScanner";
+import { parseFribbelsSave } from "@/lib/importers/fribbels";
 import { WarpTrackerButton } from "@/components/warp/Pity";
 import { SLOT_LABEL } from "@/lib/relics/stats";
 import { useApp } from "@/lib/store";
@@ -47,22 +48,28 @@ function ScannerImport() {
   const [err, setErr] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
+  const [kind, setKind] = useState<"hsr-scanner" | "fribbels">("hsr-scanner");
   const load = async (f: File) => {
     setErr(null); setDone(null); setPlan(null); setParsed(null); setApproved(new Set());
     try {
-      const p = parseHsrScanner(JSON.parse(await f.text()), profileId);
+      const json = JSON.parse(await f.text());
       const db = getDb();
       const existing = {
         characters: await db.characters.where("profileId").equals(profileId).toArray(),
         lightCones: await db.lightCones.where("profileId").equals(profileId).toArray(),
         relics: await db.relics.where("profileId").equals(profileId).toArray(),
       };
-      setFile(f.name); setParsed(p); setPlan(planScan(existing, p));
+      // HSR Scanner files say so; anything else with a relics array is tried as a Fribbels save.
+      const isScanner = json && typeof json === "object" && (json as { source?: string }).source === "HSR-Scanner";
+      if (!isScanner && !game) throw new Error("Download game data first: Fribbels saves name relic sets, which the app matches against game data.");
+      const p = isScanner ? parseHsrScanner(json, profileId) : parseFribbelsSave(json, profileId, game!, existing.characters);
+      setKind(isScanner ? "hsr-scanner" : "fribbels");
+      setFile(f.name); setParsed(p); setPlan(planScan(existing, p, { lightConesAreFullInventory: isScanner }));
     } catch (e) { setErr(e instanceof SyntaxError ? "File is not valid JSON." : e instanceof Error ? e.message : String(e)); }
   };
   const apply = async () => {
     if (!plan) return;
-    const r = await applyScanPlan(plan, { categories: cats, approvedConflicts: approved, fileName: file });
+    const r = await applyScanPlan(plan, { categories: cats, approvedConflicts: approved, fileName: file, kind });
     setDone(fill(pick(SW.importDone, r.historyId), { applied: r.written + r.removed }) + `|${r.written} written, ${r.removed} removed`);
     setPlan(null); setParsed(null);
   };
@@ -77,19 +84,20 @@ function ScannerImport() {
   const totals = plan ? countDiff<unknown>([...(cats.characters ? plan.characters : []), ...(cats.lightCones ? plan.lightCones : []), ...(cats.relics ? plan.relics : [])]) : null;
 
   return (
-    <Panel title="HSR Scanner / Fribbels-compatible inventory (JSON)" hud>
-      <p className="mb-3 text-sm text-muted">
-        Export from <a className="text-cyan hover:underline" href="https://github.com/kel-z/HSR-Scanner" target="_blank" rel="noreferrer">HSR Scanner</a> (format v3–v4, the same file the Fribbels optimizer imports).
-        The scanner reads your screen with OCR on your own PC; this app never touches the game client.
-      </p>
-      {!plan && <FilePick accept=".json,application/json" onFile={load} label="Choose scan file" />}
+    <Panel title="Your inventory: HSR Scanner or Fribbels" hud>
+      <div className="mb-3 grid gap-2 text-sm sm:grid-cols-2">
+        <div className="rounded-lg border border-line p-2.5"><div className="font-medium">HSR Scanner file</div><div className="text-xs text-muted">Characters, Light Cones and relics read from your game screen by <a className="text-cyan hover:underline" href="https://github.com/kel-z/HSR-Scanner" target="_blank" rel="noreferrer">HSR Scanner</a>.</div></div>
+        <div className="rounded-lg border border-line p-2.5"><div className="font-medium">Fribbels optimizer save</div><div className="text-xs text-muted">In <a className="text-cyan hover:underline" href="https://fribbels.github.io/hsr-optimizer" target="_blank" rel="noreferrer">Fribbels</a>: Import / Save → Save optimizer data. Brings relics, levels, Eidolons and equipped Light Cones.</div></div>
+      </div>
+      {!plan && <FilePick accept=".json,application/json" onFile={load} label="Choose a file" />}
+      <div className="mt-2"><Notice>Both tools run on your own PC; this app only reads the file you pick, shows every change first, and can undo the import. Fribbels saves don&apos;t include trace levels (yours are kept) or unequipped Light Cones (nothing is removed).</Notice></div>
       {err && <div className="mt-3"><ErrorBox>{err}</ErrorBox></div>}
       {done && <WolfComment comment={{ mood: "smug", line: done, facts: ["Recorded in Import history below, with rollback."] }} className="mt-3" />}
       {plan && parsed && totals && (
         <div className="space-y-4">
           <WolfComment comment={importComment(totals)} />
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted">
-            <Badge tone="cyan">{file}</Badge> {parsed.meta.build && <span>scanner {parsed.meta.build}</span>} <span>format v{parsed.meta.version}</span>
+            <Badge tone="cyan">{file}</Badge> {kind === "fribbels" ? <span>Fribbels optimizer save</span> : <>{parsed.meta.build && <span>scanner {parsed.meta.build}</span>} <span>format v{parsed.meta.version}</span></>}
             {parsed.meta.uid && <span>UID {parsed.meta.uid}</span>}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">

@@ -2,10 +2,11 @@ import type { MainStatKey, RelicSlot } from "./relics/stats";
 import type { RelicSubstat } from "./relics/scoring";
 
 /** Where a personal record came from. "verified" sources were read from the game/account, not typed. */
-export type DataSource = "manual" | "hsr-scanner" | "enka" | "hoyolab" | "uigf" | "srgf" | "csv" | "backup";
+export type DataSource = "manual" | "hsr-scanner" | "fribbels" | "enka" | "hoyolab" | "uigf" | "srgf" | "csv" | "backup";
 
 export const VERIFIED_SOURCES: DataSource[] = ["enka", "hoyolab"];
 export const SOURCE_LABEL: Record<DataSource, string> = {
+  fribbels: "Fribbels optimizer save",
   manual: "Manual entry",
   "hsr-scanner": "HSR Scanner import (OCR)",
   enka: "Verified: public showcase (Enka.Network)",
@@ -224,7 +225,7 @@ export interface EventEntry {
 
 export interface ImportHistoryEntry {
   id: string;
-  kind: "hsr-scanner" | "uigf" | "srgf" | "csv" | "backup" | "enka" | "hoyolab";
+  kind: "hsr-scanner" | "fribbels" | "uigf" | "srgf" | "csv" | "backup" | "enka" | "hoyolab";
   fileName?: string;
   importedAt: string;
   summary: string;
