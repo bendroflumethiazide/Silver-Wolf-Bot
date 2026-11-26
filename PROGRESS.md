@@ -81,6 +81,23 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.6.2 Investment grant audit
+
+Reported: the Gold strategy "Elation Emblem" gave neither the Emblem (shown as "Unknown") nor Sparxie. An audit of all 228 Strategies/Environments that grant something found 201 that gave nothing. Fixed:
+- **"Unknown" items:** the wiki itself writes "Unknown{{verify}}" for some items. In an "X Emblem"/"X Emblem Set" strategy it's the X Emblem, so that's what you get (the log says so). Elsewhere it's named as not simulated.
+- **Named characters and items in quotes** ("Sparxie", "Peace Pistol", "Wealth Gem"…), whole lists ("1 X, 1 Y, and 1 Z"), gold anywhere in a sentence, XP, free refreshes.
+- **Random grants:** N-cost and N-star characters, "damage-dealing" ones, random members of a Bond, "1 of every 2-cost character", half of a Bond's members (and the other half later), random Emblems, basic/advanced/privileged equipment, "N of each type of basic equipment", Weapon Boxes, Employment Contracts (as a random character of that cost), Emblem Codex (a random Emblem).
+- **Index Funds** environments: a character of that Bond plus basic equipment.
+- **Peppy** (and Peppi): a non-character squad member wearing its Emblems, which count for Bonds; it has no strength of its own, never merges, and its Emblems can't be swapped.
+- **Later and repeated grants** now fire on time: after N Nodes, at the start of a given plane or each plane, after the next Boss, after each combat, after Encounters, on level-up (Climbing the Ranks), after N refreshes, extra Supply picks (Scout Talent Pool, I Want It ALL with fewer options), Hiring Spree (gold → 4-costs), squad HP costs.
+- **A full bench** no longer silently loses a granted character: the log says "(bench full)".
+- Anything still not modelled (Staff Projector, Smelting Furnace, Good Fortune Token, Trailblaze Power, Surprise Box…) is named in the log as "not simulated" instead of disappearing.
+
+Result: 182 fully handled, 38 partly (the unmodelled consumables), 8 that only have conditional effects.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **180/180** · E2E **13/13** on both builds. Balance on real data: A0 ~84%, A4 ~51%; a passive player never clears.
+
 ## 2026-11-26 · 1.6.1 Recommended equipment
 
 - Every character's recommended equipment (from their wiki page, by On-Field / Off-Field, or by form for Dan Heng) now shows on the selected character in the simulator (like the game's card), near the top of the character sheet with each item's recipe, and as icons on team-builder rows.

@@ -725,3 +725,111 @@ describe("recommended equipment", () => {
     expect(gearStatus(PACK, "Firestorm Surge", [], [])).toBe("none");
   });
 });
+
+describe("Investment grants (items, characters, Peppy, later and repeated grants)", () => {
+  const fresh = (): RunState => ({ ...chooseEnvironment(newRun(PACK, "grants", "A0-1"), PACK, 1), bag: [], bench: Array(9).fill(null) });
+  const run = (text: string, source = "Test", s: RunState = fresh()) => applyEffect(s, PACK, text, createRng("g"), source);
+
+  it("'X Emblem' strategies give the X Emblem the wiki lists as \"Unknown\", plus named characters", () => {
+    const [s, applied] = run('Obtains 1 "Unknown," 1 "Kafka," and 1 "Firestorm Surge."', "Heal Emblem Set");
+    expect(s.bag).toEqual(["Heal Emblem", "Firestorm Surge"]);
+    expect(units(s).map((u) => u.name)).toContain("Kafka");
+    expect(applied.join(" ")).toMatch(/Heal Emblem \(the wiki lists this item as “Unknown”\)/);
+    const [s2, applied2] = run('Obtain 1 "Unknown."', "Intern Development Plan");
+    expect(s2.bag).toEqual([]);
+    expect(applied2.join(" ")).toMatch(/not simulated: an item the wiki lists as “Unknown”/);
+  });
+
+  it("named items, weapon boxes, random equipment, gold and XP, all in one list", () => {
+    expect(run('Obtains "Folding Knife" and "Roller Skates."')[0].bag).toEqual(["Folding Knife", "Roller Skates"]);
+    const [s, applied] = run('Obtains 1 "Basic Weapon Box" and 8 Gold Coin(s).');
+    expect(s.bag).toHaveLength(1);
+    expect(s.gold).toBe(fresh().gold + 8);
+    expect(applied).toContain("+8 gold");
+    expect(run("Obtain 1 random basic equipment, 1 random 4-cost character(s), and 6 Gold Coin(s).")[0].gold).toBe(fresh().gold + 6);
+    expect(run("Obtain 2 of each type of basic equipment.")[0].bag).toHaveLength(4);
+    const [s3, a3] = run('Obtains 1 "Staff Projector."');
+    expect([s3.bag, a3]).toEqual([[], ["not simulated: Staff Projector"]]);
+  });
+
+  it("Bond characters (Index Funds), random Bond members, and every N-cost character", () => {
+    const [s] = run('Start with "Heal" character and basic equipment.');
+    expect(units(s).some((u) => ["Natasha", "Luocha", "Huohuo"].includes(u.name))).toBe(true);
+    expect(s.bag).toHaveLength(1);
+    expect(units(run("Obtain 2 random Stellaron Hunters characters.")[0]).filter((u) => ["Kafka", "Welt", "Pearl"].includes(u.name)).length).toBeGreaterThanOrEqual(2);
+    const twoCosts = (x: RunState) => units(x).filter((u) => u.cost === 2).map((u) => u.name);
+    const base = fresh();
+    expect(twoCosts(run("Obtain 1 of every 2-cost character.", "Test", base)[0]).length - twoCosts(base).length).toBe(2);
+  });
+
+  it("a full bench says so instead of losing the character silently", () => {
+    const full = { ...fresh(), bench: Array(9).fill(null).map((_, i) => ({ uid: 500 + i, name: `X${i}`, cost: 1, stars: 1 as const, items: [] })) };
+    const [s, applied] = run('Obtains 1 "Kafka."', "Test", full);
+    expect(units(s).some((u) => u.name === "Kafka")).toBe(false);
+    expect(applied.join(" ")).toMatch(/Kafka \(bench full\)/);
+  });
+
+  it("Peppy: a non-character squad member wearing Emblems that count for Bonds", () => {
+    const [s, applied] = run('Obtains 1 "Peppy" with 3 permanently attached Emblems. Obtains 8 Gold Coin(s).');
+    const peppy = units(s).find((u) => u.name === "Peppy")!;
+    expect(peppy.npc).toBe(true);
+    expect(peppy.items).toHaveLength(3);
+    expect(applied[0]).toMatch(/^Peppy with /);
+    expect(unitPower(peppy, "on", PACK)).toBe(0);
+    // Deployed next to Kafka with a Stellaron Hunters Emblem, Peppy counts for the Bond and isn't IDLE.
+    const deployed2 = { ...s, on: [{ uid: 1, name: "Kafka", cost: 5, stars: 1 as const, items: [] }, { ...peppy, items: ["Stellaron Hunters Emblem"] }, null, null], bench: Array(9).fill(null), off: Array(6).fill(null) };
+    expect(teamPower(deployed2, PACK).bonds.map((b) => [b.bond.name, b.count])).toEqual([["Stellaron Hunters", 2]]);
+    expect(teamPower(deployed2, PACK).idle).toEqual([]);
+    expect(equip({ ...deployed2, phase: "prep", bag: ["Folding Knife"] }, PACK, 0, { zone: "on", index: 1 }).note).toMatch(/permanently attached/);
+    // Three Peppys never merge.
+    let three = s;
+    for (let i = 0; i < 2; i++) three = run('Obtains 1 "Peppy" with 3 permanently attached Emblems.', "Test", three)[0];
+    expect(units(three).filter((u) => u.name === "Peppy")).toHaveLength(3);
+    const [withPeppi] = run("You got a Peppi that looks exactly like your Peppy!", "Peppy & Peppi", s);
+    expect(units(withPeppi).find((u) => u.name === "Peppi")!.items).toEqual(peppy.items);
+  });
+
+  it("later grants fire on schedule: after N nodes, at a plane's start, after each combat", () => {
+    let s = run('After entering 2 Node(s), obtains 1 "Basic Weapon Box."')[0];
+    s = { ...s, phase: "result" };
+    s = advance(s, PACK);
+    expect(s.bag).toHaveLength(0);
+    s = advance({ ...s, phase: "result" }, PACK);
+    expect(s.bag).toHaveLength(1);
+    expect(s.triggers).toEqual([]);
+
+    let p = run("Gains 1 Privilege Weapon Box(es) at the start of the Second Plane.")[0];
+    p = enterNode({ ...p, plane: 1, node: 0 }, PACK);
+    expect(p.bag).toHaveLength(1);
+    expect(p.log.some((l) => /Privilege Weapon Box/.test(l))).toBe(true);
+
+    let c = run("After each combat ends, obtain 1 2-Cost character or 1-Cost character.")[0];
+    c = { ...c, phase: "prep", plane: 0, node: 3, on: [{ uid: 1, name: "Kafka", cost: 5, stars: 3, items: [] }, null, null, null] };
+    const before = units(c).length;
+    const after = battle(c, PACK);
+    expect(units(after).length).toBe(before + 1);
+    expect(after.triggers).toHaveLength(1); // repeats
+  });
+
+  it("I Want It ALL: fewer Supply options, but every unselected one comes too", () => {
+    let s = run("In this run, you have 2 fewer option(s) during the Supply phase. After making your selection in the next 1 Supply phase(s), you'll additionally receive all unselected characters and their carried equipment.")[0];
+    expect([s.supplyFewer, s.supplyAll]).toEqual([2, 1]);
+    s = enterNode({ ...s, plane: 0, node: 4 }, PACK);
+    expect(s.phase).toBe("supply");
+    expect(s.offers.supply).toHaveLength(3);
+    const took = pickSupply(s, PACK, 0);
+    expect(units(took).length).toBe(units(s).length + 3);
+    expect(took.supplyAll).toBe(0);
+  });
+});
+
+describe("Hiring Spree", () => {
+  it("spends gold in 4s (up to 40) for 4-cost characters", () => {
+    const s = { ...chooseEnvironment(newRun(PACK, "hire", "A0-1"), PACK, 1), gold: 13, bench: Array(9).fill(null) };
+    const [a, applied] = applyEffect(s, PACK, 'Loses Gold Coins. For every 4 Gold Coins lost, gains a random 4-cost character, up to 40 Gold Coin(s). Gains 1 "Perfect Projector" and 10 Gold Coin(s).', createRng("h"), "Hiring Spree");
+    expect(a.gold).toBe(13 - 12 + 10);
+    expect(units(a).filter((u) => u.cost === 4).length - units(s).filter((u) => u.cost === 4).length).toBe(3);
+    expect(applied.join(" ")).toMatch(/−12 gold → 3 random 4-cost characters/);
+    expect(applied.join(" ")).toMatch(/not simulated: Perfect Projector/);
+  });
+});
