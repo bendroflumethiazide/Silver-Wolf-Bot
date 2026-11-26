@@ -5,7 +5,9 @@
  * anything else (e.g. the cost limit of Intern/Staff Projectors) is a stated guess.
  */
 
-export type SpecialUse = "projector" | "plotArmor" | "box" | "equip";
+import type { Stats } from "./combat";
+
+export type SpecialUse = "projector" | "plotArmor" | "box" | "equip" | "wrench" | "furnace" | "privilege" | "token";
 
 export interface SpecialItem {
   name: string;
@@ -21,9 +23,15 @@ export interface SpecialItem {
   only?: string;
   /** Strength the component adds to its wearer in the simulator's model (a share, like advanced equipment's 0.15). */
   power?: number;
+  /** Exact stats from the wiki (Trash Bags); used instead of `power`. */
+  stats?: Partial<Stats>;
+  /** Not used up (Precision Disassembly Wrench). */
+  reusable?: boolean;
   /** Source shown in the item details. */
   source: string;
 }
+
+const trash = (k: number): Partial<Stats> => ({ on: 0.03 * k, off: 0.03 * k, lucky: 0.03 * k, luckyDmg: 0.03 * k, spd: 0.03 * k, dmg: 0.03 * k });
 
 const TSR = "Trailblaze Silver Rail";
 
@@ -56,6 +64,21 @@ export const SPECIAL_ITEMS: Record<string, SpecialItem> = Object.fromEntries(([
     text: "Greatly increases On/Off-Field Strength. The wearer's attacks can \"Execute\" enemy targets whose HP percentage is lower than 12%." },
   { name: "Trailblaze's Whistle", kind: "component", use: "equip", power: 0.1, verified: true, source: "Trailblaze Store (Bond Level 6)",
     text: "After the wearer uses their Ultimate, summons the \"Astral Express\" to strike all enemy targets, dealing DMG based on the current Express level. \"Light Rail\": Increases the ally squad's On/Off-Field Strength by 30%. Provides 1 stack of \"Light Rail\" after an Express collision; increases the max stack limit of \"Light Rail\" by 2." },
+  // Consumables (HSR Wiki, Tutorial "Consumables: …" (4.7) and the Zero-Sum Game Equipment page) and the Trash Bags (4.7 Equipment page).
+  { name: "Disassembly Wrench", kind: "consumable", use: "wrench", verified: true, source: "Investment Strategies, Master Smith",
+    text: "Drag onto a character to remove all of their equipped gears. This item will disappear after use." },
+  { name: "Precision Disassembly Wrench", kind: "consumable", use: "wrench", reusable: true, verified: true, source: "Precision Disassembly strategies",
+    text: "Drag onto a character to remove all of their equipped gears. Can be used infinitely. While holding this item, obtaining another Disassembly Wrench will result in obtaining 1 Gold Coin instead." },
+  { name: "Smelting Furnace", kind: "consumable", use: "furnace", verified: true, source: "Investment Strategies, Master Smith",
+    text: "Drag onto the equipment to randomly re-obtain another piece of equipment of the same quality. Drag onto the character to randomly reroll all pieces of equipment on that character." },
+  { name: "Special Privilege Card", kind: "consumable", use: "privilege", verified: true, source: "Superior Firepower Theory",
+    text: "Drag onto a piece of advanced equipment to upgrade it, obtaining the privileged equipment of the same name. Drag onto the character to upgrade 1 piece of advanced equipment they're wearing (here: the first one)." },
+  { name: "Good Fortune Token", kind: "consumable", use: "token", verified: true, source: "Good Fortune Token strategies",
+    text: "Drag onto the character to choose and obtain 1 of the 4 pieces of advanced equipment from that character's recommended equipment list (here: a random one of them)." },
+  { name: "Trash Bag", kind: "component", use: "equip", stats: trash(1), verified: true, source: "Harmless Trash",
+    text: "On-Field Strength 3%, Off-Field Strength 3%, Lucky Strike Rate 3%, Lucky Strike DMG 3%, SPD Amplification 3%, DMG Amplification 3%. \"Pollution-free. Harmless. Useless.\"" },
+  { name: "Golden Trash Bag", kind: "component", use: "equip", stats: trash(10), verified: true, source: "Golden Trash, Owlbert, Emissary of Environmental Preservation",
+    text: "On-Field Strength 30%, Off-Field Strength 30%, Lucky Strike Rate 30%, Lucky Strike DMG 30%, SPD Amplification 30%, DMG Amplification 30%." },
 ] as SpecialItem[]).map((x) => [x.name, x]));
 
 export const specialItem = (name: string): SpecialItem | undefined => SPECIAL_ITEMS[name];

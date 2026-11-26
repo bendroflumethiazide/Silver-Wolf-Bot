@@ -7,6 +7,7 @@
  * (summons' base SPD, the share of damage a summon deals) are stated assumptions (SUMMON_ASSUMED).
  */
 import { parseStatLine, type StatKey } from "./stats";
+import { baseItem, isPrivileged } from "./items";
 import { specialItem } from "./specialItems";
 import type { BondState, CwPack } from "./sim";
 
@@ -70,7 +71,9 @@ export function itemEffect(pack: CwPack, name: string, ctx: ItemCtx): ItemEffect
   const basic = eq?.basic.find((b) => b.name === name);
   if (basic) { for (const l of basic.stats.split(" · ")) add("self", statLine(l)); return out; }
   const sp = specialItem(name);
-  if (sp) { if (sp.kind === "component" && name !== "Imploding Singularity") add("self", { str: sp.power ?? 0.15 }); return out; }
+  if (sp) { if (sp.stats) add("self", sp.stats); else if (sp.kind === "component" && name !== "Imploding Singularity") add("self", { str: sp.power ?? 0.15 }); return out; }
+  // Privileged equipment: the advanced item's second (privileged) values.
+  if (isPrivileged(name)) return itemEffect(pack, baseItem(name), { ...ctx, privileged: true });
   const em = eq?.emblems?.find((e) => e.name === name);
   if (em) { for (const l of em.stats) add("self", statLine(l)); return out; }
   const adv = eq?.advanced.find((a) => a.name === name);
@@ -161,6 +164,8 @@ export interface BondCtx {
   placed: { uid: number; name: string; cost: number; stars: number; items: string[]; place: "on" | "off"; base: number }[];
   /** Nodes entered so far this run (Chimera Energy, Clara's modifications). */
   nodes: number;
+  /** Extra Chimera Energy from Strategies. */
+  chimeraEnergy?: number;
   /** AV limit of this fight. */
   av: number;
   boss: boolean;
@@ -270,7 +275,7 @@ export function bondEffect(pack: CwPack, b: BondState, ctx: BondCtx): BondEffect
     }
     case "Beast Garden": {
       const per = lvl >= 7 ? 2 : lvl >= 5 ? 3 : 4;
-      const n = Math.min(SUMMON_ASSUMED.maxChimeras, Math.floor(ctx.nodes / per));
+      const n = Math.min(SUMMON_ASSUMED.maxChimeras, Math.floor((ctx.nodes + (ctx.chimeraEnergy ?? 0)) / per));
       for (let i = 0; i < n; i++) out.summons.push({ name: `Chimera ${i + 1}`, bond: name, emoji: "🦄", spd: SUMMON_ASSUMED.chimeraSpd + (lvl >= 7 ? 40 : 0), share: 0.025 * (lvl >= 7 ? 2.5 : 1) * (lvl >= 10 ? 2 : 1), note: `recruited with Chimera Energy (1 per node, ${per} per chimera)` });
       break;
     }

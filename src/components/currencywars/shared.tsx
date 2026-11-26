@@ -1,6 +1,6 @@
 "use client";
 
-import { Award, ThumbsUp, Clover, Coins, Cpu, Crosshair, Crown, Flower2, Footprints, Gem, Orbit, Package, Pickaxe, Projector, Shield, Sparkles, Sword, Zap, type LucideIcon } from "lucide-react";
+import { Award, ThumbsUp, Clover, Coins, Cpu, Crosshair, Crown, Flame, Flower2, Footprints, Gem, Orbit, Package, Pickaxe, Projector, Shield, Sparkles, Sword, Ticket, Trash2, Wrench, Zap, type LucideIcon } from "lucide-react";
 import { bondFamily, bondsOf, membersOf } from "@/lib/currencywars/bonds";
 import { emblemBond, oreGold, oreTier } from "@/lib/currencywars/items";
 import { specialItem } from "@/lib/currencywars/specialItems";
@@ -202,14 +202,20 @@ export function ItemIcon({ pack, name, size = 16 }: { pack: CwPack; name: string
   if (emblemBond(pack, name)) return <Award size={size} className="text-amber-200" aria-hidden />;
   const sp = specialItem(name);
   if (sp) {
-    const Icon = sp.use === "projector" ? Projector : sp.use === "plotArmor" ? Crown : sp.use === "box" ? Package : name === "Imploding Singularity" ? Orbit : Cpu;
-    return <Icon size={size} className={sp.use === "plotArmor" ? "text-fuchsia-300" : sp.use === "projector" ? "text-sky-300" : sp.use === "box" ? "text-amber-200" : "text-amber-300"} aria-hidden />;
+    const TOOL: Partial<Record<typeof sp.use, [LucideIcon, string]>> = {
+      projector: [Projector, "text-sky-300"], plotArmor: [Crown, "text-fuchsia-300"], box: [Package, "text-amber-200"],
+      wrench: [Wrench, name.startsWith("Precision") ? "text-cyan-300" : "text-zinc-300"], furnace: [Flame, "text-orange-400"],
+      privilege: [Ticket, "text-amber-300"], token: [Clover, "text-emerald-300"],
+    };
+    const [Icon, tone] = TOOL[sp.use] ?? (/Trash Bag/.test(name) ? [Trash2, name.startsWith("Golden") ? "text-amber-300" : "text-zinc-400"] : [name === "Imploding Singularity" ? Orbit : Cpu, "text-amber-300"]);
+    return <Icon size={size} className={tone} aria-hidden />;
   }
-  const adv = pack.equipment?.advanced.find((a) => a.name === name);
+  const priv = name.endsWith(": Privilege");
+  const adv = pack.equipment?.advanced.find((a) => a.name === (priv ? name.slice(0, -": Privilege".length) : name));
   if (!adv) return <Sparkles size={size} className="text-violet-300" aria-hidden />;
   const [A, B] = adv.recipe.map((r) => BASIC_ICON[r] ?? Sparkles);
   return (
-    <span className="relative inline-flex items-center justify-center rounded bg-violet-500/25 ring-1 ring-violet-300/40" style={{ width: size + 6, height: size + 6 }} aria-hidden>
+    <span className={cx("relative inline-flex items-center justify-center rounded", priv ? "bg-amber-400/25 ring-1 ring-amber-300/70" : "bg-violet-500/25 ring-1 ring-violet-300/40")} style={{ width: size + 6, height: size + 6 }} aria-hidden>
       <A size={size * 0.62} className={cx("absolute left-0.5 top-0.5", BASIC_TONE[adv.recipe[0]])} />
       <B size={size * 0.62} className={cx("absolute bottom-0.5 right-0.5", BASIC_TONE[adv.recipe[1]])} />
     </span>

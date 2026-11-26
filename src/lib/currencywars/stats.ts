@@ -47,7 +47,7 @@ export function itemStatLines(pack: CwPack, item: string): string[] {
   const eq = pack.equipment;
   const basic = eq?.basic.find((b) => b.name === item);
   if (basic) return basic.stats.split(" · ");
-  return eq?.advanced.find((a) => a.name === item)?.stats ?? eq?.emblems?.find((e) => e.name === item)?.stats ?? [];
+  return eq?.advanced.find((a) => a.name === item.replace(/: Privilege$/, ""))?.stats ?? eq?.emblems?.find((e) => e.name === item)?.stats ?? [];
 }
 
 export function itemBoosts(pack: CwPack, items: string[]): Partial<Record<StatKey, number>> {

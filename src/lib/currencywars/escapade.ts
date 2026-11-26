@@ -174,7 +174,9 @@ export function shiftEarlier(kinds: NodeKind[], kind: NodeKind): NodeKind[] {
 /** Basic equipment you get (Mummicat's "mc-box" turns each into a Basic Weapon Box). */
 export function addBasics(s: RunState, items: string[]): RunState {
   if (!items.length) return s;
-  return { ...s, bag: [...s.bag, ...(hasVariant(s, "mc-box") ? items.map(() => "Basic Weapon Box") : items)] };
+  // "Exclusive Endorsement": its components arrive as the advanced item.
+  const got = s.endorsed ? items.map((i) => (s.endorsed!.parts.includes(i) ? s.endorsed!.item : i)) : items;
+  return { ...s, bag: [...s.bag, ...(hasVariant(s, "mc-box") ? got.map((i) => (s.endorsed?.item === i ? i : "Basic Weapon Box")) : got)] };
 }
 
 // --------------------------------------------------------------------------------------------- nodes
@@ -284,7 +286,7 @@ function applyTea(s0: RunState, pack: CwPack, v: CompanionVariant, opt: TeaOptio
     }
     case "ink": return record(addBasics(s, ["Roller Skates"]), "Ink Black Coffee: Roller Skates.");
     case "coins": return record({ ...s, gold: s.gold + 5, stats: { ...s.stats, goldEarned: s.stats.goldEarned + 5 } }, "Coins Coffee: +5 gold.");
-    case "good": return record({ ...s, hp: Math.min(100, s.hp + 99) }, "\"Surprisingly Good\" Coffee: squad HP restored.");
+    case "good": return record({ ...s, hp: Math.min(s.maxHp ?? 100, s.hp + 99) }, "\"Surprisingly Good\" Coffee: squad HP restored.");
     case "fled": return record({ ...s, bag: [...s.bag, "Anti-Grav Boots", "Anti-Grav Boots", "Anti-Grav Boots"] }, "Fled Like Lightning: 3 Anti-Grav Boots.");
     case "advance-reward": case "advance-supply": {
       const k: NodeKind = kind === "advance-reward" ? "Reward" : "Supply";

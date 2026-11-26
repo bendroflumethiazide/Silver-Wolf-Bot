@@ -9,7 +9,8 @@
  */
 import { createRng } from "../warp/simulator";
 import type { CwAdvancedItem, CwCharInfo, CwNamed, CwStrategy, StrategyRarity } from "./parse";
-import { combineResult, emblemBond, goldOreName, isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS, oreGold, oreName, oreTier, type OreTier } from "./items";
+import { combatRules, RULE_ASSUMED, RULE_INFO, ruleHandled, type CombatUnit } from "./rules";
+import { baseItem, combineResult, emblemBond, goldOreName, isOre, isPrivileged, itemKind, privileged, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS, oreGold, oreName, oreTier, type OreTier } from "./items";
 import { membersOf } from "./bonds";
 import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPack } from "./sim";
 import { buildTimeline, type Timeline, type TlKind } from "./timeline";
@@ -119,6 +120,8 @@ export interface Unit {
   npc?: boolean;
   /** Whatever Dice: basic equipment it put on this unit for the current node. */
   dice?: string[];
+  /** "Lifetime Employment": fought once, so it can't return to the bench or be sold. */
+  bound?: boolean;
 }
 /** A grant that happens later or repeatedly. `text` is wiki wording run through the grant parser (or a special "__" rule). */
 export interface Trigger {
@@ -247,7 +250,20 @@ export interface RunState {
   advantage?: string[];
   /** One-time Advantage effects used (Claims Settlement, Safety Mechanism, Total Refresh of the Environment). */
   advantageUsed?: string[];
+  /** Squad Max HP when a Strategy raised it (Health Recharge, Cost Control, Diode); else RULES.startHp. */
+  maxHp?: number;
+  /** Extra "Chimera Energy" from Strategies (Beast Garden recruits chimeras with it). */
+  chimeraEnergy?: number;
+  /** Counters and flags of named Environment/Strategy rules (rules.ts), by key. */
+  rule?: Record<string, number>;
+  /** "Exclusive Endorsement": its components arrive as this advanced item. */
+  endorsed?: { item: string; parts: [string, string] };
 }
+
+/** Squad Max HP (100, or more after Strategies that raise it). */
+export const maxHpOf = (s: Pick<RunState, "maxHp">) => s.maxHp ?? RULES.startHp;
+/** Heal the squad, up to Max HP. */
+export const heal = (s: RunState, n: number): RunState => ({ ...s, hp: Math.min(maxHpOf(s), s.hp + n) });
 
 // --------------------------------------------------------------------------------------------- helpers
 
@@ -283,7 +299,7 @@ export const units = (s: RunState) => [...s.on, ...s.off, ...s.bench].filter((u)
 export const deployed = (s: RunState) => [...s.on, ...s.off].filter((u): u is Unit => !!u);
 /** Owning a Wealth Gem raises the team size limit by 1, equipped or not (wiki). */
 export const wealthGems = (s: RunState) => [...s.bag, ...units(s).flatMap((u) => u.items)].filter((i) => i === "Wealth Gem").length;
-export const teamSize = (s: RunState) => ASSUMED.teamSize(s.level) + wealthGems(s);
+export const teamSize = (s: RunState) => ASSUMED.teamSize(s.level) + wealthGems(s) + (owns(s, "Cost of Expansion") ? 2 : 0);
 export const xpToNext = (level: number) => ASSUMED.levelXp[level] ?? 0;
 export const lineupValue = (s: RunState) => deployed(s).reduce((n, u) => n + u.cost * copiesFor(u.stars), 0);
 const shopRoster = (pack: CwPack) => pack.characters.filter((c) => c.cost <= 5);
@@ -339,6 +355,9 @@ export function levelUp(s: RunState, xp: number): RunState {
   let out = { ...s, level, xp: cur };
   if (level > s.level) {
     out = log(out, `Level ${level}: you can deploy ${ASSUMED.teamSize(level)}.`);
+    if (owns(out, "Growth Fund") && level >= 9 && s.level < 9) out = log({ ...out, gold: out.gold + 36 }, "Growth Fund: +36 gold.");
+    if (owns(out, "The Joy of Growth") && level >= 8 && !ruleN(out, "joy")) out = log(setRule({ ...out, xpCost: Math.max(1, out.xpCost - 1) }, "joy", 1), `The Joy of Growth: Experience costs ${Math.max(1, out.xpCost - 1)}.`);
+    if (owns(out, "Chimera Growth Log")) { const n = level - s.level; out = log({ ...out, gold: out.gold + 6 * n, chimeraEnergy: (out.chimeraEnergy ?? 0) + 2 * n }, `Chimera Growth Log: +${2 * n} Chimera Energy, +${6 * n} gold.`); }
     for (const t of out.triggers ?? []) {
       const m = /^__climb:(\d+)$/.exec(t.text);
       if (t.on !== "levelup" || !m) continue;
@@ -361,8 +380,9 @@ function climbGrant(s: RunState, level: number, gold: number, source: string): R
 
 function rollShopSlots(s: RunState, pack: CwPack, rng: () => number): ShopSlot[] {
   const owned3 = new Set(units(s).filter((u) => u.stars === 3).map((u) => u.name));
-  return rollShop(pack.odds, s.level, shopRoster(pack), rng, RULES.shopSlots, owned3)
-    .map((c) => ({ name: c.name, cost: c.cost, stars: s.twoStarShop && rng() < ASSUMED.twoStarShop ? 2 : 1 }));
+  const vitality = owns(s, "Market Vitality") ? RULE_ASSUMED.vitalityPerLevel * Math.max(0, s.level - 2) : 0;
+  return rollShop(shopOdds(s, pack), s.level, shopRoster(pack), rng, RULES.shopSlots, owned3)
+    .map((c) => ({ name: c.name, cost: c.cost, stars: (s.twoStarShop && rng() < ASSUMED.twoStarShop) || (c.cost <= 2 && vitality > 0 && rng() < vitality) ? 2 : 1 }));
 }
 
 const basicNames = (pack: CwPack) => pack.equipment?.basic.map((b) => b.name) ?? [];
@@ -382,6 +402,32 @@ export function recipe(pack: CwPack, a: string, b: string): CwAdvancedItem | und
 }
 export const isBasic = (pack: CwPack, name: string) => basicNames(pack).includes(name);
 
+/** Add items to the bag. A Disassembly Wrench while holding a Precision Disassembly Wrench is 1 Gold Coin instead (wiki). */
+export function addToBag(s: RunState, items: string[]): RunState {
+  let out = s;
+  for (const it of items) {
+    if (it === "Disassembly Wrench" && out.bag.includes("Precision Disassembly Wrench")) out = { ...out, gold: out.gold + 1 };
+    else if (out.endorsed?.parts.includes(it)) out = { ...out, bag: [...out.bag, out.endorsed.item] };
+    else out = { ...out, bag: [...out.bag, it] };
+  }
+  return out;
+}
+
+/** A random piece of equipment of the same type (Smelting Furnace). "Boiler Upgrade": basic → advanced. */
+function smelt(s: RunState, pack: CwPack, item: string, rng: () => number): string {
+  const kind = itemKind(pack, item);
+  const eq = pack.equipment;
+  const boiler = s.strategies.some((x) => x.name === "Boiler Upgrade");
+  const pool = kind === "basic" ? (boiler ? eq?.advanced.map((a) => a.name) : basicNames(pack))
+    : kind === "advanced" ? eq?.advanced.map((a) => a.name)
+    : kind === "emblem" ? eq?.emblems?.map((e) => e.name)
+    : kind === "gem" ? eq?.gems?.map((g) => g.name).filter((g) => g !== "Wealth Gem") : null;
+  const others = (pool ?? []).filter((x) => x !== baseItem(item));
+  if (!others.length) return item;
+  const got = pickOne(rng, others);
+  return isPrivileged(item) ? privileged(got) : got;
+}
+
 // --------------------------------------------------------------------------------------------- effects
 
 const CONDITIONAL = /^(when|after|each|every|if|upon|whenever|in |during|at the start of (each|every)|the first|for each)/i;
@@ -393,7 +439,7 @@ const CONDITIONAL = /^(when|after|each|every|if|upon|whenever|in |during|at the 
 const NUM: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 const toNum = (x: string | undefined) => (x === undefined ? 1 : NUM[x.toLowerCase()] ?? (Number(x) || 1));
 /** Items the simulator doesn't model (named in the log instead of silently ignored). */
-const UNMODELLED = /Chimera|Smelting Furnace|Disassembly Wrench|Good Fortune Token|Special Privilege Card|Surprise Box|Dice|Trash Bag|Owlbert|massive reward/i;
+const UNMODELLED = /Chimera Projector|Surprise Box|Owlbert|massive reward/i;
 
 /**
  * Apply the parts of an Environment/Strategy text the simulator understands; returns what it applied.
@@ -404,15 +450,18 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
   // Plot Armor and Strategy-grade investments first; their sentences are then left out of the general parser.
   const [plotState, plotApplied, handled] = plotInvestment(s, text0, source);
   const [gradeState, gradeApplied, gradeHandled] = strategyInvestment(plotState, pack, text0, source, rng);
-  const text = [...handled, ...gradeHandled].reduce((t, h) => t.replace(h, ""), text0).trim();
+  // Named rules (rules.ts / ruleOnPick) handle their own sentences.
+  const ruled = ruleHandled(source, text0);
+  const text = [...handled, ...gradeHandled, ...ruled].reduce((t, h) => t.replace(h, ""), text0).trim();
   let state = gradeState;
   const applied: string[] = [...plotApplied, ...gradeApplied];
+  if (RULE_INFO[source]) { const [st, got] = ruleOnPick(state, pack, source, rng); state = st; applied.push(...got); }
   const skipped: string[] = [];
   let lastEmblem: string | null = null;
   const roster = shopRoster(pack);
   const eq = pack.equipment;
-  const isItem = (n: string) => !!specialItem(n) || !!(eq?.basic.some((x) => x.name === n) || eq?.advanced.some((x) => x.name === n) || eq?.emblems?.some((x) => x.name === n) || eq?.gems?.some((x) => x.name === n));
-  const addItem = (n: string) => { state = { ...state, bag: [...state.bag, n] }; if (emblemBond(pack, n)) lastEmblem = n; };
+  const isItem = (n: string) => !!specialItem(n) || !!(eq?.basic.some((x) => x.name === n) || eq?.advanced.some((x) => x.name === baseItem(n)) || eq?.emblems?.some((x) => x.name === n) || eq?.gems?.some((x) => x.name === n));
+  const addItem = (n: string) => { state = addToBag(state, [n]); if (emblemBond(pack, n)) lastEmblem = n; };
   const addUnit = (name: string, cost: number, stars: 1 | 2 | 3, items: string[] = [], npc = false) => {
     const [s2, u] = makeUnit(state, name, cost, stars, items);
     const after = gain(s2, npc ? { ...u, npc: true } : u);
@@ -441,11 +490,15 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
     if (starM) desc = starM[2];
     let g: RegExpExecArray | null;
     if (/^Gold Coins?(\(s\))?$/i.test(desc)) { state = { ...state, gold: state.gold + n }; applied.push(`+${n} gold`); return; }
+    // "15 squad HP and 15 Max HP", "10 Squad HP and Max HP", "30 squad Max HP".
+    if ((g = /^squad HP(?: and (?:squad )?Max HP)?$/i.exec(desc))) { const both = /Max HP/i.test(desc); state = { ...state, maxHp: maxHpOf(state) + (both ? n : 0) }; state = heal(state, n); applied.push(both ? `+${n} squad HP and Max HP` : `+${n} squad HP`); return; }
+    if (/^(?:squad )?Max HP$/i.test(desc)) { state = { ...state, maxHp: maxHpOf(state) + n }; applied.push(`+${n} squad Max HP`); return; }
     if (/^(Experience|EXP)$/i.test(desc)) { state = levelUp(state, n); applied.push(`+${n} XP`); return; }
-    if (/^free (?:Store )?refresh/i.test(desc)) { state = { ...state, freeRefreshes: state.freeRefreshes + n }; applied.push(`${n} free refreshes`); return; }
+    if (/^free (?:Store )?(?:refresh|reset)/i.test(desc)) { state = { ...state, freeRefreshes: state.freeRefreshes + n }; applied.push(`${n} free refreshes`); return; }
     if ((g = /^"([^"]+)"(.*)$/.exec(desc))) {
       const name = g[1];
       const rest = g[2];
+      if (/^Chimera Energy$/i.test(name)) { state = { ...state, chimeraEnergy: (state.chimeraEnergy ?? 0) + n }; applied.push(`+${n} Chimera Energy`); return; }
       if (/^Trailblaze Power$/i.test(name)) { const t = tsrOf(state); state = { ...state, tsr: { ...t, tp: t.tp + n, earned: t.earned + n } }; applied.push(`+${n} Trailblaze Power`); return; }
       if (/^Unknown/i.test(name)) {
         if (sourceEmblem && !unknownUsed && eq?.emblems?.some((e) => e.name === sourceEmblem)) { unknownUsed = true; for (let i = 0; i < n; i++) addItem(sourceEmblem); applied.push(sourceEmblem); return; }
@@ -523,7 +576,7 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
       if (peppy) addUnit("Peppi", 0, 1, [...peppy.items], true); else skipped.push("Peppi (you have no Peppy)");
       return;
     }
-    if (/Express deals/i.test(desc)) return;
+    if (/Express deals/i.test(desc) || /interest cap/i.test(desc)) return;
     if (UNMODELLED.test(desc) || desc.length < 60) skipped.push(desc.replace(/^"|"$/g, ""));
   };
 
@@ -603,6 +656,8 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
       for (let i = 0; i < n && pool.length; i++) { const c = pickOne(rng, pool); addUnit(c.name, c.cost, 1); }
     } else if (/^Loses Gold Coins\.?$/i.test(sen)) {
       consumed.add(sen);
+    } else if ((m = /^Set current win streak to (\d+)/i.exec(sen))) {
+      state = { ...state, streak: Number(m[1]), stats: { ...state.stats, bestStreak: Math.max(state.stats.bestStreak, Number(m[1])) } }; consumed.add(sen); applied.push(`win streak set to ${m[1]}`);
     } else if ((m = /^Loses (\d+) Squad HP/i.exec(sen))) {
       state = { ...state, hp: Math.max(1, state.hp - Number(m[1])) }; applied.push(`−${m[1]} squad HP`);
     }
@@ -622,8 +677,8 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
     const hits = [...sen.matchAll(verb)];
     hits.forEach((h, k) => {
       const before = sen.slice(Math.max(0, (h.index ?? 0) - 12), h.index ?? 0);
-      // "a chance to obtain", "is able to gain" are possibilities, not grants.
-      if (/\bto\s*$/i.test(before + h[1])) return;
+      // "a chance to obtain", "is able to gain" are possibilities, not grants; "no longer gain" is a loss.
+      if (/\bto\s*$/i.test(before + h[1]) || /no longer\s*$/i.test(before + h[1])) return;
       const startAt = (h.index ?? 0) + h[0].length;
       const end = k + 1 < hits.length ? hits[k + 1].index ?? sen.length : sen.length;
       let chunk = sen.slice(startAt, end).replace(/[,\s]+(?:and)?\s*$/i, "");
@@ -669,6 +724,165 @@ function runTriggerText(s: RunState, pack: CwPack, t: Trigger, rng: () => number
   if (t.text === "__scout") return s; // handled in pickSupply
   const [s2, applied] = applyEffect(s, pack, /^(gain|obtain|get|receive)/i.test(t.text) ? t.text : `Obtains ${t.text}`, rng, t.source);
   return applied.length ? log(s2, `${t.source}: ${applied.join(", ")}.`) : s2;
+}
+
+// --------------------------------------------------------------------------------------------- named rules (rules.ts)
+
+/** Whether this run has an Environment or Strategy of that name. */
+export const owns = (s: Pick<RunState, "environment" | "strategies">, name: string) => s.environment?.name === name || s.strategies.some((x) => x.name === name);
+const ruleN = (s: RunState, k: string) => s.rule?.[k] ?? 0;
+const setRule = (s: RunState, k: string, v: number): RunState => ({ ...s, rule: { ...s.rule, [k]: v } });
+/** Nodes entered since a rule was obtained. */
+export const ruleSince = (s: RunState, name: string) => Math.max(0, ruleN(s, "nodes") - ruleN(s, `at:${name}`));
+/** Mark that gold was spent at this node (Cut Costs & Increase Revenue, Deposit Returns). */
+const spent = (s: RunState): RunState => (ruleN(s, "spent") ? s : setRule(s, "spent", 1));
+/** Store refresh price (Long-Term Gains lowers it to 1 after 30 paid refreshes). */
+export const refreshCostOf = (s: RunState) => (owns(s, "Long-Term Gains") && ruleN(s, "paidRefresh") >= 30 ? 1 : RULES.refreshCost);
+/** Last Supply node of the run (Final Payment). */
+const lastSupply = (s: RunState) => { const p = RULES.planes.length - 1; return s.plane === p && s.node === nodeKinds(p, s).lastIndexOf("Supply"); };
+
+/** The part of a named rule that happens when it's obtained. */
+function ruleOnPick(s0: RunState, pack: CwPack, name: string, rng: () => number): [RunState, string[]] {
+  let s = setRule(s0, `at:${name}`, ruleN(s0, "nodes"));
+  const info = RULE_INFO[name];
+  const got: string[] = [info.label + (info.approx ? ` (${info.approx})` : "")];
+  const gainUnit = (unitName: string, cost: number, items: string[] = [], npc = false) => {
+    const [s2, u] = makeUnit(s, unitName, cost, 1, items);
+    const after = gain(s2, npc ? { ...u, npc: true } : u);
+    if (after) s = after; else got.push(`${unitName} couldn't join (bench full)`);
+  };
+  switch (name) {
+    case "Efficient Decision": s = setRule({ ...s, freeRefreshes: s.freeRefreshes + 9999 }, "efficient", 1); break;
+    case "Interastral Peace Insurance": { const g = maxHpOf(s) - s.hp; s = { ...s, gold: s.gold + g }; got.push(`+${g} gold`); break; }
+    case "Exclusive Endorsement": {
+      const pick = sample(rng, pack.equipment?.advanced ?? [], 3);
+      if (pick.length) { const a = pickOne(rng, pick); s = { ...s, endorsed: { item: a.name, parts: [...a.recipe] as [string, string] } }; got.push(`${a.name} (from ${pick.map((x) => x.name).join(", ")})`); }
+      break;
+    }
+    case "Inequivalent Exchange": { const hp = s.hp; s = { ...s, hp: Math.max(1, Math.min(maxHpOf(s), s.gold)), gold: hp }; got.push(`HP ${s.hp}, gold ${s.gold}`); break; }
+    case "Longtermism": case "Longtermism+": { const g = name === "Longtermism" ? 7 : 9; s = setRule(setRule({ ...s, gold: s.gold + g }, "longterm", 3), "longtermGold", g); got.push(`+${g} gold`); break; }
+    case "Hyperinflation": s = setRule(setRule({ ...s, gold: 0 }, "hyper", s.gold + 70), "hyperIn", 5); got.push(`−${s0.gold} gold now, ${s0.gold + 70} after 5 nodes`); break;
+    case "What a Diamond": gainUnit("Peppy", 0, ["Wealth Gem"], true); break;
+    case "Bare Minimum": s = setRule(s, "bare", 3); break;
+    case "Market Intervention": s = setRule({ ...s, freeRefreshes: s.freeRefreshes + 5 }, "intervention", 0); break;
+    case "Full Promotion": {
+      const promote = (u: Unit | null): Unit | null => {
+        if (!u || u.npc || u.cost >= 5) return u;
+        const pool = shopRoster(pack).filter((c) => c.cost === u.cost + 1);
+        if (!pool.length) return u;
+        const c = pickOne(rng, pool);
+        got.push(`${u.name} → ${c.name}`);
+        return { ...u, name: c.name, cost: c.cost };
+      };
+      s = merge({ ...s, on: s.on.map(promote), off: s.off.map(promote) });
+      break;
+    }
+    case "The Joy of Growth": s = levelUp(s, 4); got.push("+4 XP"); break;
+    case "\"Get Out of Battle Free\" Card": s = setRule(levelUp(s, 30), "getOut", 2); got.push("+30 XP"); break;
+    case "Blue Ocean": {
+      const pool = (pack.environments ?? []).filter((e) => e.name !== "Blue Ocean");
+      s = { ...s, gold: s.gold + 6 };
+      if (pool.length) {
+        const env = pickOne(rng, pool);
+        const [s2, applied] = applyEffect({ ...s, environment: env }, pack, env.effect, rng, env.name);
+        s = s2; got.push(`+6 gold, ${env.name}${applied.length ? ` (${applied.join(", ")})` : ""}`);
+      }
+      break;
+    }
+    case "Talent Reserve": {
+      const clear = (z: (Unit | null)[]) => z.map((u) => (u && !u.npc ? null : u));
+      s = { ...s, on: clear(s.on), off: clear(s.off), bench: clear(s.bench) };
+      for (const c of sample(rng, shopRoster(pack).filter((x) => x.cost === 3), 3)) {
+        gainUnit(c.name, c.cost);
+        const u = s.bench.find((x) => x?.name === c.name);
+        const to = u && autoSpot(s, pack, u);
+        if (u && to) s = moveUnit(s, findUnit(s, u.uid)!, to);
+      }
+      break;
+    }
+    case "Personal Accident Insurance": s = { ...s, layout: RULES.planes.map((_, p) => { const k = [...nodeKinds(p, s)]; k.splice(k.lastIndexOf("Boss"), 0, "Supply"); return k; }) }; break;
+    case "War Frontier": s = { ...s, layout: RULES.planes.map((_, p) => nodeKinds(p, s).map((k) => (p === 2 && k === "Combat" ? "Encounter" : k))) }; break;
+    case "Success Experience": s = setRule(s, "success", 3); break;
+    case "Market Chaos": case "Economic Hyperheat": case "Shift Rotation": case "Excess Budget": break;
+    default: break;
+  }
+  return [s, got];
+}
+
+/** Named rules when entering a node (before the store restocks). */
+function ruleOnNode(s0: RunState, pack: CwPack, kind: NodeKind, rng: () => number): RunState {
+  const prevSpent = ruleN(s0, "spent");
+  let s = setRule(setRule(s0, "nodes", ruleN(s0, "nodes") + 1), "spent", 0);
+  const say = (line: string) => { s = log(s, line); };
+  if (ruleN(s, "efficient")) { s = setRule({ ...s, freeRefreshes: 0 }, "efficient", 0); say("Efficient Decision: free refreshes removed."); }
+  if (ruleN(s, "chaos")) s = setRule({ ...s, freeRefreshes: Math.max(0, s.freeRefreshes - ruleN(s, "chaos")) }, "chaos", 0);
+  if (owns(s, "Market Chaos") && kind === "Reward") { s = setRule({ ...s, freeRefreshes: s.freeRefreshes + 7 }, "chaos", 7); say("Market Chaos: 7 forced Store refreshes (free) this node."); }
+  if (!prevSpent && ruleN(s, "nodes") > 1) {
+    if (owns(s, "Cut Costs & Increase Revenue")) { s = { ...s, gold: s.gold + s.interestCap }; say(`Cut Costs & Increase Revenue: +${s.interestCap} gold (nothing spent last node).`); }
+    if (owns(s, "Deposit Returns")) { s = { ...s, freeRefreshes: s.freeRefreshes + 2 }; say("Deposit Returns: 2 free refreshes."); }
+  }
+  if (kind === "Boss") for (const [n, g] of [["Special Ops Fund", 7], ["Special Ops Funds+", 11]] as const) if (owns(s, n)) { s = { ...s, gold: s.gold + g }; say(`${n}: +${g} gold.`); }
+  if (ruleN(s, "longterm") > 0) { const g = ruleN(s, "longtermGold"); s = setRule({ ...s, gold: s.gold + g }, "longterm", ruleN(s, "longterm") - 1); say(`Longtermism: +${g} gold.`); }
+  if (ruleN(s, "hyperIn") > 0) { s = setRule(s, "hyperIn", ruleN(s, "hyperIn") - 1); if (!ruleN(s, "hyperIn")) { s = { ...s, gold: s.gold + ruleN(s, "hyper") }; say(`Hyperinflation: +${ruleN(s, "hyper")} gold.`); } }
+  if (ruleN(s, "bare") > 0) { s = setRule(s, "bare", ruleN(s, "bare") - 1); if (!ruleN(s, "bare")) { s = { ...s, gold: s.gold + 20 }; say("Bare Minimum: the Store opens again, +20 gold."); } }
+  if (owns(s, "Good Fortune Token: Prismatic") && ruleSince(s, "Good Fortune Token: Prismatic") > 0 && ruleSince(s, "Good Fortune Token: Prismatic") % 4 === 0) { s = { ...s, bag: [...s.bag, "Good Fortune Token"] }; say("Good Fortune Token: Prismatic: +1 Good Fortune Token."); }
+  for (const n of ["Complete Chaos", "Complete Chaos +"]) if (owns(s, n)) {
+    let k = 0;
+    const bench = s.bench.map((u) => {
+      if (!u || u.npc || k >= 6) return u;
+      k++;
+      const pool = shopRoster(pack).filter((c) => c.cost === u.cost && c.name !== u.name);
+      return pool.length ? { ...u, name: pickOne(rng, pool).name } : u;
+    });
+    if (k) { s = merge({ ...s, bench }); say(`${n}: ${k} bench character${k === 1 ? "" : "s"} rerolled.`); }
+  }
+  if (ruleN(s, "dub") === 1) { const e = Array.from({ length: 5 }, () => randomEmblem(pack, rng)).filter((x): x is string => !!x); s = setRule({ ...s, bag: [...s.bag, ...e] }, "dub", 2); say(`Don't Underestimate Our Bond: ${e.join(", ")}.`); }
+  if (ruleN(s, "success") > 0 && s.level >= 8) { s = setRule(levelUp(s, 12), "success", ruleN(s, "success") - 1); say("Success Experience: +12 XP."); }
+  if (owns(s, "Elite Talent Investment")) s = levelUp(s, 2);
+  if (kind === "Supply" && owns(s, "Final Payment") && lastSupply(s) && !ruleN(s, "final")) { s = setRule({ ...s, gold: s.gold + 30 }, "final", 1); say("Final Payment: +30 gold."); }
+  if (owns(s, "Shift Rotation")) { const c = 1 + Math.floor(rng() * 5); s = setRule(s, "shift", c); say(`Shift Rotation: ${c}-cost characters drop twice as often this node.`); }
+  return s;
+}
+
+/** Shop odds after Shift Rotation (one cost's drop rate doubled, then renormalized). */
+function shopOdds(s: RunState, pack: CwPack): CwPack["odds"] {
+  const c = owns(s, "Shift Rotation") ? ruleN(s, "shift") : 0;
+  if (!c) return pack.odds;
+  return pack.odds.map((o) => { const w = o.odds.map((p, i) => (i === c - 1 ? p * 2 : p)); const t = w.reduce((a, b) => a + b, 0) || 1; return { ...o, odds: w.map((p) => p / t) }; });
+}
+
+/** After a fight: named rules that pay out or heal (before the run can end). */
+function ruleAfterFight(s0: RunState, pack: CwPack, ctx: { kind: NodeKind; won: boolean; avLeft: number; idle: number; bonds: number; last: boolean }): RunState {
+  let s = s0;
+  const say = (line: string) => { s = log(s, line); };
+  if (s.hp <= 0 && owns(s, "Ace in the Hole") && !ruleN(s, "ace")) { s = setRule(levelUp({ ...s, hp: 40, gold: s.gold + 80 }, 30), "ace", 1); say("Ace in the Hole: immune to the final blow, HP 40, +30 XP, +80 gold."); }
+  if (s.hp <= 0) return s;
+  if (ctx.kind !== "Reward") {
+    if (owns(s, "Interastral Peace Insurance")) s = heal(s, 10);
+    if (owns(s, "Surplus Value") && ctx.won && ctx.avLeft > 0) { const g = Math.min(4, Math.floor(ctx.avLeft / 30)); if (g) { s = { ...s, gold: s.gold + g }; say(`Surplus Value: +${g} gold.`); } }
+    if (owns(s, "Cost Control") && ctx.won && ctx.avLeft > 0) { const h = Math.min(8, Math.floor(ctx.avLeft / 10)); if (h) s = heal(s, h); }
+    if (owns(s, "Hype Squad") && ctx.idle >= 2) { s = levelUp(s, Math.floor(ctx.idle / 2)); say(`Hype Squad: +${Math.floor(ctx.idle / 2)} XP.`); }
+    if (owns(s, "Don't Underestimate Our Bond") && ctx.bonds >= 8 && !ruleN(s, "dub")) s = setRule(s, "dub", 1);
+    if (owns(s, "Lifetime Employment")) { const bind = (u: Unit | null) => (u && !u.npc ? { ...u, bound: true } : u); s = { ...s, on: s.on.map(bind), off: s.off.map(bind) }; }
+  }
+  if (ctx.kind === "Boss" && owns(s, "Struggle Protocol")) { s = heal(s, 50); say("Struggle Protocol: +50 squad HP."); }
+  if (ctx.last && owns(s, "Restore Vitality")) { s = heal(s, 40); say("Restore Vitality: +40 squad HP."); }
+  return s;
+}
+
+/** Combat context for rules.ts from the deployed squad. */
+function ruleCtx(s: RunState, pack: CwPack, units: CombatUnit[], av: number, boss: boolean, bonds: { bond: { category?: string } }[], summons: number): Parameters<typeof combatRules>[1] {
+  const g = globalIndex(s.plane, Math.min(s.node, RULES.planes[s.plane].length - 1));
+  return {
+    units, av, boss, bonds: bonds.length, sharedBonds: bonds.filter((b) => b.bond.category === "Faction" || b.bond.category === "School").length, summons,
+    enemyStar: 1 + 0.9 * (g / (totalNodes - 1)), since: (n) => ruleSince(s, n),
+    itemGain: (u, k) => {
+      const ctx = { place: u.place, stars: u.stars, boss };
+      if (k === "privilege") { const it = u.items.find((x) => itemKind(pack, x) === "advanced" && !isPrivileged(x)); if (!it) return {}; const a = itemEffect(pack, it, ctx).self, b = itemEffect(pack, it, { ...ctx, privileged: true }).self; const d: Partial<Stats> = {}; for (const key of Object.keys(b) as (keyof Stats)[]) d[key] = (b[key] ?? 0) - (a[key] ?? 0); return d; }
+      const rec = (pack.equipment?.advanced ?? []).find((a) => a.users.includes(u.name) && !u.items.includes(a.name));
+      return rec ? itemEffect(pack, rec.name, ctx).self : {};
+    },
+  };
 }
 
 // --------------------------------------------------------------------------------------------- run flow
@@ -766,27 +980,32 @@ export function enterNode(s0: RunState, pack: CwPack): RunState {
   if (s.xpPerNode) s = levelUp(s, s.xpPerNode);
   if (s.node === 0) s = fireTriggers(s, pack, "plane", rng);
   if (s.node === 0 && s.plane === 1 && s.advantage?.includes("reselect")) s = log({ ...s, plotArmor: { ...plotOf(s), swaps: plotOf(s).swaps + 1 } }, "Reselect Protagonist: 1 Plot Armor reselection chance.");
-  if (s.node === 0 && s.plane === 1 && s.advantage?.includes("master-smith")) s = log({ ...s, bag: [...s.bag, "Smelting Furnace", "Disassembly Wrench"] }, "Master Smith: Smelting Furnace and Disassembly Wrench.");
+  if (s.node === 0 && s.plane === 1 && s.advantage?.includes("master-smith")) s = log(addToBag(s, ["Smelting Furnace", "Disassembly Wrench"]), "Master Smith: Smelting Furnace and Disassembly Wrench.");
   s = fireTriggers(s, pack, "node", rng);
   s = nodeTp(s);
   s = frenzyContract(s, pack, rng);
   s = rollDice(s, pack);
+  s = ruleOnNode(s, pack, kind, rng);
   // The store refreshes at the start of every node. Lock keeps it for the next node only (tutorial "Store"), then releases.
   if (!s.locked) s = { ...s, shop: rollShopSlots(s, pack, rng), shopNote: "refreshed" };
   else s = log({ ...s, locked: false, shopNote: "kept" }, "Store kept by Lock for this node (lock released).");
   const opp = kind === "Boss" ? s.opponents[s.plane] ?? s.opponents[0] : s.opponents.length ? pickOne(rng, s.opponents) : "";
   s = { ...s, nodeOpponent: opp ?? "", encounter: null, last: null, interlude: undefined };
   s = onEnterNode(s, pack, rng, () => highestBond(s, pack));
-  return settle(withInterludes(nodePhase(s, pack, kind, rng), pack), pack);
+  const out = settle(withInterludes(nodePhase(s, pack, kind, rng), pack), pack);
+  // "Get Out of Battle Free" Card: a Combat node is skipped (twice per run).
+  if (kind === "Combat" && out.phase === "prep" && !out.interlude && ruleN(out, "getOut") > 0) return advance(log(setRule(out, "getOut", ruleN(out, "getOut") - 1), `"Get Out of Battle Free" Card: P${out.plane + 1}-${out.node + 1} skipped.`), pack);
+  return out;
 }
 
 /** Whatever Dice: at each node it puts two random items on its holder (for that node). */
 function rollDice(s: RunState, pack: CwPack): RunState {
-  if (!units(s).some((u) => u.items.includes("Whatever Dice") || u.dice)) return s;
+  const hasDice = (u: Unit) => u.items.some((i) => baseItem(i) === "Whatever Dice");
+  if (!units(s).some((u) => hasDice(u) || u.dice)) return s;
   const rng = createRng(`${s.seed}:dice:${s.tick}`);
   const roll = (u: Unit | null): Unit | null => {
-    if (!u || (!u.items.includes("Whatever Dice") && !u.dice)) return u;
-    if (!u.items.includes("Whatever Dice")) { const { dice: _gone, ...rest } = u; void _gone; return rest; }
+    if (!u || (!hasDice(u) && !u.dice)) return u;
+    if (!hasDice(u)) { const { dice: _gone, ...rest } = u; void _gone; return rest; }
     return { ...u, dice: [randomBasic(pack, rng), randomBasic(pack, rng)].filter((x): x is string => !!x) };
   };
   const out = { ...s, on: s.on.map(roll), off: s.off.map(roll), bench: s.bench.map(roll) };
@@ -809,7 +1028,12 @@ function nodePhase(s: RunState, pack: CwPack, kind: NodeKind, rng: () => number)
     const roster = shopRoster(pack);
     const extra = s.advantage?.includes("bonus-supply") ? 1 : 0;
     const gem = () => (s.advantage?.includes("shining-diamond") || s.advantage?.includes("diamond")) && rng() < 0.2 ? pickOne(rng, ["Red Gem", "Blue Gem"]) : null;
-    const base = rollShop(pack.odds, s.level, roster, rng, Math.max(1, RULES.supplyOffers + extra - (s.supplyFewer ?? 0))).map((c) => ({ name: c.name, cost: c.cost, item: gem() ?? randomBasic(pack, rng) ?? "" }));
+    const two = owns(s, "Excess Budget");
+    const base = rollShop(pack.odds, s.level, roster, rng, Math.max(1, RULES.supplyOffers + extra - (s.supplyFewer ?? 0))).map((c) => {
+      const item = gem() ?? randomBasic(pack, rng) ?? "";
+      const second = two ? randomBasic(pack, rng) : null;
+      return { name: c.name, cost: c.cost, item, ...(second ? { items: [item, second].filter(Boolean) } : {}) };
+    });
     const offer = supplyOffers(s, pack, base, rng);
     if (offer.length) return { ...s, phase: "supply", offers: { supply: offer } };
   }
@@ -1051,6 +1275,13 @@ export function settle(s: RunState, pack: CwPack): RunState {
   out = checkAssignments(out);
   // Aeon ★ Aha becomes 5-cost, then 7-cost (Master of Phantasia's unlock criteria).
   out = promoteAeonAha(out, states);
+  // Economies of Scale: a Perfect Projector the first time you own 8 copies of one character.
+  if (owns(out, "Economies of Scale") && !ruleN(out, "scale")) {
+    const copies = new Map<string, number>();
+    for (const u of units(out)) if (!u.npc) copies.set(u.name, (copies.get(u.name) ?? 0) + copiesFor(u.stars));
+    const hit = [...copies].find(([, n]) => n >= 8);
+    if (hit) out = log(setRule({ ...out, bag: [...out.bag, "Perfect Projector"] }, "scale", 1), `Economies of Scale: 8 copies of ${hit[0]} → Perfect Projector.`);
+  }
   // Aha descends into the preparation area once the Elation Bond is active, with 3 random basic pieces.
   if (!out.aha && count("Elation") && ahaStar(out, pack)) {
     const rng = createRng(`${out.seed}:aha`);
@@ -1127,19 +1358,25 @@ export const at = (s: RunState, spot: Spot) => s[spot.zone][spot.index] ?? null;
 export function buy(s0: RunState, pack: CwPack, index: number): RunState {
   const slot = s0.shop[index];
   if (s0.phase !== "prep" || !slot) return s0;
+  if (ruleN(s0, "bare") > 0) return note(s0, `Bare Minimum: no buying for ${ruleN(s0, "bare")} more node${ruleN(s0, "bare") === 1 ? "" : "s"}.`);
   const price = slot.cost * copiesFor(slot.stars);
   if (s0.gold < price) return note(s0, `Not enough gold (${price} needed).`);
   const [s, u] = makeUnit(step(s0)[0], slot.name, slot.cost, slot.stars);
   const after = gain({ ...s, gold: s.gold - price }, u);
   if (!after) return note(s0, "Your bench is full. Sell someone or deploy them first.");
   const shop = [...after.shop]; shop[index] = null;
-  return talentRefill({ ...after, shop }, pack, index, slot.cost, createRng(`${s0.seed}:talent:${s0.tick}`));
+  let out = spent({ ...after, shop });
+  // Cashback: 3 gold per 3 5-cost characters bought. Twin Primes: XP on the first buy of each cost.
+  if (slot.cost === 5 && owns(out, "Cashback")) { const k = ruleN(out, "cashback") + 1; out = setRule(out, "cashback", k); if (k % 3 === 0) out = log({ ...out, gold: out.gold + 3 }, "Cashback: +3 gold."); }
+  if (owns(out, "Twin Primes") && !ruleN(out, `prime:${slot.cost}`)) { const xp = [2, 3, 5, 7, 11][slot.cost - 1] ?? 0; out = log(levelUp(setRule(out, `prime:${slot.cost}`, 1), xp), `Twin Primes: +${xp} XP.`); }
+  return talentRefill(out, pack, index, slot.cost, createRng(`${s0.seed}:talent:${s0.tick}`));
 }
 
 export function sell(s0: RunState, spot: Spot): RunState {
   const u = at(s0, spot);
   // Allowed at Supply too, so a full bench never blocks taking a character.
   if (!u || (s0.phase !== "prep" && s0.phase !== "supply")) return s0;
+  if (u.bound) return note(s0, `Lifetime Employment: ${u.name} has fought and can't be sold.`);
   const [s] = step(s0);
   const zone = [...s[spot.zone]]; zone[spot.index] = null;
   const refund = ASSUMED.sellRefund(u.cost, u.stars);
@@ -1150,6 +1387,7 @@ export function sell(s0: RunState, spot: Spot): RunState {
 export function moveUnit(s0: RunState, from: Spot, to: Spot): RunState {
   const a = at(s0, from), b = at(s0, to);
   if (!a || (from.zone === to.zone && from.index === to.index)) return s0;
+  if ((a.bound && to.zone === "bench") || (b?.bound && from.zone === "bench")) return note(s0, "Lifetime Employment: characters who fought stay on the field.");
   const deploying = from.zone === "bench" && to.zone !== "bench" && !b;
   if (deploying && deployed(s0).length >= teamSize(s0)) return note(s0, `Team is full: level ${s0.level} deploys ${teamSize(s0)}. Buy XP to level up.`);
   const s = { ...s0, on: [...s0.on], off: [...s0.off], bench: [...s0.bench], note: null };
@@ -1173,19 +1411,58 @@ export function autoSpot(s: RunState, pack: CwPack, u: Unit): Spot | null {
 
 export function refresh(s0: RunState, pack: CwPack): RunState {
   if (s0.phase !== "prep") return s0;
+  if (ruleN(s0, "bare") > 0) return note(s0, `Bare Minimum: no Store refreshes for ${ruleN(s0, "bare")} more node${ruleN(s0, "bare") === 1 ? "" : "s"}.`);
   const free = s0.freeRefreshes > 0;
-  if (!free && s0.gold < RULES.refreshCost) return note(s0, `Refreshing costs ${RULES.refreshCost} gold.`);
+  const cost = refreshCostOf(s0);
+  if (!free && s0.gold < cost) return note(s0, `Refreshing costs ${cost} gold.`);
   const [s, rng] = step(s0);
-  const out = { ...s, gold: free ? s.gold : s.gold - RULES.refreshCost, freeRefreshes: free ? s.freeRefreshes - 1 : s.freeRefreshes, shop: rollShopSlots(s, pack, rng), stats: { ...s.stats, refreshes: s.stats.refreshes + 1 } };
+  // Probability Event: a paid refresh has a 50% chance to be free.
+  const lucky = !free && owns(s, "Probability Event") && rng() < 0.5;
+  const paid = !free && !lucky;
+  let out: RunState = { ...s, gold: paid ? s.gold - cost : s.gold, freeRefreshes: free ? s.freeRefreshes - 1 : s.freeRefreshes, shop: rollShopSlots(s, pack, rng), stats: { ...s.stats, refreshes: s.stats.refreshes + 1 } };
+  if (free && ruleN(out, "chaos") > 0) out = setRule(out, "chaos", ruleN(out, "chaos") - 1);
+  if (lucky) out = log(out, "Probability Event: free refresh.");
+  if (paid) {
+    out = spent(setRule(out, "paidRefresh", ruleN(out, "paidRefresh") + 1));
+    if (owns(out, "Goldgrubber")) out = levelUp(out, 2);
+    if (owns(out, "Long-Term Gains") && ruleN(out, "paidRefresh") === 30) out = log({ ...out, gold: out.gold + 20 }, "Long-Term Gains: +20 gold; refreshes now cost 1.");
+  }
+  // Market Intervention: the next and every 4th refresh shows 3-cost characters.
+  if (owns(out, "Market Intervention")) {
+    const n = ruleN(out, "intervention");
+    out = setRule(out, "intervention", n + 1);
+    if (n % 4 === 0) { const pool = shopRoster(pack).filter((c) => c.cost === 3); out = log({ ...out, shop: sample(rng, pool, RULES.shopSlots).map((c) => ({ name: c.name, cost: c.cost, stars: 1 as const })) }, "Market Intervention: 3-cost characters."); }
+  }
+  // Procurement Specialist: every 5 (Prismatic) / 7 (Gold) refreshes, 5 characters of the leftmost bench character's cost.
+  for (const [n, every] of [["Procurement Specialist: Prismatic", 5], ["Procurement Specialist: Gold", 7]] as const) {
+    if (!owns(out, n)) continue;
+    const k = ruleN(out, `proc:${n}`) + 1;
+    out = setRule(out, `proc:${n}`, k);
+    const left = out.bench.find((u) => u && !u.npc);
+    if (k % every === 0 && left) { const pool = shopRoster(pack).filter((c) => c.cost === left.cost); out = log({ ...out, shop: Array.from({ length: RULES.shopSlots }, () => { const c = pickOne(rng, pool); return { name: c.name, cost: c.cost, stars: 1 as const }; }) }, `${n}: ${left.cost}-cost restock.`); }
+  }
   return (out.triggers ?? []).some((t) => t.on === "refresh") ? fireTriggers(out, pack, "refresh", rng) : out;
 }
 
-export function buyXp(s0: RunState): RunState {
+export function buyXp(s0: RunState, pack?: CwPack): RunState {
   if (s0.phase !== "prep") return s0;
   if (s0.level >= ASSUMED.maxLevel) return note(s0, "Already max level.");
-  if (s0.gold < s0.xpCost) return note(s0, `Experience costs ${s0.xpCost} gold.`);
-  const [s] = step(s0);
-  return levelUp({ ...s, gold: s.gold - s.xpCost, stats: { ...s.stats, xpBought: s.stats.xpBought + 1 } }, ASSUMED.xpPerBuy + xpBonus(s));
+  // Struggle Protocol: Experience costs 6 squad HP instead of gold.
+  const struggle = owns(s0, "Struggle Protocol");
+  if (struggle ? s0.hp <= 6 : s0.gold < s0.xpCost) return note(s0, struggle ? "Struggle Protocol: Experience costs 6 squad HP (you'd drop to 0)." : `Experience costs ${s0.xpCost} gold.`);
+  const [s, rng] = step(s0);
+  let out = levelUp({ ...s, gold: struggle ? s.gold : s.gold - s.xpCost, hp: struggle ? s.hp - 6 : s.hp, stats: { ...s.stats, xpBought: s.stats.xpBought + 1 } }, ASSUMED.xpPerBuy + xpBonus(s));
+  if (!struggle) out = spent(out);
+  // Promotion Quota: a random shop character becomes one costing 1 more.
+  if (pack && owns(out, "Promotion Quota")) {
+    const slots = out.shop.map((x, i) => (x && x.cost < 5 ? i : -1)).filter((i) => i >= 0);
+    if (slots.length) {
+      const i = pickOne(rng, slots), was = out.shop[i]!;
+      const pool = shopRoster(pack).filter((c) => c.cost === was.cost + 1);
+      if (pool.length) { const c = pickOne(rng, pool); const shop = [...out.shop]; shop[i] = { name: c.name, cost: c.cost, stars: was.stars }; out = log({ ...out, shop }, `Promotion Quota: ${was.name} → ${c.name}.`); }
+    }
+  }
+  return out;
 }
 
 export const toggleLock = (s: RunState): RunState => ({ ...s, locked: !s.locked });
@@ -1213,6 +1490,7 @@ export function equip(s0: RunState, pack: CwPack, bagIndex: number, spot: Spot):
     return startPrepInterlude(log({ ...s1, bag: s1.bag.filter((_, i) => i !== bagIndex) }, `Imagenae: Plot Armor used on ${u.name}.`), pack, "imagenae", u.uid);
   }
   if (sp?.use === "box") return note(s0, "Tap the Basic Weapon Box in Items to choose what's inside.");
+  if (sp && (sp.use === "wrench" || sp.use === "furnace" || sp.use === "privilege" || sp.use === "token")) return applyTool(s0, pack, bagIndex, spot);
   if (sp?.only && sp.only !== u.name) return note(s0, `${item} can only be equipped by ${sp.only}.`);
   let items = [...u.items];
   let made: string | null = null;
@@ -1229,16 +1507,71 @@ export function equip(s0: RunState, pack: CwPack, bagIndex: number, spot: Spot):
   const zone = [...s[spot.zone]]; zone[spot.index] = { ...u, items };
   const bag = s.bag.filter((_, i) => i !== bagIndex);
   const out = { ...s, [spot.zone]: zone, bag };
-  return made ? synthesisRefund(log(out, `${u.name}: ${item} combined into ${made}.`), [u.items.find((x) => isComponent(pack, x) && combineResult(pack, x, item)) ?? item, item].filter((x) => isBasic(pack, x))) : out;
+  return made ? afterSynthesis(log(out, `${u.name}: ${item} combined into ${made}.`), [u.items.find((x) => isComponent(pack, x) && combineResult(pack, x, item)) ?? item, item].filter((x) => isBasic(pack, x))) : out;
 }
 
-/** Combine two items in the bag (basic + basic, gem + basic, gem + gem). */
+/** Consumables used on a character: Disassembly Wrench, Smelting Furnace, Special Privilege Card, Good Fortune Token (wiki). */
+function applyTool(s0: RunState, pack: CwPack, bagIndex: number, spot: Spot): RunState {
+  const tool = s0.bag[bagIndex];
+  const u = at(s0, spot);
+  const sp = specialItem(tool);
+  if (!u || !sp) return s0;
+  const [s1, rng] = step(s0);
+  const bag = sp.reusable ? [...s1.bag] : s1.bag.filter((_, i) => i !== bagIndex);
+  const put = (items: string[], extra: string[] = []): RunState => {
+    const zone = [...s1[spot.zone]]; zone[spot.index] = { ...u, items };
+    return { ...s1, [spot.zone]: zone, bag: [...bag, ...extra] };
+  };
+  if (sp.use === "wrench") {
+    if (!u.items.length) return note(s0, `${u.name} has no equipment to remove.`);
+    return log(put([], u.items), `${tool}: removed ${u.items.join(", ")} from ${u.name}.`);
+  }
+  if (sp.use === "furnace") {
+    const gear = u.items.filter((it) => !specialItem(it));
+    if (!gear.length) return note(s0, `${u.name} has no equipment to reroll.`);
+    const items = u.items.map((it) => (specialItem(it) ? it : smelt(s1, pack, it, rng)));
+    return log(put(items), `${tool}: ${u.name}'s ${gear.join(", ")} → ${items.filter((it) => !specialItem(it)).join(", ")}.`);
+  }
+  if (sp.use === "privilege") {
+    const k = u.items.findIndex((it) => itemKind(pack, it) === "advanced" && !isPrivileged(it));
+    if (k < 0) return note(s0, `${u.name} wears no advanced equipment to upgrade.`);
+    const items = [...u.items]; items[k] = privileged(items[k]);
+    return log(put(items), `${tool}: ${u.items[k]} → ${items[k]}.`);
+  }
+  // Good Fortune Token: one of the character's recommended advanced equipment (up to 4).
+  const rec = (pack.equipment?.advanced ?? []).filter((a) => a.users.includes(u.name)).slice(0, 4).map((a) => a.name);
+  if (!rec.length) return note(s0, `The wiki lists no recommended equipment for ${u.name}.`);
+  const got = pickOne(rng, rec);
+  return log({ ...s1, bag: [...bag, got] }, `${tool}: ${got} (recommended for ${u.name}; you'd choose 1 of ${rec.length}, random here).`);
+}
+
+/** After synthesizing equipment: Mummicat's refund, Power Refresh's 2 free refreshes. */
+function afterSynthesis(s: RunState, used: string[]): RunState {
+  const out = synthesisRefund(s, used);
+  return owns(out, "Power Refresh") ? log({ ...out, freeRefreshes: out.freeRefreshes + 2 }, "Power Refresh: 2 free refreshes.") : out;
+}
+
+/** Combine two items in the bag (basic + basic, gem + basic, gem + gem), or use a Smelting Furnace / Special Privilege Card on one. */
 export function combineBag(s0: RunState, pack: CwPack, i: number, j: number): RunState {
   const a = s0.bag[i], b = s0.bag[j];
+  const tool = [a, b].map((x) => specialItem(x ?? "")?.use);
+  if (a && b && i !== j && (tool[0] === "furnace" || tool[0] === "privilege" || tool[1] === "furnace" || tool[1] === "privilege")) {
+    const [ti, gi] = tool[0] === "furnace" || tool[0] === "privilege" ? [i, j] : [j, i];
+    const t = s0.bag[ti], g = s0.bag[gi];
+    if (specialItem(g)) return note(s0, `${t} works on equipment.`);
+    const [s, rng] = step(s0);
+    let out: string;
+    if (specialItem(t)?.use === "privilege") {
+      if (itemKind(pack, g) !== "advanced" || isPrivileged(g)) return note(s0, "The Special Privilege Card upgrades advanced equipment.");
+      out = privileged(g);
+    } else out = smelt(s, pack, g, rng);
+    const bag = [...s.bag]; bag[gi] = out;
+    return log({ ...s, bag: bag.filter((_, k) => k !== ti) }, `${t}: ${g} → ${out}.`);
+  }
   const r = a && b && i !== j && isComponent(pack, a) && isComponent(pack, b) ? combineResult(pack, a, b) : null;
   if (!r) return note(s0, "Those two don't combine.");
   const [s] = step(s0);
-  return synthesisRefund(log({ ...s, bag: [...s.bag.filter((_, k) => k !== i && k !== j), r] }, `${a} + ${b} → ${r}.`), [a, b].filter((x) => isBasic(pack, x)));
+  return afterSynthesis(log({ ...s, bag: [...s.bag.filter((_, k) => k !== i && k !== j), r] }, `${a} + ${b} → ${r}.`), [a, b].filter((x) => isBasic(pack, x)));
 }
 
 /** Phases when you can open ores (any time you're in the run, not on its end screen). */
@@ -1303,14 +1636,14 @@ export function unitItems(u: Unit, place: "on" | "off", pack: CwPack, ctx: { sin
   const notes: string[] = [];
   // Evolution Modification Module: the first advanced item counts as privileged.
   const evo = u.items.includes("Evolution Modification Module");
-  const firstAdv = u.items.find((it) => itemKind(pack, it) === "advanced");
+  const firstAdv = u.items.find((it) => itemKind(pack, it) === "advanced" && !isPrivileged(it));
   for (const it of [...u.items, ...(u.dice ?? [])]) {
     if (it === "Imploding Singularity") { self = addStats(self, { str: ESCAPADE_ASSUMED.singularity.perStack * (ctx.singularity ?? 0) }); continue; }
-    const fx = itemEffect(pack, it, { place, stars: u.stars, boss: !!ctx.boss, privileged: evo && it === firstAdv });
+    const fx = itemEffect(pack, it, { place, stars: u.stars, boss: !!ctx.boss, privileged: (evo && it === firstAdv) || isPrivileged(it) });
     self = addStats(self, fx.self);
     if (Object.keys(fx.squad).length) squad.push(fx.squad);
     if (fx.notes.length) notes.push(`${it}: ${fx.notes.join(", ")}`);
-    if (pack.equipment?.advanced.find((a) => a.name === it)?.users.includes(u.name)) self = addStats(self, { str: MODEL.recommended });
+    if (pack.equipment?.advanced.find((a) => a.name === baseItem(it))?.users.includes(u.name)) self = addStats(self, { str: MODEL.recommended });
   }
   return { self, squad, notes };
 }
@@ -1415,7 +1748,7 @@ export function teamPower(s: RunState, pack: CwPack) {
   const idle = placed.filter((x) => !x.u.npc && !bases.get(x.u.uid)).map((x) => x.u.name);
   const bctx: BondCtx = {
     placed: fighters.map((x) => ({ uid: x.u.uid, name: x.u.name, cost: x.u.cost, stars: x.u.stars, items: x.u.items, place: x.place, base: (bases.get(x.u.uid) ?? 0) * powerMult(items.get(x.u.uid)!.self, x.place) })),
-    nodes: globalIndex(s.plane, s.node) + 1, av: av ?? 150, boss, storeLevel: s.level, isBasic: (i) => isBasic(pack, i),
+    nodes: globalIndex(s.plane, s.node) + 1, chimeraEnergy: s.chimeraEnergy, av: av ?? 150, boss, storeLevel: s.level, isBasic: (i) => isBasic(pack, i),
   };
   const effects = teamBonds.map((b) => bondEffect(pack, b, bctx));
   // Every character's kit for where they stand: team buffs, enemy debuffs, ally actions, shields, healing, named summons (kits.ts).
@@ -1447,6 +1780,19 @@ export function teamPower(s: RunState, pack: CwPack) {
     const base = bases.get(x.u.uid) ?? 0;
     return { uid: x.u.uid, name: x.u.name, place: x.place, power: base * powerMult(st, x.place), noBonds: base * powerMult(noBonds, x.place), spd: st.spd, plot: plot.strength, stats: st };
   });
+  // Named Environment/Strategy combat rules (rules.ts): squad and per-character stats, star-ups, enemy changes.
+  const ruleNames = [s.environment?.name, ...s.strategies.map((x) => x.name)].filter((n): n is string => !!n && !!RULE_INFO[n]);
+  const shared = (name: string) => teamBonds.filter((b) => (b.bond.category === "Faction" || b.bond.category === "School") && b.bond.members.includes(name)).length;
+  const rules = ruleNames.length ? combatRules(ruleNames, ruleCtx(s, pack, per.map((p) => { const f = fighters.find((x) => x.u.uid === p.uid)!; return { uid: p.uid, name: p.name, cost: f.u.cost, stars: f.u.stars, items: f.u.items, place: p.place, power: p.power, lucky: p.stats.lucky, sharedBonds: shared(p.name) }; }),
+    av ?? 150, boss, teamBonds, kits.reduce((n, { k }) => n + k.summons.length, 0) + effects.reduce((n, e) => n + e.summons.length, 0))) : null;
+  if (rules) for (const p of per) {
+    const f = fighters.find((x) => x.u.uid === p.uid)!;
+    const up = rules.starUp.get(p.uid);
+    const base = up ? unitBase({ ...f.u, stars: up.stars as 1 | 2 | 3 }, p.place, pack) * up.mult : bases.get(p.uid) ?? 0;
+    p.stats = addStats(addStats(p.stats, rules.squad), rules.per.get(p.uid) ?? {});
+    p.spd = p.stats.spd;
+    p.power = base * powerMult(p.stats, p.place);
+  }
   // Elation: Aha Instants, Punchline, Certified Banger, Lucky Strike (elation.ts).
   const elation = simulateElation(
     per.map((x) => ({ uid: x.uid, name: x.name, cost: fighters.find((f) => f.u.uid === x.uid)!.u.cost, stars: fighters.find((f) => f.u.uid === x.uid)!.u.stars, place: x.place, power: x.power, spdAmp: x.spd + (pack.info?.[x.name]?.spd?.[fighters.find((f) => f.u.uid === x.uid)!.u.stars - 1] ?? 0) / 100, lucky: x.stats.lucky, luckyDmg: x.stats.luckyDmg, elation: 0 })),
@@ -1482,7 +1828,7 @@ export function teamPower(s: RunState, pack: CwPack) {
   const robot = robotFor(s, kind);
   const robotBonus = robot ? (robot.mult / 100) * Math.max(1, Math.floor(((av ?? 150) * robot.spd) / 10000)) * 0.01 : 0;
   const power = (units + summonPower + elationPower) * (1 + express.bonus + robotBonus + elation.repellency * 0.5);
-  return { raw, bonus, power, bonds, idle, per, summons, effects, kits: kits.map(({ x, k }) => ({ uid: x.u.uid, name: x.u.name, kit: k })), express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7, squadItems, elation, elationPower, ahaStar: aStar };
+  return { raw, bonus, power, bonds, idle, per, summons, effects, rules, kits: kits.map(({ x, k }) => ({ uid: x.u.uid, name: x.u.name, kit: k })), express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7, squadItems, elation, elationPower, ahaStar: aStar };
 }
 
 /** Average strength of a cost at a (fractional) star level, from the pack's character pages. */
@@ -1495,7 +1841,8 @@ function avgStrength(pack: CwPack, cost: number, star: number): number {
 
 /** Enemy strength for a node: what a typical board at that point would have, scaled by difficulty. */
 export function enemyPower(s: RunState, pack: CwPack, kind: NodeKind = nodeKind(s)): number {
-  const g = globalIndex(s.plane, s.node);
+  // Inserted nodes (Personal Accident Insurance) map back onto the base plane for the difficulty curve.
+  const g = globalIndex(s.plane, Math.min(s.node, RULES.planes[s.plane].length - 1));
   const bosses = [0, ...RULES.planes.map((_, p) => globalIndex(p, RULES.planes[p].length - 1))];
   const seg = Math.max(0, bosses.findIndex((b, i) => i > 0 && g <= b) - 1);
   const t = (g - bosses[seg]) / Math.max(1, bosses[seg + 1] - bosses[seg]);
@@ -1507,7 +1854,9 @@ export function enemyPower(s: RunState, pack: CwPack, kind: NodeKind = nodeKind(
   const third = kind === "Combat" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? 1.1 : 1;
   const rankStep = pack.difficulty?.find((d) => d.id === s.rank);
   const hpBoost = rankStep?.planes[s.plane]?.hp ?? 0;
-  const diff = (1 + hpBoost / 100) ** 0.2 * (1 + 0.03 * s.extraDifficulty);
+  // Easy Mode (−3) and Difficulty Modifier (−4 at Encounter/Boss nodes) lower the difficulty Strategies added, to 0 at least.
+  const cut = (owns(s, "Easy Mode") ? 3 : 0) + ((kind === "Encounter" || kind === "Boss") && owns(s, "Difficulty Modifier") ? 4 : 0);
+  const diff = (1 + hpBoost / 100) ** 0.2 * (1 + 0.03 * Math.max(0, s.extraDifficulty - cut));
   const elite = kind === "Combat" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node;
   const companion = s.escapade ? (s.escapade.enemyMult ?? 1) * (s.escapade.variant === "bw-weaken" && elite ? ESCAPADE_ASSUMED.weakenedMult : 1) : 1;
   return level * unit * 1.15 * kindMult[kind] * third * diff * MODEL.enemyScale * companion;
@@ -1527,7 +1876,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   // Bubble Wolf's Trotters (own RNG stream, so other rolls stay the same).
   const trotterRng = createRng(`${s.seed}:trotter:${s.tick}`);
   const trotter = enemyMods(s, kind, false, trotterRng).trotter || (!!s.advantage?.includes("fauna") && kind !== "Boss" && kind !== "Reward" && trotterRng() < 0.15);
-  const enemy = enemyPower(s, pack, kind) * (trotter ? ESCAPADE_ASSUMED.trotterMult : 1);
+  const enemy = enemyPower(s, pack, kind) * (trotter ? ESCAPADE_ASSUMED.trotterMult : 1) * (tp.rules?.enemyMult ?? 1);
   const chance = kind === "Reward" ? 1 : winChance(power, enemy);
   let won = kind === "Reward" || rng() < chance;
   // Woof Woof Dan: the first failed fight (per plane, or from a plane on) becomes a Perfect Clear.
@@ -1536,7 +1885,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const boss = kind === "Boss";
   const base = RULES.hpLoss[s.plane][boss ? 1 : 0];
   const cleared = won ? 1 : Math.max(0.05, Math.min(0.95, (power / Math.max(1, enemy)) * 0.9));
-  const hpLost = won ? 0 : Math.round((base + Math.round((1 - cleared) * base)) * (s.advantage?.includes("safety") ? 0.9 : 1));
+  const hpLost = won ? 0 : Math.round((base + Math.round((1 - cleared) * base)) * (s.advantage?.includes("safety") ? 0.9 : 1) * (owns(s, "Cost of Expansion") ? 2 : 1));
   const streak = kind === "Reward" ? s.streak : won ? s.streak + 1 : 0;
   const interest = Math.min(s.interestCap, Math.floor(s.gold / RULES.interestPer));
   const adv = s.advantage ?? [];
@@ -1546,14 +1895,19 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   let drops = 0, item: string | undefined;
   const ores: string[] = [];
   if (kind === "Reward") {
-    drops = ASSUMED.rewardGold[0] + Math.floor(rng() * (ASSUMED.rewardGold[1] - ASSUMED.rewardGold[0] + 1));
-    for (let k = 0; k < ASSUMED.rewardOres; k++) ores.push(randomOre(s.plane, rng));
+    // Economic Hyperheat: Super Warp Trotters drop more (amount assumed).
+    const loot = owns(s, "Economic Hyperheat") ? RULE_ASSUMED.hyperheatLoot : owns(s, "Economic Overheat") ? RULE_ASSUMED.overheatLoot : 1;
+    drops = (ASSUMED.rewardGold[0] + Math.floor(rng() * (ASSUMED.rewardGold[1] - ASSUMED.rewardGold[0] + 1))) * loot;
+    for (let k = 0; k < ASSUMED.rewardOres * loot; k++) ores.push(randomOre(s.plane, rng));
     ores.push(...(s.pendingOres ?? []));
   }
   if (kind === "Encounter" && won && s.encounter) {
-    const e = ASSUMED.encounter[s.encounter];
+    // Complimentary Upgrade: rewards one level higher (the hard fight's rewards for the easy one; a bonus item on the hard one).
+    const up = owns(s, "Complimentary Upgrade");
+    const e = ASSUMED.encounter[up ? "hard" : s.encounter];
     drops = e.gold;
     if (e.item) item = randomBasic(pack, rng) ?? undefined;
+    if (up && s.encounter === "hard") { const extra = randomBasic(pack, rng); if (extra) s = log(addBasics(s, [extra]), `Complimentary Upgrade: bonus ${extra}.`); }
   }
   const gold = { base: ASSUMED.baseIncome, streak: streakGold, interest, drops };
   const earned = gold.base + gold.streak + gold.interest + gold.drops;
@@ -1593,7 +1947,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
     allies: [...placed.map((x) => ({ name: x.u.name, cost: x.u.cost, stars: x.u.stars, power: perOf(x.u.uid)?.power ?? 0, place: x.place, spd: (pack.info?.[x.u.name]?.spd?.[x.u.stars - 1] ?? 0) + 100 * (perOf(x.u.uid)?.spd ?? 0) })), ...helpers],
     enemies: foes, waves: kind === "Boss" ? 1 : 2, won, cleared, ratio: power / Math.max(1, enemy),
     limit: kind === "Reward" ? null : RULES.actionValue[s.plane][boss ? 1 : 0], bossPhases: s.plane === 2 ? 3 : 2,
-    reviveCost: (rankNumber(s.rank) >= 3 ? 35 : 15) - (s.advantage?.includes("action-recovery") ? 10 : 0),
+    reviveCost: Math.max(0, (rankNumber(s.rank) >= 3 ? 35 : 15) - (s.advantage?.includes("action-recovery") ? 10 : 0) - (tp.rules?.reviveCut ?? 0)),
     scripted, notes,
   }, rng);
   if (s.oreOnKill) for (let k = 0; k < timeline.kills; k++) if (rng() < s.oreOnKill) ores.push(randomOre(s.plane, rng));
@@ -1614,18 +1968,20 @@ export function battle(s0: RunState, pack: CwPack): RunState {
     s = afterCombat(s, pack, tsrLevel, tp.express.collisions);
     s = afterFight(s, won);
   }
+  const finalNode = s.plane === RULES.planes.length - 1 && s.node === nodeKinds(s.plane, s).length - 1;
+  s = ruleAfterFight(s, pack, { kind, won, avLeft: won && timeline.limit ? Math.max(0, timeline.limit - timeline.end) : 0, idle: tp.idle.length + deployed(s).filter((u) => u.npc).length, bonds: tp.bonds.length, last: finalNode });
   // Advantage Layout after-fight effects.
   // Safety first: at 0 HP the run is over unless the Safety Mechanism catches it; healing never revives.
   if (adv.includes("safety") && s.hp <= 0 && !(s.advantageUsed ?? []).includes("safety")) s = log({ ...s, hp: 1, advantageUsed: [...(s.advantageUsed ?? []), "safety"] }, "Safety Mechanism: squad HP stays at 1.");
   if (adv.includes("claims") && s.hp > 0 && s.hp < 50 && !(s.advantageUsed ?? []).includes("claims")) s = log({ ...s, gold: s.gold + 5, advantageUsed: [...(s.advantageUsed ?? []), "claims"] }, "Claims Settlement: +5 gold.");
-  if (adv.includes("sustained-combat") && kind !== "Reward" && s.hp > 0) s = { ...s, hp: Math.min(RULES.startHp, s.hp + 2) };
+  if (adv.includes("sustained-combat") && kind !== "Reward" && s.hp > 0) s = heal(s, 2);
   if (adv.includes("basic-armament") && kind === "Boss" && won && s.plane < 2) { const b = randomBasic(pack, rng); if (b) s = log({ ...s, bag: [...s.bag, b] }, `Basic Armament: ${b}.`); }
-  if (adv.includes("victory") && kind === "Boss" && won && s.plane === RULES.planes.length - 1 && (timeline.end <= (timeline.limit ?? 0) - 100)) s = log({ ...s, hp: Math.min(RULES.startHp, s.hp + 40) }, "Victory Commendation: +40 squad HP.");
+  if (adv.includes("victory") && kind === "Boss" && won && s.plane === RULES.planes.length - 1 && (timeline.end <= (timeline.limit ?? 0) - 100)) s = log(heal(s, 40), "Victory Commendation: +40 squad HP.");
   if (kind !== "Reward") s = fireTriggers(s, pack, "combat", rng);
   if (kind === "Encounter") s = fireTriggers(s, pack, "encounter", rng);
   if (kind === "Boss") s = fireTriggers(s, pack, "boss", rng);
   s = log(s, `P${s.plane + 1}-${s.node + 1} ${kind}${s.nodeOpponent ? ` vs ${s.nodeOpponent}` : ""}${trotter ? " (Trotters!)" : ""}: ${won ? "cleared" : `not cleared (−${hpLost} HP)`} · +${earned} gold.`);
-  const last = s.plane === RULES.planes.length - 1 && s.node === RULES.planes[s.plane].length - 1;
+  const last = s.plane === RULES.planes.length - 1 && s.node === nodeKinds(s.plane, s).length - 1;
   if (s.hp <= 0) return log({ ...s, phase: "over", result: "defeated" }, "Squad HP hit 0. Run over.");
   if (last) return log({ ...s, phase: "over", result: "cleared" }, `Run cleared with ${s.hp} squad HP.`);
   return settle(s, pack);
@@ -1634,7 +1990,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
 /** Go to the next node (or plane). */
 export function advance(s: RunState, pack: CwPack): RunState {
   if (s.phase === "over") return s;
-  const lastNode = s.node >= RULES.planes[s.plane].length - 1;
+  const lastNode = s.node >= nodeKinds(s.plane, s).length - 1;
   const next = lastNode ? { ...s, plane: s.plane + 1, node: 0 } : { ...s, node: s.node + 1 };
   return enterNode(lastNode ? log(next, `Plane ${next.plane + 1}.`) : next, pack);
 }
@@ -1659,3 +2015,22 @@ export function objectives(s: RunState, pack: CwPack) {
 
 export const rankGain = (s: RunState) => (s.result === "cleared" ? RULES.rankGain(s.hp) : 0);
 export { costOf };
+
+// --------------------------------------------------------------------------------------------- coverage
+
+export type EffectCoverage = { status: "full" | "partial" | "none"; applied: string[]; missing: string[] };
+const coverageBase = new WeakMap<CwPack, RunState>();
+/**
+ * How much of an Environment/Strategy text the simulator applies, from the same parser a run uses.
+ * Parts skipped only because of the test run's state (a full bench, no Emblem owned yet) count as applied.
+ */
+export function effectCoverage(pack: CwPack, name: string, effect: string): EffectCoverage {
+  let base = coverageBase.get(pack);
+  if (!base) { base = { ...newRun(pack, "coverage", "A3-1"), bench: Array(RULES.benchSlots).fill(null) }; coverageBase.set(pack, base); }
+  const [, applied] = applyEffect(base, pack, effect, createRng(`coverage:${name}`), name);
+  const skip = applied.find((a) => a.startsWith("not simulated: "));
+  const missing = (skip ? skip.replace(/^not simulated: /, "").split(", ") : []).filter((m) => !/bench full|you own none|you have no/i.test(m));
+  const done = applied.filter((a) => !a.startsWith("not simulated: "));
+  if (!done.length && !skip) missing.push("the wiki text doesn't say exactly what it gives or does");
+  return { status: missing.length ? (done.length ? "partial" : "none") : "full", applied: done, missing };
+}

@@ -7,7 +7,7 @@ import { kvGet, kvSet } from "@/lib/db";
 import {
   advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
-  toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
+  maxHpOf, refreshCostOf, toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
   ahaStats, choosePlotArmor, equipAha, gradeRulesOf, rerollEnvironments, rerollSupply, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
 import { openBox, specialNode } from "@/lib/currencywars/escapade";
@@ -101,7 +101,7 @@ function Hud({ run }: { run: RunState }) {
         {comp && <span className="flex items-center gap-1 text-xs text-muted" title="Voyage Companion"><span aria-hidden>{comp.emoji}</span>{comp.name}</span>}
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
-        <span className="flex items-center gap-1.5"><Heart size={15} className="text-rose-400" /> <b>{run.hp}</b><span className="text-faint">/100</span></span>
+        <span className="flex items-center gap-1.5"><Heart size={15} className="text-rose-400" /> <b>{run.hp}</b><span className="text-faint">/{maxHpOf(run)}</span></span>
         <span className="flex items-center gap-1.5"><Coins size={15} className="text-amber-300" /> <b>{run.gold}</b> gold</span>
         <span className="flex items-center gap-1.5">Lv.<b>{run.level}</b>{need > 0 && <span className="text-xs text-faint">{run.xp}/{need} XP</span>}</span>
         <span className="flex items-center gap-1.5"><Swords size={14} className="text-cyan" /> {deployed(run).length}/{teamSize(run)} deployed</span>
@@ -309,7 +309,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
     if (sel?.kind === "item" && sel.index !== index) {
       const a = run.bag[sel.index];
       const both = [itemKind(pack, a), itemKind(pack, it)];
-      if (both.every((k) => k === "basic" || k === "gem")) { update((s) => combineBag(s, pack, sel.index, index)); setSel(null); return; }
+      const tool = (x: string) => /furnace|privilege/.test(specialItem(x)?.use ?? "");
+      if (both.every((k) => k === "basic" || k === "gem") || tool(a) || tool(it)) { update((s) => combineBag(s, pack, sel.index, index)); setSel(null); return; }
     }
     setSel(sel?.kind === "item" && sel.index === index ? null : { kind: "item", index });
   };
@@ -473,7 +474,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
               const name = run.bag[sel.index];
               const sp = specialItem(name);
               const kindOf = itemKind(pack, name);
-              const hint = sp?.use === "box" ? "Choose the basic equipment inside:" : sp?.use === "projector" ? "Tap a character to copy them (1-star copy to the bench)." : sp?.use === "plotArmor" ? "Tap a deployed character to give them Plot Armor." : kindOf === "basic" || kindOf === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it.";
+              const hint = sp?.use === "box" ? "Choose the basic equipment inside:" : sp?.use === "projector" ? "Tap a character to copy them (1-star copy to the bench)." : sp?.use === "plotArmor" ? "Tap a deployed character to give them Plot Armor." : sp?.use === "wrench" ? "Tap a character to take off all their equipment." : sp?.use === "furnace" ? "Tap a character to reroll all their equipment, or tap an item here to reroll it." : sp?.use === "privilege" ? "Tap a character (their first advanced item) or an advanced item here to make it privileged." : sp?.use === "token" ? "Tap a character for one of their recommended advanced items." : kindOf === "basic" || kindOf === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it.";
               return (
                 <ItemDetail pack={pack} name={name} owned={run.bag.filter((_, i) => i !== sel.index)} needs={needs} onClose={() => setSel(null)} hint={hint}
                   actions={sp?.use === "box" ? <span className="flex flex-wrap gap-1">{(pack.equipment?.basic ?? []).map((b) => <Button key={b.name} size="sm" variant="ghost" onClick={() => { update((s) => openBox(s, pack, sel.index, b.name)); setSel(null); }}><ItemIcon pack={pack} name={b.name} size={11} /> {b.name}</Button>)}</span> : undefined} />
@@ -507,8 +508,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
                 : <span key={i} className="rounded-xl border border-dashed border-line/60" />)}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              <Button onClick={() => update(buyXp)} disabled={run.level >= ASSUMED.maxLevel}><span className="flex flex-col items-start leading-tight"><span className="text-xs">Buy XP · <Coins size={11} className="inline text-amber-300" /> {run.xpCost}</span><span className="text-[10px] text-faint">Lv.{run.level} {xpToNext(run.level) ? `${run.xp}/${xpToNext(run.level)}` : "max"}</span></span></Button>
-              <Button onClick={() => update((s) => refresh(s, pack))}><RefreshCw size={14} /> {run.freeRefreshes ? `Free ×${run.freeRefreshes}` : <>Refresh · <Coins size={11} className="text-amber-300" /> {RULES.refreshCost}</>}</Button>
+              <Button onClick={() => update((s) => buyXp(s, pack))} disabled={run.level >= ASSUMED.maxLevel}><span className="flex flex-col items-start leading-tight"><span className="text-xs">Buy XP · <Coins size={11} className="inline text-amber-300" /> {run.xpCost}</span><span className="text-[10px] text-faint">Lv.{run.level} {xpToNext(run.level) ? `${run.xp}/${xpToNext(run.level)}` : "max"}</span></span></Button>
+              <Button onClick={() => update((s) => refresh(s, pack))}><RefreshCw size={14} /> {run.freeRefreshes ? `Free ×${run.freeRefreshes}` : <>Refresh · <Coins size={11} className="text-amber-300" /> {refreshCostOf(run)}</>}</Button>
               <Button variant="ghost" onClick={() => update(toggleLock)} aria-pressed={run.locked}>{run.locked ? <Lock size={14} className="text-amber-300" /> : <LockOpen size={14} />} {run.locked ? "Locked (next node)" : "Lock shop"}</Button>
               <Button variant="primary" onClick={() => { setSel(null); setPeek(null); const before = runRef.current; update((s) => battle(s, pack)); if (runRef.current !== before && runRef.current?.last?.timeline) setWatching(runRef.current.tick); }}><Swords size={14} /> Battle</Button>
             </div>

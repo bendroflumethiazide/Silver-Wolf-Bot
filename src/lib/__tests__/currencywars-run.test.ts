@@ -7,6 +7,7 @@ import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
+  addToBag, effectCoverage, levelUp, maxHpOf, refreshCostOf,
   ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, ahaStar, equipAha, promoteAeonAha, placedBondStates, rerollEnvironments, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
   nodeKind, nodeKinds, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
@@ -1739,5 +1740,117 @@ describe("Aeon ★ Aha progression", () => {
     const seven = promoteAeonAha(big, placedBondStates(big, AA));
     expect(seven.on[0]!.cost).toBe(7);
     expect(teamPower(seven, AA).per.find((p) => p.name === "Aeon ★ Aha")!.power).toBeGreaterThan(teamPower(big, AA).per.find((p) => p.name === "Aeon ★ Aha")!.power);
+  });
+});
+
+describe("Named Environment and Strategy rules (rules.ts) and consumables", () => {
+  const strat = (s: RunState, name: string, effect: string, pack: CwPack = P47) =>
+    pickStrategy({ ...s, phase: "strategy", offers: { strategies: [{ name, rarity: "Silver", effect, planes: [1, 2, 3] }] } }, pack, 0);
+  const prep = (s: RunState): RunState => ({ ...s, phase: "prep" });
+
+  it("consumables: Disassembly Wrench, Precision Wrench (reusable, wrench → 1 gold), Smelting Furnace, Special Privilege Card, Good Fortune Token", () => {
+    const s = at47(["Welt", "Kafka"], { bag: ["Disassembly Wrench", "Precision Disassembly Wrench", "Smelting Furnace", "Special Privilege Card", "Good Fortune Token"] });
+    const worn = { ...s, on: [{ ...s.on[0]!, items: ["Firestorm Surge", "Roller Skates"] }, s.on[1], null, null] };
+    const off = equip(worn, P47, 0, { zone: "on", index: 0 });
+    expect(off.on[0]!.items).toEqual([]);
+    expect(off.bag).toEqual(expect.arrayContaining(["Firestorm Surge", "Roller Skates", "Precision Disassembly Wrench"]));
+    expect(off.bag).not.toContain("Disassembly Wrench");
+    // The Precision Wrench stays; a later Disassembly Wrench becomes 1 gold.
+    const again = equip({ ...worn, bag: ["Precision Disassembly Wrench"] }, P47, 0, { zone: "on", index: 0 });
+    expect(again.bag).toEqual(["Precision Disassembly Wrench", "Firestorm Surge", "Roller Skates"]);
+    expect(addToBag(again, ["Disassembly Wrench"]).gold).toBe(again.gold + 1);
+    // Privilege Card: the first advanced item becomes privileged (uses the second values).
+    const priv = equip(worn, P47, 3, { zone: "on", index: 0 });
+    expect(priv.on[0]!.items[0]).toBe("Firestorm Surge: Privilege");
+    expect(unitPower(priv.on[0]!, "on", P47)).toBeGreaterThan(unitPower(worn.on[0]!, "on", P47));
+    expect(describeItem(P47, "Firestorm Surge: Privilege").kindLabel).toMatch(/Privileged/);
+    // Smelting Furnace on a bag item: same type (basic → basic).
+    const smelt = combineBag({ ...s, bag: ["Smelting Furnace", "Roller Skates"] }, P47, 0, 1);
+    expect(smelt.bag).toEqual(["Folding Knife"]);
+    // Good Fortune Token: one of the character's recommended advanced items (Kafka: Firestorm Surge).
+    const tok = equip(s, P47, 4, { zone: "on", index: 1 });
+    expect(tok.bag).toContain("Firestorm Surge");
+  });
+
+  it("Trash Bags carry their wiki stats; HP, Max HP and win streak grants", () => {
+    expect(itemEffect(P47, "Golden Trash Bag", { place: "on", stars: 1, boss: false }).self).toMatchObject({ on: 0.3, off: 0.3, lucky: 0.3, luckyDmg: 0.3, spd: 0.3, dmg: 0.3 });
+    const s = at47(["Welt"], { hp: 50 });
+    const hr = strat(s, "Health Recharge", "Gain 30 squad HP and 30 squad Max HP.");
+    expect([hr.hp, maxHpOf(hr)]).toEqual([80, 130]);
+    const cc = strat(s, "Cost Control", "At the end of combat, for each 10 action value(s) remaining, restores 1 squad HP during finalization. Gains up to 8 squad HP. Immediately gains 8 Gold Coin(s), 15 squad HP and 15 Max HP.");
+    expect([cc.gold, cc.hp, maxHpOf(cc)]).toEqual([s.gold + 8, 65, 115]);
+    expect(cc.log.at(-1)).not.toMatch(/not simulated/);
+    expect(strat(s, "Victories After Victories", "Set current win streak to 4. Earn 4 Gold Coin(s).").streak).toBe(4);
+  });
+
+  it("event rules: Growth Fund, Twin Primes, Cashback, Bare Minimum, Goldgrubber, Long-Term Gains, Struggle Protocol, Longtermism", () => {
+    const s = at47(["Welt"], { level: 8, xp: 0, gold: 10 });
+    const gf = strat(s, "Growth Fund", "Provides 36 Gold Coin(s) when you reach level 9.");
+    expect(levelUp(gf, 200).gold).toBe(gf.gold + 36);
+    const tp = strat(s, "Twin Primes", "After obtaining this Investment Strategy, gain 2/3/5/7/11 Experience when you first purchase a 1/2/3/4/5-cost character.");
+    const shop = [{ name: "Welt", cost: 1, stars: 1 as const }, { name: "Pearl", cost: 1, stars: 1 as const }, null, null, null];
+    const b1 = buy(prep({ ...tp, shop }), P47, 0);
+    expect(b1.xp).toBe(tp.xp + 2);
+    expect(buy(b1, P47, 1).xp).toBe(b1.xp); // only the first 1-cost
+    const bm = strat(s, "Bare Minimum", "You cannot purchase characters or refresh in the Store for 3 Node(s). After that, gains 20 Gold Coin(s).");
+    expect(buy(prep({ ...bm, shop }), P47, 0).note).toMatch(/Bare Minimum/);
+    expect(refresh(prep(bm), P47).note).toMatch(/Bare Minimum/);
+    let n = prep(bm); for (let i = 0; i < 3; i++) n = prep(advance({ ...n, phase: "result" }, P47));
+    expect(n.log.join(" ")).toMatch(/Bare Minimum: the Store opens again, \+20 gold/);
+    const gg = strat({ ...s, gold: 20 }, "Goldgrubber", "Each time you spend Gold Coins to refresh the Store, you'll gain 2 Experience.");
+    expect(refresh(prep(gg), P47).xp).toBe(gg.xp + 2);
+    const sp = strat(s, "Struggle Protocol", "Purchasing EXP consumes 6 squad HP instead of Gold Coins. Restores 50 squad HP after boss battles.");
+    const x = buyXp(prep(sp), P47);
+    expect([x.gold, x.hp]).toEqual([sp.gold, sp.hp - 6]);
+    const lt = strat({ ...s, gold: 0 }, "Longtermism", "Now and for the next 3 time(s) you enter a new Node, gain 7 Gold Coin(s) each time.");
+    expect(lt.gold).toBe(7);
+    let l = lt; for (let i = 0; i < 4; i++) l = advance({ ...l, phase: "result" }, P47);
+    expect(l.log.filter((x2) => x2.startsWith("Longtermism: +7")).length).toBe(3);
+  });
+
+  it("combat rules change strength: Lone Wolf, Role Model, Team Power, Triple Threes, Hope of the Team, Easy Mode", () => {
+    const s = at47(["Welt", "Kafka", "Feixiao"]);
+    const base = teamPower(s, P47).power;
+    const lone = strat(s, "Lone Wolf", "If the character has no active non-independent Bond, grants the character 120% On/Off-Field Strength and 36% DMG Mitigation.");
+    // Welt and Kafka share Stellaron Hunters (a Faction Bond); only Feixiao has no non-independent Bond.
+    const per = (st: RunState, n: string) => teamPower(st, P47).per.find((p) => p.name === n)!.power;
+    expect(per(lone, "Feixiao")).toBeGreaterThan(per(s, "Feixiao") * 1.8);
+    expect(per(lone, "Welt")).toBeCloseTo(per(s, "Welt"));
+    for (const [name, text] of [["Role Model: Gold", "During combat, the member ranking first in DMG dealt becomes \"Role Model\" and their On/Off-Field Strength increases by 40%. Other members' On/Off-Field Strength increases by 10%."],
+      ["Team Power: Gold", "For each activated Bond, the squad gains 6% On/Off-Field Strength and 4% HP Amplification."],
+      ["Triple Threes", "Characters that are 3-star, 3-cost, or equipped with 3 items gain 10% SPD Amplification and 25% On/Off-Field Strength. These effects stack across different conditions."],
+      ["Hope of the Team", "The ally character in the first on-field position gains 15% DMG Amplification and 15% HP Amplification."]] as const) {
+      const r = strat(s, name, text);
+      expect(teamPower(r, P47).power, name).toBeGreaterThanOrEqual(base);
+      expect(r.log.at(-1), name).not.toMatch(/not simulated/);
+    }
+    const hard = { ...s, extraDifficulty: 6 };
+    expect(enemyPower(strat(hard, "Easy Mode", "Reduces the difficulty of enemies by 3, down to a minimum of 0."), P47)).toBeLessThan(enemyPower(hard, P47));
+    // Star Shifting: a 1-cost character fights at 3-star.
+    const ss = strat(s, "Star Shifting", "At the start of combat, transforms a random 1-cost character into 3 star(s).");
+    expect(teamPower(ss, P47).per.find((p) => p.name === "Welt")!.power).toBeGreaterThan(teamPower(s, P47).per.find((p) => p.name === "Welt")!.power * 1.8);
+  });
+
+  it("environments: Personal Accident Insurance adds a Supply before each Boss; War Frontier; Excess Budget; Long-Term Gains", () => {
+    const s0 = newRun(P47, "env-rules", "A3-1");
+    const env = (name: string, effect: string) => chooseEnvironment({ ...s0, offers: { environments: [{ name, effect }] } }, P47, 0);
+    const pai = env("Personal Accident Insurance", "An extra supply phase is added before every Boss Node.");
+    for (let p = 0; p < 3; p++) { const k = nodeKinds(p, pai); expect(k.at(-1)).toBe("Boss"); expect(k.at(-2)).toBe("Supply"); expect(k.length).toBe(RULES.planes[p].length + 1); }
+    expect(nodeKinds(2, env("War Frontier", "All Combat Nodes in the Third Plane are replaced with Encounter Nodes."))).not.toContain("Combat");
+    const eb = env("Excess Budget", "In supply phases, characters will carry two items.");
+    const sup = enterNode({ ...eb, plane: 0, node: RULES.planes[0].indexOf("Supply") }, P47);
+    expect(sup.offers.supply!.every((o) => (o.items ?? []).length === 2)).toBe(true);
+    const lt = prep({ ...env("Long-Term Gains", "After refreshing 30 time(s) by spending Gold Coins, receives 20 Gold Coins. Afterwards, refreshing only costs 1 Gold Coin in this run."), gold: 200, freeRefreshes: 0 });
+    let r = lt; for (let i = 0; i < 30; i++) r = refresh(r, P47);
+    expect(r.gold).toBe(200 - 60 + 20);
+    expect(refreshCostOf(r)).toBe(1);
+  });
+
+  it("coverage tags come from the same parser a run uses", () => {
+    expect(effectCoverage(P47, "Growth Fund", "Provides 36 Gold Coin(s) when you reach level 9.").status).toBe("full");
+    expect(effectCoverage(P47, "Holiday Giftbox", "Gain a random massive reward.").status).toBe("none");
+    const part = effectCoverage(P47, "Chimera Growth Log", "When the Store levels up, obtains 2 \"Chimera Energy\" and 6 Gold Coins. Obtains 1 \"Welt\" and 1 \"Chimera Projector.\"");
+    expect(part.status).toBe("partial");
+    expect(part.missing).toEqual(["Chimera Projector"]);
   });
 });

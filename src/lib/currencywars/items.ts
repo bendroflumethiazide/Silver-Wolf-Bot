@@ -53,11 +53,18 @@ export const ORE_DROP_ODDS: number[][] = [
 
 export type ItemKind = "basic" | "advanced" | "emblem" | "gem" | "ore" | "consumable" | "component" | "other";
 
+/** Privileged equipment keeps its name with ": Privilege" (as the game and wiki write it, e.g. "Whatever Dice: Privilege"). */
+export const PRIVILEGE = ": Privilege";
+export const isPrivileged = (name: string) => name.endsWith(PRIVILEGE);
+/** The advanced item a (possibly privileged) name is. */
+export const baseItem = (name: string) => (isPrivileged(name) ? name.slice(0, -PRIVILEGE.length) : name);
+export const privileged = (name: string) => (isPrivileged(name) ? name : `${name}${PRIVILEGE}`);
+
 export function itemKind(pack: CwPack, name: string): ItemKind {
   const eq = pack.equipment;
   if (isOre(name)) return "ore";
   if (eq?.basic.some((b) => b.name === name)) return "basic";
-  if (eq?.advanced.some((a) => a.name === name)) return "advanced";
+  if (eq?.advanced.some((a) => a.name === baseItem(name))) return "advanced";
   if (eq?.emblems?.some((e) => e.name === name)) return "emblem";
   if (eq?.gems?.some((g) => g.name === name)) return "gem";
   const sp = specialItem(name);
@@ -92,7 +99,7 @@ export function combinations(pack: CwPack, name: string): { partner: string; mak
 /** The two items something is made from. */
 export function madeFrom(pack: CwPack, name: string): [string, string][] {
   const eq = pack.equipment;
-  const adv = eq?.advanced.find((a) => a.name === name);
+  const adv = eq?.advanced.find((a) => a.name === baseItem(name));
   if (adv) return [adv.recipe];
   const em = eq?.emblems?.find((e) => e.name === name);
   if (em?.recipe) return [em.recipe];
@@ -104,7 +111,7 @@ export function describe(pack: CwPack, name: string): { kind: ItemKind; kindLabe
   const eq = pack.equipment;
   const kind = itemKind(pack, name);
   if (kind === "basic") { const b = eq!.basic.find((x) => x.name === name)!; return { kind, kindLabel: `Basic equipment · ${b.tags.join(", ")}`, summary: b.stats, details: [], users: [] }; }
-  if (kind === "advanced") { const a = eq!.advanced.find((x) => x.name === name)!; return { kind, kindLabel: `Advanced equipment · ${a.tags.join(", ")}`, summary: a.effect, details: a.stats, users: a.users }; }
+  if (kind === "advanced") { const a = eq!.advanced.find((x) => x.name === baseItem(name))!; return { kind, kindLabel: `${isPrivileged(name) ? "Privileged equipment (uses the second values)" : "Advanced equipment"} · ${a.tags.join(", ")}`, summary: a.effect, details: a.stats, users: a.users }; }
   if (kind === "emblem") { const e = eq!.emblems!.find((x) => x.name === name)!; return { kind, kindLabel: `Emblem · ${e.bond}`, summary: e.effect, details: e.stats, users: e.users }; }
   if (kind === "gem") { const g = eq!.gems!.find((x) => x.name === name)!; return { kind, kindLabel: "Diamond", summary: g.effect, details: [], users: [] }; }
   if (kind === "ore") {
