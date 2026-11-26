@@ -1,5 +1,7 @@
 "use client";
 
+import { AbilityTags } from "./CharacterCard";
+import { normalizeLabel } from "@/lib/currencywars/abilities";
 import { ThumbsUp, ChevronDown, Coins, Crown, Crosshair, Heart, Hexagon, PlusCircle, ShieldHalf, Sparkle, Sword, Wind, Zap, type LucideIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 import { bondsOf } from "@/lib/currencywars/bonds";
@@ -114,7 +116,7 @@ export function CharacterSheet({ pack, name, stars: initialStars = 1, items = []
         <div className="space-y-1.5">
           {info.summaries.map((a, i) => (
             <div key={i} className="rounded-lg border border-line bg-white/[0.02] p-2.5">
-              <div className="flex flex-wrap items-center gap-1.5"><b>{a.name}</b>{a.types.map((t) => <Badge key={t} tone={/talent/i.test(t) ? "ok" : "cyan"}>{t}</Badge>)}{a.energy && <span className="text-[11px] text-faint">{a.energy} Energy</span>}</div>
+              <div className="flex flex-wrap items-center gap-1.5"><b>{a.name === "Blezzed Brushwork" ? "Blessed Brushwork" : a.name}</b><AbilityTags size="sm" labels={[...new Set(a.types.map(normalizeLabel))]} />{a.energy && <span className="text-[11px] text-faint">{a.energy} Energy</span>}</div>
               <p className="mt-1 text-xs text-muted">{a.desc}</p>
             </div>
           ))}
@@ -129,7 +131,7 @@ export function CharacterSheet({ pack, name, stars: initialStars = 1, items = []
           <ul className="space-y-2">
             {groups[Math.min(tab, groups.length - 1)].list.map((a) => (
               <li key={a.name + a.types.join()} className="rounded-lg border border-line p-2.5">
-                <div className="flex flex-wrap items-center gap-1.5"><b>{a.name}</b>{a.types.map((t) => <Badge key={t} tone={/talent/i.test(t) ? "ok" : /ultimate/i.test(t) ? "gold" : "cyan"}>{t}</Badge>)}</div>
+                <div className="flex flex-wrap items-center gap-1.5"><b>{a.name}</b><AbilityTags size="sm" labels={a.types.map(normalizeLabel)} />{a.types.some((t) => /\(New\)/i.test(t)) && <span className="text-[10px] text-cyan">Currency Wars only</span>}{a.types.some((t) => /\(Change\)/i.test(t)) && <span className="text-[10px] text-faint">changed for Currency Wars</span>}</div>
                 <p className="mt-1 text-xs leading-relaxed text-muted"><StarText text={a.effect} star={stars} /></p>
               </li>
             ))}

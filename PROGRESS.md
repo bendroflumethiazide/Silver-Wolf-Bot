@@ -81,6 +81,15 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.9.0 Strategy grades fixed, ability labels, game-style character card
+
+- **Investment Strategy grades (bug fix).** Root cause: only "All Investment Strategies … are of X quality" was parsed (into one forced grade). Jackpot / Last Chance ("The first/third investment strategy …") were skipped as conditional sentences; Silver • Gold • Iridescence, Investment Level Up, Gold/Silver Investment, Gold/Prismatic Futures(+), Renegotiation, Visionary, Joint Decision and Strategy Master did nothing, and there was no Strategy refresh. Now one function (`offerGrades`, strategyGrades.ts) decides every offer's grades — Silver < Gold < Prismatic with clamping, fixed (Ages), by position (left/middle/right), guaranteed by selection number, one-shot +1 — and the offer stores its grades, so the card, the pick, the difficulty and the save all agree. Strategy refresh keeps each option's grade (Cottontail's first refresh per plane upgrades it); extra selections arrive at their node or immediately.
+- **Ability labels** per character and position from the wiki's Currency Wars ability types, in the game's order and colours: Pearl "Basic ATK · Ultimate · Elation Skill · Talent · Innate Trace", Sunday On-Field "Ultimate · Talent", Silver Wolf LV.999 "Talent", Topaz & Numby Off-Field "Skill · Talent" (all four match the game screenshots; all 58 characters have labels). Fixed: the parser kept only 3 infobox types.
+- **Character card** like the game's (star bar, portrait, cost, position, roles, Bonds, ability box with labels and summary, equipment slots, Details/Sell).
+
+### Test results
+- unit 222/222 (grade rules, every grade Investment, refresh, save/load, labels) · E2E 14/14 on both builds.
+
 ## 2026-11-26 · 1.8.0 Summons in battle, real equipment and Bond effects, Simple Mode
 
 - **Bond summons fight** and show on the turn order and in a "Summons" list in the battle viewer, acting on their own SPD (never targeted): Crimson Thorns (DoT; 200 → 300 → 500 SPD), Starskiff (Xianzhou Fleet; +20 SPD per member equipment), Quintet Joint (High-Cloud Quintet; 200–400 SPD, stacking squad DMG), Soul (AoE ATK 6+), Aha (Elation), chimeras (Beast Garden, from Chimera Energy), Svarog (Clara), each Summon-school member's summon, and Dan Heng • Permansor Terrae (Twin Dragons' Call, off-field with copied equipment), next to the Astral Express and Belobog Robot.

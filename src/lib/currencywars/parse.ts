@@ -382,7 +382,7 @@ export function parseCharInfo(wikitext: string): CwCharInfo | null {
   for (let i = 1; i <= 6; i++) {
     const name = get(`ability${i}`);
     if (!name) continue;
-    const types = [1, 2, 3].map((k) => get(`ability${i}_type${k}`)).filter(Boolean);
+    const types = [1, 2, 3, 4, 5, 6, 7, 8].map((k) => get(`ability${i}_type${k}`)).filter(Boolean);
     const energy = Number(get(`energy${i}`)) || undefined;
     summaries.push({ name, types, desc: cleanWikitext(param(infobox, `ability${i}_desc`)), energy });
   }

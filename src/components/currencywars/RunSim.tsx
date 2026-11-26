@@ -24,10 +24,11 @@ import { isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/cu
 import type { CwPack } from "@/lib/currencywars/sim";
 import { BattleView } from "./BattleView";
 import { CharacterSheet } from "./CharacterSheet";
+import { CharacterCard } from "./CharacterCard";
 import { RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
-import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
+import { BondList, BondMembers, CharCard, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
 import { BondTracker, TrackMark, useTracked } from "./tracking";
 import { useSimple, Verbose } from "./simple";
 
@@ -462,25 +463,18 @@ export function RunSim({ pack }: { pack: CwPack }) {
             })()}
             {peek && !sel && <ItemDetail pack={pack} name={peek} owned={run.bag} needs={needs} onClose={() => setPeek(null)} />}
             {selUnit && sel?.kind === "unit" && (
-              <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/[0.06] p-2 text-xs">
-                <Portrait name={selUnit.name} cost={selUnit.cost} size={30} />
-                <span className="min-w-[12rem] flex-1">
-                  <b className="text-text">{selUnit.npc ? "" : `${"★".repeat(selUnit.stars)} `}{selUnit.name}</b> {selUnit.npc ? <Badge>squad member</Badge> : <FieldTag field={pack.info?.[selUnit.name]?.field} />}
-                  <span className="mt-0.5 flex flex-wrap items-center gap-1 text-muted">
-                    {bondsOf(pack, selUnit.name).map((b) => <button key={b} type="button" onClick={() => setBondPeek(bondPeek === b ? null : b)} aria-expanded={bondPeek === b} className={cx("rounded border px-1 py-0.5 text-[10px]", bondPeek === b ? "border-cyan text-cyan" : "border-line hover:text-text")}>{b}</button>)}
-                    <span>· On-Field {Math.round(unitPower(selUnit, "on", pack))} / Off-Field {Math.round(unitPower(selUnit, "off", pack))}</span>
-                  </span>
-                  {selUnit.items.length > 0 && <span className="mt-1 flex flex-wrap gap-1">{selUnit.items.map((it, i) => <button key={i} type="button" onClick={() => { setPeek(it); setSel(null); }} className="inline-flex items-center gap-1 rounded border border-line px-1 py-0.5 hover:border-cyan/50"><ItemIcon pack={pack} name={it} size={11} />{it}</button>)}</span>}
-                  <Verbose><span className="block text-faint">Tap a slot to move it there.</span></Verbose>
-                </span>
-                {sel.spot.zone === "bench"
-                  ? <Button size="sm" onClick={() => { const to = autoSpot(run, pack, selUnit); if (to) update((s) => moveUnit(s, sel.spot, to)); else update((s) => ({ ...s, note: `Team is full: level ${s.level} deploys ${teamSize(s)}.` })); setSel(null); }}><Swords size={13} /> Deploy</Button>
-                  : <Button size="sm" onClick={() => { const free = run.bench.findIndex((x) => !x); if (free >= 0) update((s) => moveUnit(s, sel.spot, { zone: "bench", index: free })); setSel(null); }}><ArrowDownToLine size={13} /> To bench</Button>}
-                {pack.info?.[selUnit.name]?.recommended?.length ? <Button size="sm" variant="ghost" aria-pressed={gearTracked.includes(selUnit.name)} onClick={() => toggleGear(selUnit.name)}><ThumbsUp size={13} className={gearTracked.includes(selUnit.name) ? "text-emerald-400" : ""} /> {gearTracked.includes(selUnit.name) ? "Tracking gear" : "Track gear"}</Button> : null}
-                {pack.info?.[selUnit.name] && <Button size="sm" variant="ghost" onClick={() => setSheet({ name: selUnit.name, stars: selUnit.stars, items: selUnit.items, place: sel.spot.zone })}><Search size={13} /> Details</Button>}
-                <Button size="sm" variant="ghost" onClick={() => { update((s) => sell(s, sel.spot)); setSel(null); }}><Coins size={13} /> Sell +{ASSUMED.sellRefund(selUnit.cost, selUnit.stars)}</Button>
-                <button type="button" onClick={() => setSel(null)} aria-label="Cancel" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>
-              </div>
+              <CharacterCard pack={pack} name={selUnit.name} cost={selUnit.cost} stars={selUnit.stars} items={[...selUnit.items, ...(selUnit.dice ?? [])]} place={sel.spot.zone}
+                plotArmor={plotOf(run).holders.find((h) => h.uid === selUnit.uid && !h.disabled)?.option ?? null}
+                onBond={(b) => setBondPeek(bondPeek === b ? null : b)} bondOpen={bondPeek} onItem={(it) => { setPeek(it); setSel(null); }} onClose={() => setSel(null)}
+                extra={selUnit.npc ? <p className="text-xs text-muted">Squad member: no strength of its own; its Emblems count for Bonds.</p> : <p className="text-xs text-muted">Strength here: On-Field <b className="text-text">{Math.round(unitPower(selUnit, "on", pack))}</b> · Off-Field <b className="text-text">{Math.round(unitPower(selUnit, "off", pack))}</b>{selUnit.dice?.length ? ` · Whatever Dice: ${selUnit.dice.join(", ")}` : ""}{simple ? "" : " · tap a slot to move it there"}</p>}
+                actions={<>
+                  {sel.spot.zone === "bench"
+                    ? <Button size="sm" onClick={() => { const to = autoSpot(run, pack, selUnit); if (to) update((s) => moveUnit(s, sel.spot, to)); else update((s) => ({ ...s, note: `Team is full: level ${s.level} deploys ${teamSize(s)}.` })); setSel(null); }}><Swords size={13} /> Deploy</Button>
+                    : <Button size="sm" onClick={() => { const free = run.bench.findIndex((x) => !x); if (free >= 0) update((s) => moveUnit(s, sel.spot, { zone: "bench", index: free })); setSel(null); }}><ArrowDownToLine size={13} /> To bench</Button>}
+                  {pack.info?.[selUnit.name]?.recommended?.length ? <Button size="sm" variant="ghost" aria-pressed={gearTracked.includes(selUnit.name)} onClick={() => toggleGear(selUnit.name)}><ThumbsUp size={13} className={gearTracked.includes(selUnit.name) ? "text-emerald-400" : ""} /> {gearTracked.includes(selUnit.name) ? "Tracking gear" : "Track gear"}</Button> : null}
+                  {pack.info?.[selUnit.name] && <Button size="sm" variant="ghost" onClick={() => setSheet({ name: selUnit.name, stars: selUnit.stars, items: selUnit.items, place: sel.spot.zone })}><Search size={13} /> Details</Button>}
+                  <Button size="sm" variant="ghost" className="ml-auto" onClick={() => { update((s) => sell(s, sel.spot)); setSel(null); }}><Coins size={13} /> Sell +{ASSUMED.sellRefund(selUnit.cost, selUnit.stars)}</Button>
+                </>} />
             )}
             {selUnit && sel?.kind === "unit" && <RecommendedGear pack={pack} name={selUnit.name} place={sel.spot.zone} held={selUnit.items} bag={run.bag} compact />}
             {selUnit && sel?.kind === "unit" && bondPeek && <BondMembers pack={pack} bond={bondPeek} have={new Set(units(run).map((u) => u.name))} />}

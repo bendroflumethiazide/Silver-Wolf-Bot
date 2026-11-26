@@ -16,6 +16,7 @@ import { COMPANIONS } from "../currencywars/voyageCompanions";
 import { openBox, shiftEarlier } from "../currencywars/escapade";
 import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
 import { offerGrades, shiftGrade } from "../currencywars/strategyGrades";
+import { abilityCard } from "../currencywars/abilities";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
 import { createRng } from "../warp/simulator";
 
@@ -1455,5 +1456,70 @@ describe("Investment Strategy grades (Silver < Gold < Prismatic)", () => {
     const loaded = JSON.parse(JSON.stringify(again)) as RunState;
     expect(gradesOf(loaded)).toEqual(gradesOf(again));
     expect(pickStrategy(loaded, PG, 0).strategies.at(-1)!.rarity).toBe("Prismatic");
+  });
+});
+
+// --------------------------------------------------------------------------------------------- ability labels (the game's character card)
+
+const row = (name: string, type: string, effect: string) => `|-\n| {{Icon/Dark|Ability ${name}.png|50}}<br />${name}\n| ${type}\n| ${effect}`;
+const table = (...rows: string[]) => `{| class="wikitable tdc1 thc1"\n! width="50px" | Ability !! Type !! Effect\n${rows.join("\n")}\n|}`;
+const PEARL = `{{Currency Wars Character Infobox
+|name           = Pearl
+|cost           = 1
+|field          = Off Field
+|role1          = Heal
+|role2          = Support
+|bond1          = Phantasmoon Games
+|ability1       = Blezzed Brushwork
+|ability1_type1 = Basic ATK
+|ability1_type2 = Ultimate
+|ability1_type3 = Elation Skill
+|ability1_type4 = Talent
+|ability1_type5 = Innate Trace
+|ability1_desc  = Can use "Certified Banger" to offset DMG. When taking action, uses Enhanced Basic ATK to attack enemies and heal on-field allies. When Energy is full, uses Ultimate to gain "Certified Banger" and advance the target's action.
+|energy1        = 180
+}}
+==Abilities==
+${table(row("Brushstroke", "Basic ATK (Change)", "Deals Ice DMG."), row("Appraise Soul's Ground", "Ultimate (Change)", "Gains 30 Certified Banger."), row("Dissolve Reason into Elation", "Elation Skill (Change)", "Elation DMG."), row("Grow Grace from Grit", "Talent (Change)", "Repellency."), row("Faces of Elation", "Innate Trace (Change)", "Party Trick."))}
+==Recommended Equipment==`;
+const SUNDAY = `{{Currency Wars Character Infobox
+|name           = Sunday
+|cost           = 2
+|field          = On/Off Field
+|role1          = Support
+|ability1       = Bountiful Bestowal
+|ability1_type1 = Skill
+|ability1_type2 = Talent
+|ability1_desc  = The SPD of "The Beatified" increases, and the ally squad's CRIT DMG increases.
+|ability2       = Bountiful Bestowal
+|ability2_type1 = Skill
+|ability2_type2 = Ultimate
+|ability2_type3 = Talent
+|ability2_desc  = When taking action, makes one on-field unit immediately take action.
+}}
+==Abilities==
+===On Field===
+${table(row("Ode to Caress and Cicatrix", "Ultimate (Change)", "The Beatified."), row("Eternal Benediction", "Talent (New)", "Base Combo Rate of 15%/20%/30%/40%."))}
+===Off Field===
+${table(row("Benison of Paper and Rites", "Skill (Change)", "Immediate action."), row("Ode to Caress and Cicatrix", "Ultimate (Change)", "The Beatified."), row("The Sorrowing Body", "Talent (Change)", "CRIT Rate."))}
+==Recommended Equipment==`;
+
+describe("ability labels on character cards", () => {
+  it("Pearl's card matches the game: Blessed Brushwork with five labels in the game's order", () => {
+    const c = abilityCard(parseCharInfo(PEARL), "off")!;
+    expect(c.name).toBe("Blessed Brushwork");
+    expect(c.labels).toEqual(["Basic ATK", "Ultimate", "Elation Skill", "Talent", "Innate Trace"]);
+    expect(c.desc).toMatch(/^Can use "Certified Banger" to offset DMG/);
+    expect(c.energy).toBe(180);
+    // All five infobox types survive parsing (the old parser kept three).
+    expect(parseCharInfo(PEARL).summaries![0].types).toHaveLength(5);
+  });
+
+  it("labels follow the position: Sunday On-Field is Ultimate · Talent, Off-Field Skill · Ultimate · Talent", () => {
+    const info = parseCharInfo(SUNDAY);
+    expect(abilityCard(info, "on")).toMatchObject({ labels: ["Ultimate", "Talent"], desc: expect.stringMatching(/The Beatified/) });
+    expect(abilityCard(info, "off")).toMatchObject({ labels: ["Skill", "Ultimate", "Talent"], desc: expect.stringMatching(/immediately take action/) });
+    // No label a character doesn't have.
+    expect(abilityCard(info, "on")!.labels).not.toContain("Elation Skill");
   });
 });
