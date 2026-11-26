@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, Coins, Dices, Flag, Gift, Heart, Lock, LockOpen, Package, Play, RefreshCw, Skull, Swords, Trophy, Undo2, X, type LucideIcon } from "lucide-react";
+import { ArrowDownToLine, Search, Coins, Dices, Flag, Gift, Heart, Lock, LockOpen, Package, Play, RefreshCw, Skull, Swords, Trophy, Undo2, X, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WolfComment } from "@/components/SilverWolf";
 import { kvGet, kvSet } from "@/lib/db";
@@ -12,8 +12,9 @@ import {
 import { isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { BattleView } from "./BattleView";
+import { CharacterSheet } from "./CharacterSheet";
 import { ItemDetail } from "./ItemDetail";
-import { Badge, Button, cx, Notice, Panel } from "../ui";
+import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
 import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
 import { BondTracker, TrackMark } from "./tracking";
 
@@ -172,6 +173,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
   const [peek, setPeek] = useState<string | null>(null);
   /** A Bond whose members are shown (from a selected character's Bond tags). */
   const [bondPeek, setBondPeek] = useState<string | null>(null);
+  /** The character whose full sheet (stats, abilities) is open. */
+  const [sheet, setSheet] = useState<{ name: string; stars: number; items: string[]; place: Zone } | null>(null);
   /** The fight being watched (by tick), so a reload shows the result instead of replaying. */
   const [watching, setWatching] = useState<number | null>(null);
   useEffect(() => { let live = true; void kvGet<RunState | null>(RUN_KEY, null).then((r) => { if (live) setRun(r); }); return () => { live = false; }; }, []);
@@ -350,6 +353,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
                 {sel.spot.zone === "bench"
                   ? <Button size="sm" onClick={() => { const to = autoSpot(run, pack, selUnit); if (to) update((s) => moveUnit(s, sel.spot, to)); else update((s) => ({ ...s, note: `Team is full: level ${s.level} deploys ${teamSize(s)}.` })); setSel(null); }}><Swords size={13} /> Deploy</Button>
                   : <Button size="sm" onClick={() => { const free = run.bench.findIndex((x) => !x); if (free >= 0) update((s) => moveUnit(s, sel.spot, { zone: "bench", index: free })); setSel(null); }}><ArrowDownToLine size={13} /> To bench</Button>}
+                <Button size="sm" variant="ghost" onClick={() => setSheet({ name: selUnit.name, stars: selUnit.stars, items: selUnit.items, place: sel.spot.zone })}><Search size={13} /> Details</Button>
                 <Button size="sm" variant="ghost" onClick={() => { update((s) => sell(s, sel.spot)); setSel(null); }}><Coins size={13} /> Sell +{ASSUMED.sellRefund(selUnit.cost, selUnit.stars)}</Button>
                 <button type="button" onClick={() => setSel(null)} aria-label="Cancel" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>
               </div>
@@ -391,6 +395,9 @@ export function RunSim({ pack }: { pack: CwPack }) {
           <Rules />
         </div>
       </div>
+      <Modal open={!!sheet} onClose={() => setSheet(null)} title={sheet ? `${sheet.name} · details` : "Details"} wide>
+        {sheet && <CharacterSheet key={`${sheet.name}-${sheet.stars}`} pack={pack} name={sheet.name} stars={sheet.stars} items={sheet.items} place={sheet.place} />}
+      </Modal>
     </div>
   );
 }

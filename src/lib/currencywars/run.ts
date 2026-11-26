@@ -729,7 +729,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
       return { name: list?.length ? list[k % list.length] : kind === "Reward" ? "Independent Venture" : "Enemy", elite };
     });
   const timeline = buildTimeline({
-    allies: placed.map((x) => ({ name: x.u.name, cost: x.u.cost, stars: x.u.stars, power: unitPower(x.u, x.place, pack) * (1 + tp.bonus), place: x.place })),
+    allies: placed.map((x) => ({ name: x.u.name, cost: x.u.cost, stars: x.u.stars, power: unitPower(x.u, x.place, pack) * (1 + tp.bonus), place: x.place, spd: pack.info?.[x.u.name]?.spd?.[x.u.stars - 1] ?? 0 })),
     enemies: foes, waves: kind === "Boss" ? 1 : 2, won, cleared, ratio: power / Math.max(1, enemy),
     limit: kind === "Reward" ? null : RULES.actionValue[s.plane][boss ? 1 : 0], bossPhases: s.plane === 2 ? 3 : 2,
     reviveCost: rankNumber(s.rank) >= 3 ? 35 : 15,

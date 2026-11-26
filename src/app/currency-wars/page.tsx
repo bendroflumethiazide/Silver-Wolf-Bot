@@ -33,7 +33,7 @@ export default function CurrencyWarsPage() {
       <PageHeader title="Currency Wars" subtitle={pack ? `${pack.season} (Version ${pack.version}): run simulator, team builder and every item.` : "Run simulator, team builder, equipment and investments."}
         actions={pack ? <div className="flex gap-2"><Link href="/guides/view?g=currency-wars" className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-sm text-muted hover:text-text"><BookOpen size={14} /> Guide</Link>{update}</div> : undefined} />
       {err && <ErrorBox>{err}</ErrorBox>}
-      {outdated && <Notice tone="warn" title="New Currency Wars data available" open>Press Update to download equipment, Investment Environments and Strategies, opponents, difficulty ranks and character stats. The simulator needs them.</Notice>}
+      {outdated && <Notice tone="warn" title="New Currency Wars data available" open>Press Update to download the latest: equipment, Emblems, Investment Environments and Strategies, opponents, difficulty ranks, and every character&apos;s stats, abilities, Eidolons and recommended equipment.</Notice>}
       {pack === undefined ? null : pack ? (
         <TrackedProvider>
           <Tabs<Tab> value={tab} onChange={setTab} tabs={[

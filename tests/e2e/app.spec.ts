@@ -281,8 +281,21 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   expect(await gold()).toBe(before - 4);
   await page.getByRole("button", { name: "Lock shop" }).click();
   await expect(page.getByRole("button", { name: "Locked" })).toBeVisible();
-  // Select a deployed unit and send it to the bench.
+  // Character details: stats like the game's Stats Details, and abilities by star.
   await page.getByRole("button", { name: /^(On|Off)-Field slot \d: / }).first().click();
+  await page.getByRole("button", { name: "Details" }).click();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.getByText("Stats Details")).toBeVisible();
+  await expect(sheet.getByText("Base Lucky Strike Rate")).toBeVisible();
+  await expect(sheet.getByText("Base Healing Strength")).toBeVisible();
+  await expect(sheet.getByRole("tab", { name: "On Field" })).toBeVisible();
+  await sheet.getByRole("tab", { name: "Off Field" }).click();
+  await expect(sheet.getByText(/Support$/).first()).toBeVisible();
+  await sheet.getByRole("radio", { name: "3★" }).click();
+  await expect(sheet.locator("span.text-cyan", { hasText: "30%" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  // The unit is still selected after closing the details: send it to the bench.
   await page.getByRole("button", { name: "To bench" }).click();
   await expect(page.getByRole("button", { name: /^Bench slot \d: / }).first()).toBeVisible();
   // The run survives a reload (give IndexedDB a moment to commit the last write).

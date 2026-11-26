@@ -8,7 +8,7 @@ import {
 
 export const CW_PACK_KEY = "cwPack";
 /** Bump when CwPack gains fields, so the page can ask for a re-download. */
-export const CW_PACK_SCHEMA = 3;
+export const CW_PACK_SCHEMA = 4;
 
 export interface CwPack {
   schema?: number;

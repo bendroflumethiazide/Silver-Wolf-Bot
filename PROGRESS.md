@@ -81,6 +81,16 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.6.0 Character stats and abilities
+
+- **Character sheets** (Details on a selected unit in the simulator; the ⓘ button in the team builder): every stat from the game's Stats Details: On-/Off-Field Strength, DMG Amplification with its eight parts, DMG Mitigation, Lucky Strike Rate (base 5%) and DMG (base 100%), SPD Amplification, Healing and Shield Strength, HP Amplification, each with base by star and the boost from held equipment. Checked against the game's screen for Topaz & Numby.
+- **Abilities** from each character's wiki page, grouped On Field / Off Field (or by cost for Aeon ★ Aha), with the selected star's value highlighted in "a/b/c" numbers; infobox summaries with Energy; Off-Field Eidolons, signature Light Cone, recommended equipment (held ones marked) and gameplay notes. Hidden damage multipliers (base DMG Amplification and per-Eidolon) shown from the wiki's damage formula.
+- Battle viewer: characters with higher SPD Amplification now take more turns.
+- Parser fixes found on real pages: a wiki typo ("||" inside a template) split a table cell; names in {{Enemy}}/{{Extra Effect}} templates were dropped.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **170/170** · E2E **13/13** on the server build and the static web edition (character sheet: stats, ability tabs, star highlighting). All 58 character pages parse; desktop and phone checked on real data with no errors or overflow.
+
 ## 2026-11-26 · 1.5.0 Bond Tracking, turn order, Bond members
 
 - **Bond Tracking** (like the game's): pick Bonds to track in the shop bar or the team builder; every character in a tracked Bond (or wearing its Emblem) gets a thumbs-up in the shop, Supply, board, bench and character list. Saved on the device, shared by both tabs.

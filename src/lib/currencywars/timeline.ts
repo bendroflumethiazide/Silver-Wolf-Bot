@@ -35,7 +35,7 @@ export interface Timeline {
 }
 
 export interface TimelineInput {
-  allies: { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off" }[];
+  allies: { name: string; cost: number; stars: 1 | 2 | 3; power: number; place: "on" | "off"; /** SPD Amplification in percent (wiki). */ spd?: number }[];
   enemies: { name: string; elite?: boolean; boss?: boolean }[];
   /** Number of waves the normal enemies come in (the boss fight has one). */
   waves: number;
@@ -56,6 +56,7 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   const { won, ratio, limit } = input;
   const units: TlUnit[] = [];
   const events: TlEvent[] = [];
+  const spdOf = new Map(input.allies.map((a, i) => [`a${i}`, a.spd ?? 0]));
   const allies = input.allies.map((a, i) => {
     const u: TlUnit = { id: `a${i}`, name: a.name, side: "ally", maxHp: Math.round((900 + 350 * a.cost) * (1 + 0.6 * (a.stars - 1))), cost: a.cost, stars: a.stars, place: a.place, idle: a.power <= 0 };
     units.push(u);
@@ -77,7 +78,8 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   const acts: { t: number; ally: (typeof allies)[number] }[] = [];
   for (const a of allies) {
     if (a.u.idle) continue;
-    const interval = 100 / (0.85 + 0.1 * (a.u.stars ?? 1) + rng() * 0.35);
+    // Faster characters (higher SPD Amplification) take more turns; dampened so 300% isn't 4× the turns.
+    const interval = 100 / ((0.85 + 0.1 * (a.u.stars ?? 1) + rng() * 0.35) * Math.sqrt(1 + (spdOf.get(a.u.id) ?? 0) / 100));
     for (let t = rng() * interval * 0.6 + 2; t < end - 0.5; t += interval * (0.9 + rng() * 0.2)) acts.push({ t, ally: a });
   }
   acts.sort((x, y) => x.t - y.t);

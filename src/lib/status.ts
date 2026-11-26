@@ -33,6 +33,7 @@ export const FEATURES: FeatureStatus[] = [
   { area: "Endgame", feature: "Simulated Universe run simulator", status: "tested", note: "Offer odds are stated assumptions (not published)" },
   { area: "Endgame", feature: "Currency Wars run simulator: environments, strategies, 3 planes, shop, XP, merges, items, bonds, bosses", status: "tested", note: "Wiki rules (4.7); base gold, streak gold and XP curve are stated guesses" },
   { area: "Endgame", feature: "Currency Wars team builder (On/Off-Field, strength by star), equipment combination grid, investments browser", status: "tested" },
+  { area: "Endgame", feature: "Currency Wars character sheets: every stat like the game's Stats Details, abilities by star, Eidolons, Light Cone, recommended equipment", status: "tested", note: "Wiki data; equipment boosts included, Bond/Plot Armor boosts not; your build's flat SPD isn't on the wiki" },
   { area: "Endgame", feature: "Currency Wars Bond Tracking (thumbs-up on matching characters) and Bond member portraits", status: "tested" },
   { area: "Endgame", feature: "Currency Wars battle turn order with Action Value (toggle) and cycle", status: "tested" },
   { area: "Endgame", feature: "Currency Wars battle viewer: HP bars, waves, boss phases, elapsed time, 1×/2×/4×, skip", status: "tested", note: "Replays the simulated result; not the game's battle engine" },

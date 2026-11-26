@@ -1,7 +1,7 @@
 "use client";
 
 import { useLiveQuery } from "dexie-react-hooks";
-import { Coins, Dices, RefreshCw, Search, Trash2, X } from "lucide-react";
+import { Coins, Dices, Info, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useMemo, useState } from "react";
 import { WolfComment } from "@/components/SilverWolf";
 import { kvGet, kvSet } from "@/lib/db";
@@ -9,7 +9,8 @@ import { unitPower } from "@/lib/currencywars/run";
 import type { CwCharacter, CwField } from "@/lib/currencywars/parse";
 import { boardBonds, boardGold, bondVariants, chanceToSee, rollShop, withVariants, type BoardUnit, type CwPack } from "@/lib/currencywars/sim";
 import { createRng } from "@/lib/warp/simulator";
-import { Button, cx, Empty, Notice, Panel } from "../ui";
+import { Button, cx, Empty, Modal, Notice, Panel } from "../ui";
+import { CharacterSheet } from "./CharacterSheet";
 import { BondList, bondsOf, CharCard, COST_TEXT, FieldTag, OddsBar, Portrait } from "./shared";
 import { BondTracker } from "./tracking";
 
@@ -35,6 +36,7 @@ export function TeamBuilder({ pack }: { pack: CwPack }) {
   const shown = roster.filter((c) => (cost === "all" || c.cost === cost) && (field === "all" || info(c.name)?.field === field)
     && (!needle || c.name.toLowerCase().includes(needle) || bondsOf(pack, c.name).some((b) => b.toLowerCase().includes(needle))));
   const [rules, setRules] = useState<Record<string, string>>({});
+  const [sheet, setSheet] = useState<{ name: string; stars: number; place: "on" | "off" } | null>(null);
   const families = useMemo(() => bondVariants(pack.bonds), [pack.bonds]);
   const bonds = useMemo(() => boardBonds(board, withVariants(pack.bonds, rules)), [board, pack.bonds, rules]);
   const shopRoster = useMemo(() => roster.filter((c) => c.cost <= 5), [roster]);
@@ -66,6 +68,7 @@ export function TeamBuilder({ pack }: { pack: CwPack }) {
                   <div className="flex rounded-md border border-line" role="radiogroup" aria-label={`${u.name} stars`}>
                     {([1, 2, 3] as const).map((st) => <button key={st} type="button" role="radio" aria-checked={u.stars === st} onClick={() => setBoard(board.map((x) => (x.name === u.name ? { ...x, stars: st } : x)))} className={cx("px-1.5 py-0.5 text-xs", u.stars === st ? "bg-amber-400/20 text-amber-300" : "text-faint")}>{st}★</button>)}
                   </div>
+                  <button type="button" onClick={() => setSheet({ name: u.name, stars: u.stars, place: placeOf(u) })} aria-label={`${u.name} details`} className="rounded p-1 text-faint hover:text-cyan"><Info size={14} /></button>
                   <button type="button" onClick={() => setBoard(board.filter((x) => x.name !== u.name))} aria-label={`Remove ${u.name}`} className="rounded p-1 text-faint hover:text-bad"><X size={14} /></button>
                 </li>
               );
@@ -143,6 +146,9 @@ export function TeamBuilder({ pack }: { pack: CwPack }) {
           <div className="mt-2"><Button size="sm" variant="ghost" onClick={() => { setSeed(Math.random().toString(36).slice(2, 8)); setRolls(0); }}><RefreshCw size={13} /> New seed</Button></div>
         </Panel>
       )}
+      <Modal open={!!sheet} onClose={() => setSheet(null)} title={sheet ? `${sheet.name} · details` : "Details"} wide>
+        {sheet && <CharacterSheet key={`${sheet.name}-${sheet.stars}`} pack={pack} name={sheet.name} stars={sheet.stars} place={sheet.place} />}
+      </Modal>
     </div>
   );
 }

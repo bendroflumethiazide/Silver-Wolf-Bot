@@ -26,7 +26,9 @@ export function cleanWikitext(s: string): string {
       .replace(/\{\{Icon\|On Field\}\}\{\{Icon\|Off Field\}\}(?![A-Za-z])/g, "On-/Off-Field Strength")
       .replace(/\{\{Icon\|[^{}|]+(?:\|[^{}]*)?\}\}(?=[A-Za-z"\u201c{])/g, "")
       .replace(/\{\{Icon\|([^{}|]+)(?:\|[^{}]*)?\}\}/g, "$1")
-      .replace(/\{\{Item\|([^|{}]*)(?:\|[^{}]*)?\}\}/g, "$1");
+      .replace(/\{\{Item\|([^|{}]*)(?:\|[^{}]*)?\}\}/g, "$1")
+      // Templates that just show a name: {{Enemy|X}}, {{Extra Effect|X}}, {{w|X}}, {{Term|X}}.
+      .replace(/\{\{(?:Enemy|Extra Effect|w|Term|Character|Light Cone)\|([^|{}]*)(?:\|[^{}]*)?\}\}/g, "$1");
   }
   // Only after the known templates have given up their text, drop whatever templates remain.
   for (let i = 0; i < 4; i++) t = t.replace(/\{\{[^{}]*\}\}/g, "");
@@ -112,6 +114,20 @@ export function parseCurrentSeason(wikitext: string): { season: string; version:
 
 const ATTR = /^(?:rowspan|colspan|style|class|width|align|id)\s*=\s*"?[^|"]*"?\s*\|(?!\|)/i;
 
+/** Split "a || b" table cells, ignoring "||" inside {{templates}} and [[links]] (pages have such typos). */
+function splitCells(line: string): string[] {
+  const out: string[] = [];
+  let depth = 0, last = 0;
+  for (let i = 0; i < line.length; i++) {
+    const two = line.slice(i, i + 2);
+    if (two === "{{" || two === "[[") { depth++; i++; continue; }
+    if ((two === "}}" || two === "]]") && depth > 0) { depth--; i++; continue; }
+    if (two === "||" && depth === 0) { out.push(line.slice(last, i)); last = i + 2; i++; }
+  }
+  out.push(line.slice(last));
+  return out;
+}
+
 /** Rows of the first wikitable at or after `from` (cells are raw wikitext; header rows are skipped). */
 export function wikiTableRows(wikitext: string, from = 0): string[][] {
   const start = wikitext.indexOf("{|", from);
@@ -127,7 +143,7 @@ export function wikiTableRows(wikitext: string, from = 0): string[][] {
     if (line.startsWith("!")) { cur = null; continue; }
     if (line.startsWith("|")) {
       cur ??= [];
-      cur.push(...line.slice(1).split("||").map((c) => c.trim().replace(ATTR, "").trim()));
+      cur.push(...splitCells(line.slice(1)).map((c) => c.trim().replace(ATTR, "").trim()));
       continue;
     }
     if (cur?.length) cur[cur.length - 1] += `\n${line}`;
@@ -294,29 +310,123 @@ export function parseDifficulty(wikitext: string): CwDifficulty[] {
 }
 
 export type CwField = "on" | "off" | "both";
+export interface CwAbility { name: string; types: string[]; effect: string }
 export interface CwCharInfo {
   cost: number;
   field: CwField;
   roles: string[];
   bonds: string[];
-  /** On-/Off-Field Strength at 1/2/3 stars. */
+  /** On-/Off-Field Strength by star (1★, 2★, 3★, and 4★ where the character has one). */
   onField: number[];
   offField: number[];
-  /** HP bonus in percent at 1/2/3 stars. */
+  /** HP Amplification in percent by star. */
   hp: number[];
+  /** SPD Amplification in percent by star. */
+  spd?: number[];
+  healing?: number[];
+  shield?: number[];
+  /** Hidden multipliers from the damage formula: base DMG Amplification, and per Eidolon level. */
+  baseDmgAmp?: number;
+  eidolonAmp?: number;
+  /** Short ability summaries from the infobox (with Energy where listed). */
+  summaries?: { name: string; types: string[]; desc: string; energy?: number }[];
+  /** Full abilities by group ("On Field", "Off Field", "4-Cost", …). Values read "1★/2★/3★(/4★)". */
+  abilities?: { group: string; list: CwAbility[] }[];
+  eidolons?: { name: string; desc: string }[];
+  lightCone?: { name: string; desc: string } | null;
+  /** Recommended equipment by group ("On-Field", "Off-Field" or "All"). */
+  recommended?: { group: string; items: string[] }[];
+  notes?: string[];
 }
-/** A "<Name> (<Season>)" character page: infobox and "Character Details". */
+
+/** A template parameter that may span lines: "|key = value" up to the next "|param" or "}}". */
+function param(block: string, key: string): string {
+  const m = new RegExp(`^\\|\\s*${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\s*=\\s*([\\s\\S]*?)(?=\\n\\s*\\||\\n\\}\\}|$)`, "m").exec(block);
+  return m?.[1].trim() ?? "";
+}
+/** The body of the first {{Name …}} template (balanced braces). */
+function template(wikitext: string, name: string): string | null {
+  const at = wikitext.indexOf(`{{${name}`);
+  if (at < 0) return null;
+  let depth = 0;
+  for (let i = at; i < wikitext.length - 1; i++) {
+    if (wikitext[i] === "{" && wikitext[i + 1] === "{") { depth++; i++; }
+    else if (wikitext[i] === "}" && wikitext[i + 1] === "}") { depth--; i++; if (depth === 0) return wikitext.slice(at, i + 1); }
+  }
+  return null;
+}
+/** Text of a "==Heading==" section (up to the next heading of the same or higher level). */
+function section(wikitext: string, title: string, level = 2): string {
+  const eq = "=".repeat(level);
+  const m = new RegExp(`^${eq}\\s*${title.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&")}\\s*${eq}\\s*$`, "m").exec(wikitext);
+  if (!m) return "";
+  const rest = wikitext.slice(m.index + m[0].length);
+  const next = new RegExp(`^={1,${level}}[^=]`, "m").exec(rest);
+  return next ? rest.slice(0, next.index) : rest;
+}
+
+/** A "<Name> (<Season>)" character page: infobox, Character Details, abilities, Eidolons, Light Cone, equipment. */
 export function parseCharInfo(wikitext: string): CwCharInfo | null {
-  const get = (k: string) => new RegExp(`^\\|\\s*${k}\\s*=\\s*([^\\n|]*)`, "m").exec(wikitext)?.[1].trim() ?? "";
+  const infobox = template(wikitext, "Currency Wars Character Infobox") ?? wikitext;
+  const get = (k: string) => new RegExp(`^\\|\\s*${k}\\s*=\\s*([^\\n|]*)`, "m").exec(infobox)?.[1].trim() ?? "";
   const cost = Number(get("cost"));
   const fieldText = get("field").toLowerCase();
   if (!cost || !fieldText) return null;
   const field: CwField = fieldText.includes("/") ? "both" : fieldText.startsWith("off") ? "off" : "on";
-  const nums = (k: string) => [1, 2, 3].map((i) => parseFloat(get(`${k}${i}`)) || 0);
+  const details = template(wikitext, "Currency Wars Character Details") ?? wikitext;
+  const dget = (k: string) => new RegExp(`^\\|\\s*${k}\\s*=\\s*([^\\n|]*)`, "m").exec(details)?.[1].trim() ?? "";
+  // 1★–3★ always; a 4★ value only where the page has one.
+  const nums = (k: string) => { const v = [1, 2, 3, 4].map((i) => dget(`${k}${i}`)); return v.filter((x, i) => i < 3 || x !== "").map((x) => parseFloat(x) || 0); };
+
+  const summaries: NonNullable<CwCharInfo["summaries"]> = [];
+  for (let i = 1; i <= 6; i++) {
+    const name = get(`ability${i}`);
+    if (!name) continue;
+    const types = [1, 2, 3].map((k) => get(`ability${i}_type${k}`)).filter(Boolean);
+    const energy = Number(get(`energy${i}`)) || undefined;
+    summaries.push({ name, types, desc: cleanWikitext(param(infobox, `ability${i}_desc`)), energy });
+  }
+
+  const abilitiesText = section(wikitext, "Abilities");
+  const abilities: NonNullable<CwCharInfo["abilities"]> = [];
+  const parts = abilitiesText.split(/^===\s*([^=\n]+?)\s*===\s*$/m);
+  // parts: [before, title1, body1, title2, body2, …]
+  const groups: [string, string][] = [];
+  if (parts[0].includes("{|")) groups.push([field === "off" ? "Off Field" : "On Field", parts[0]]);
+  for (let i = 1; i + 1 < parts.length; i += 2) groups.push([parts[i], parts[i + 1]]);
+  for (const [group, body] of groups) {
+    const list = wikiTableRows(body).filter((r) => r.length >= 3).map((r) => ({
+      name: nameCell(r[0].replace(/<!--[\s\S]*?-->/g, "")),
+      types: cleanWikitext(r[1]).split(/\s*[,/]\s*|\n/).filter(Boolean),
+      effect: cleanWikitext(r[2].replace(/\{\{Extra Effect\|([^|}]+)(?:\|[^}]*)?\}\}/g, "$1")),
+    })).filter((a) => a.name && a.effect);
+    if (list.length) abilities.push({ group, list });
+  }
+
+  const eid = template(wikitext, "Currency Wars Character Eidolons");
+  const eidolons = eid ? [1, 2, 3, 4, 5, 6].map((i) => ({ name: cleanWikitext(param(eid, `eidolon${i}`)), desc: cleanWikitext(param(eid, `eidolon${i}_desc`).replace(/\{\{Extra Effect\|([^|}]+)(?:\|[^}]*)?\}\}/g, "$1")) })).filter((e) => e.name) : [];
+  const lc = template(wikitext, "Currency Wars Character Light Cone");
+  const lightCone = lc ? { name: cleanWikitext(param(lc, "name")), desc: cleanWikitext(param(lc, "desc")) } : null;
+
+  const eqText = section(wikitext, "Recommended Equipment");
+  const recommended: NonNullable<CwCharInfo["recommended"]> = [];
+  const eqParts = eqText.split(/^===\s*([^=\n]+?)\s*===\s*$/m);
+  const eqGroups: [string, string][] = [];
+  if (/\{\{Currency Wars Character Equipment/.test(eqParts[0])) eqGroups.push(["All", eqParts[0]]);
+  for (let i = 1; i + 1 < eqParts.length; i += 2) eqGroups.push([eqParts[i], eqParts[i + 1]]);
+  for (const [group, body] of eqGroups) {
+    const items = [...body.matchAll(/^\|\s*equipment\s*\d+\s*=\s*([^\n|]+)/gm)].map((m) => m[1].trim()).filter(Boolean);
+    if (items.length) recommended.push({ group, items });
+  }
+  const notes = [...section(wikitext, "Gameplay Notes").matchAll(/^\*+\s*(.+)$/gm)].map((m) => cleanWikitext(m[1])).filter(Boolean);
+
   return {
     cost, field,
     roles: ["role1", "role2"].map(get).map((r) => r.replace(/\s*\(.*\)$/, "")).filter(Boolean),
     bonds: ["bond1", "bond2", "bond3"].map(get).filter(Boolean),
     onField: nums("on_field"), offField: nums("off_field"), hp: nums("hp"),
+    spd: nums("spd"), healing: nums("healing"), shield: nums("shield"),
+    baseDmgAmp: parseFloat(get("dmg")) || 0, eidolonAmp: parseFloat(get("eidolon")) || 0,
+    summaries, abilities, eidolons, lightCone, recommended, notes,
   };
 }

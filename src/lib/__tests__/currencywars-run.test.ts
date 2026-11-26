@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildTimeline, hpAt, turnOrder, turnsOf } from "../currencywars/timeline";
 import { bondNames, membersOf, trackedMatches } from "../currencywars/bonds";
+import { characterStats, itemBoosts, parseStatLine } from "../currencywars/stats";
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
@@ -183,7 +184,7 @@ describe("Currency Wars table parsers", () => {
     expect(parseEnvironments(ENV)[1]).toEqual({ name: "Talent Recruitment", effect: "Start with 1 random 4-cost character(s)." });
     const st = parseStrategies(STRAT);
     expect(st.map((s) => [s.name, s.rarity, s.planes])).toEqual([["Interest Rate Increase", "Prismatic", [1]], ["Buy-Out", "Gold", [1, 2]], ["Small Help", "Silver", [1, 2, 3]]]);
-    expect(parseCharInfo(KAFKA)).toEqual({ cost: 5, field: "on", roles: ["DPS", "Support"], bonds: ["Stellaron Hunters", "DoT"], onField: [200, 320, 2000], offField: [0, 0, 0], hp: [60, 108, 500] });
+    expect(parseCharInfo(KAFKA)).toMatchObject({ cost: 5, field: "on", roles: ["DPS", "Support"], bonds: ["Stellaron Hunters", "DoT"], onField: [200, 320, 2000], offField: [0, 0, 0], hp: [60, 108, 500] });
     expect(parseCharInfo("no infobox")).toBeNull();
   });
 
@@ -546,6 +547,106 @@ describe("battle timeline", () => {
   });
 });
 
+describe("character pages: stats, abilities, Eidolons, Light Cone, equipment", () => {
+  const PAGE = `{{Currency Wars Character Infobox
+|name           = Topaz & Numby
+|cost           = 1
+|field          = On/Off Field
+|role1          = DPS
+|role2          = Support
+|bond1          = Astropolis Merchant Guild
+|bond2          = Follow-Up ATK
+|dmg            = 150%
+|eidolon        = 10%
+|ability1       = Debt Collection
+|ability1_type1 = Ultimate
+|ability1_type2 = Talent
+|ability1_desc  = Ultimate enhances Numby.
+|energy1        = 130
+}}
+==Character Details==
+{{Currency Wars Character Details
+|hp1 = 0%
+|hp2 = 30%
+|hp3 = 60%
+|on_field1 = 100
+|on_field2 = 160
+|on_field3 = 220
+|off_field1 = 100
+|off_field2 = 160
+|off_field3 = 220
+|spd1 = 0%
+|spd2 = 10%
+|spd3 = 20%
+|spd4 = 30%
+|healing1 = 60
+|healing2 = 60
+|healing3 = 60
+|shield1 = 60
+|shield2 = 60
+|shield3 = 60
+}}
+==Abilities==
+===On Field===
+{| class="wikitable"
+! Ability !! Type !! Effect
+|-
+| {{Icon/Dark|A.png|50}}<br />Turn a Profit!
+| Ultimate (Change)
+| DMG multiplier increases by {{Color|highlight|150%/187%/270%||nobold=1}}. Hits {{Extra Effect|adjacent targets}} like {{Enemy|Big Boss}}.
+|}
+===Off Field===
+{| class="wikitable"
+! Ability !! Type !! Effect
+|-
+| {{Icon/Dark|B.png|50}}<br />Difficulty Paying?
+| Skill (Change)
+| Inflicts "Proof of Debt".
+|}
+==Off-Field Eidolon/Light Cone==
+{{Currency Wars Character Eidolons
+|eidolon1      = Future Market
+|eidolon1_desc = Debtor state.
+|eidolon2      = Bona Fide Acquisition
+|eidolon2_desc = Numby's SPD increases by 20%.
+}}
+{{Currency Wars Character Light Cone
+|name = Worrisome, Blissful
+|desc = Increases Independent DMG Amplification by 12%/18%.
+}}
+==Recommended Equipment==
+===On-Field===
+{{Currency Wars Character Equipment
+|equipment 1 = High-frequency Chainsaw
+|equipment 2 = Firestorm Surge
+}}
+===Off-Field===
+{{Currency Wars Character Equipment
+|equipment 1 = Starfall Sniper
+}}
+==Gameplay Notes==
+* Numby counts as a summon.
+==Change History==`;
+  it("reads every stat by star (with a 4th star only where listed) and the hidden multipliers", () => {
+    const i = parseCharInfo(PAGE)!;
+    expect(i.spd).toEqual([0, 10, 20, 30]);
+    expect(i.healing).toEqual([60, 60, 60]);
+    expect(i.shield).toEqual([60, 60, 60]);
+    expect(i.onField).toEqual([100, 160, 220]);
+    expect([i.baseDmgAmp, i.eidolonAmp]).toEqual([150, 10]);
+    expect(i.summaries).toEqual([{ name: "Debt Collection", types: ["Ultimate", "Talent"], desc: "Ultimate enhances Numby.", energy: 130 }]);
+  });
+  it("reads abilities by group, Eidolons, Light Cone, recommended equipment and notes", () => {
+    const i = parseCharInfo(PAGE)!;
+    expect(i.abilities!.map((g) => [g.group, g.list.map((a) => [a.name, a.types])])).toEqual([["On Field", [["Turn a Profit!", ["Ultimate (Change)"]]]], ["Off Field", [["Difficulty Paying?", ["Skill (Change)"]]]]]);
+    expect(i.abilities![0].list[0].effect).toBe("DMG multiplier increases by 150%/187%/270%. Hits adjacent targets like Big Boss.");
+    expect(i.eidolons).toEqual([{ name: "Future Market", desc: "Debtor state." }, { name: "Bona Fide Acquisition", desc: "Numby's SPD increases by 20%." }]);
+    expect(i.lightCone).toEqual({ name: "Worrisome, Blissful", desc: "Increases Independent DMG Amplification by 12%/18%." });
+    expect(i.recommended).toEqual([{ group: "On-Field", items: ["High-frequency Chainsaw", "Firestorm Surge"] }, { group: "Off-Field", items: ["Starfall Sniper"] }]);
+    expect(i.notes).toEqual(["Numby counts as a summon."]);
+  });
+});
+
 describe("Bond Tracking and bond members", () => {
   it("matches characters by Bond, collapses variants, and counts worn Emblems", () => {
     expect(bondNames(PACK)).toEqual(["Stellaron Hunters", "Heal"]);
@@ -581,5 +682,27 @@ describe("turn order", () => {
     const old = { ...tl, turns: undefined };
     expect(turnsOf(old).length).toBeGreaterThan(0);
     expect(turnsOf(old).every((x) => tl.events.some((e) => e.kind === "hit" && e.from === x.id && e.t === x.t))).toBe(true);
+  });
+});
+
+describe("character stats", () => {
+  it("parses stat lines from items (advanced value, not privileged)", () => {
+    expect(parseStatLine("SPD Amplification: 5%")).toEqual({ keys: ["spdAmp"], value: 5 });
+    expect(parseStatLine("On-Field Strength 25%/50%")).toEqual({ keys: ["onField"], value: 25 });
+    expect(parseStatLine("On-Field/Off-Field Strength 10%")).toEqual({ keys: ["onField", "offField"], value: 10 });
+    expect(parseStatLine("Initial Energy: 15")).toEqual({ keys: ["initialEnergy"], value: 15 });
+    expect(parseStatLine("Something odd")).toBeNull();
+    expect(itemBoosts(PACK, ["Roller Skates", "Firestorm Surge"])).toEqual({ spdAmp: 15, onField: 25 });
+  });
+  it("matches the game's Stats Details layout and base values", () => {
+    const rows = characterStats(PACK, "Welt", 1);
+    const by = Object.fromEntries(rows.map((r) => [r.key, r]));
+    expect(rows.map((r) => r.label).slice(0, 9)).toEqual(["On-Field Strength", "Off-Field Strength", "DMG Amplification", "DMG Mitigation", "Lucky Strike Rate", "Lucky Strike DMG", "SPD Amplification", "Healing Strength", "Shield Strength"]);
+    expect([by.onField.total, by.offField.total, by.dmgAmp.total, by.mitigation.total, by.luckyRate.total, by.luckyDmg.total]).toEqual([100, 100, 0, 0, 5, 100]);
+    expect(by.dmgAmp.parts.map((p) => p.label)).toEqual(["DMG Amplification", "Basic ATK DMG Amplification", "Skill DMG Amplification", "Ultimate DMG Amplification", "Follow-Up ATK DMG Amplification", "DoT Amplification", "Break DMG Amplification", "Elation DMG Amplification"]);
+    const geared = Object.fromEntries(characterStats(PACK, "Welt", 2, ["Folding Knife", "Roller Skates"]).map((r) => [r.key, r]));
+    expect(geared.onField.total).toBe(176); // 160 × 1.10
+    expect(geared.spdAmp.total).toBe(5);
+    expect(geared.hpAmp.total).toBe(30);
   });
 });
