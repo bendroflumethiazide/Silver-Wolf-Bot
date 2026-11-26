@@ -10,12 +10,13 @@ import { fill, pick, SW } from "@/lib/companion/voice";
 import { kvGet, kvSet } from "@/lib/db";
 import { stripMarkup } from "@/lib/gamedata/types";
 import { useApp } from "@/lib/store";
+import { RunSimulator } from "@/components/universe/RunSimulator";
 
-type Tab = "blessings" | "curios" | "events";
+type Tab = "simulator" | "blessings" | "curios" | "events";
 
 export default function UniversePage() {
   const { game, profileId } = useApp();
-  const [tab, setTab] = useState<Tab>("blessings");
+  const [tab, setTab] = useState<Tab>("simulator");
   const [q, setQ] = useState("");
   const [onlyMissing, setOnlyMissing] = useState(false);
   const [limit, setLimit] = useState(120);
@@ -38,14 +39,15 @@ export default function UniversePage() {
 
   return (
     <div>
-      <PageHeader title="Simulated Universe" subtitle="Blessings, Curios and Occurrence images from game data, with your personal collection tracking." />
+      <PageHeader title="Simulated Universe" subtitle="Practise a run, or browse every blessing, curio and occurrence." />
+      <Tabs<Tab> value={tab} onChange={(t) => { setTab(t); setLimit(120); }} tabs={[{ id: "simulator", label: "Run simulator" }, { id: "blessings", label: `Blessings (${blessings.length})` }, { id: "curios", label: `Curios (${curios.length})` }, { id: "events", label: `Occurrences (${events.length})` }]} />
+      {tab === "simulator" ? <RunSimulator /> : <>
       <WolfComment comment={{ mood: "neutral", line: fill(pick(SW.universe, "su"), { curios: totals.curios, blessings: totals.blessings }), facts: [`${Object.keys(game.blessings).length} blessings, ${Object.keys(game.curios).length} curios, ${Object.keys(game.simEvents).length} occurrence entries in game data v${game.version}.`, "Collection status is tracked manually."] }} className="mb-5" />
       <Notice>Equations, Paths/Resonances by mode, domain types, difficulty modifiers and rewards are not in the downloaded data source, so they are not listed. Blessing entries cover all Universe variants and include duplicates across modes.</Notice>
       <div className="my-4 grid gap-3 sm:grid-cols-2">
         <div><div className="mb-1 flex justify-between text-xs text-muted"><span>Curios</span><span>{totals.curios}/{Object.keys(game.curios).length}</span></div><Progress value={totals.curios} max={Object.keys(game.curios).length} tone="gold" /></div>
         <div><div className="mb-1 flex justify-between text-xs text-muted"><span>Blessings</span><span>{totals.blessings}/{Object.keys(game.blessings).length}</span></div><Progress value={totals.blessings} max={Object.keys(game.blessings).length} tone="violet" /></div>
       </div>
-      <Tabs<Tab> value={tab} onChange={(t) => { setTab(t); setLimit(120); }} tabs={[{ id: "blessings", label: `Blessings (${blessings.length})` }, { id: "curios", label: `Curios (${curios.length})` }, { id: "events", label: `Occurrences (${events.length})` }]} />
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search" className="w-full sm:w-72" />
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={onlyMissing} onChange={(e) => setOnlyMissing(e.target.checked)} /> Not yet collected</label>
@@ -68,6 +70,7 @@ export default function UniversePage() {
         </ul>
       )}
       {list.length > limit && <div className="mt-3 text-center"><button className="text-sm text-cyan" onClick={() => setLimit(limit + 200)}>Show more ({list.length - limit})</button></div>}
+      </>}
     </div>
   );
 }
