@@ -22,6 +22,8 @@ test("Currency Wars tabs fit a phone", async ({ page }) => {
   await installCwWiki(page);
   await page.goto("/currency-wars");
   await page.getByRole("button", { name: "Download Currency Wars data" }).click();
+  // A fixed seed (its companion doesn't change starting items).
+  await page.getByRole("textbox", { name: "Seed" }).fill("e2e-base");
   await page.getByRole("button", { name: "Start run" }).click();
   await page.getByRole("button", { name: "Let's go" }).click();
   await page.locator("section").filter({ has: page.getByRole("heading", { name: /Choose an Investment Environment/ }) }).locator("div.grid > button").filter({ hasText: "Fixture Armory" }).click();
@@ -29,7 +31,7 @@ test("Currency Wars tabs fit a phone", async ({ page }) => {
   await expect(page.getByText(/^Can craft now:/)).toHaveCount(2);
   // Both are parts of the deployed characters' recommended "Fixture Blade": their portraits show who it's for.
   await expect(page.locator("button[title]").filter({ has: page.getByRole("img", { name: /^For Fx / }) })).toHaveCount(2);
-  for (const tab of ["Run simulator", "Team builder", "Equipment", "Investments"]) {
+  for (const tab of ["Run simulator", "Team builder", "Equipment", "Investments", "Roster"]) {
     await page.getByRole("tab", { name: tab }).click();
     await page.waitForTimeout(200);
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

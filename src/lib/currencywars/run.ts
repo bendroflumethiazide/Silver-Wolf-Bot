@@ -14,6 +14,7 @@ import { membersOf } from "./bonds";
 import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPack } from "./sim";
 import { buildTimeline, type Timeline, type TlKind } from "./timeline";
 import { GRADES, offerGrades, shiftGrade, startingRefreshes, type Grade, type GradeRules, type OfferMeta, type PendingSelection } from "./strategyGrades";
+import { kitEffect } from "./kits";
 import { AHA, simulateElation, type AhaState, type ElationResult } from "./elation";
 import { addStats, bondEffect, itemEffect, powerMult, zeroStats, type BondCtx, type Stats, type Summon } from "./combat";
 import { specialItem } from "./specialItems";
@@ -106,7 +107,7 @@ export const MODEL = {
   hpWeight: 0.5,
   /** Win chance = 1 / (1 + e^(-steepness × (ratio − 1))). */
   steepness: 6,
-  enemyScale: 0.74,
+  enemyScale: 1.0,
   /** Expected player level at the start, at each plane's boss. */
   levelCurve: [3, 6, 8, 9],
 } as const;
@@ -1363,6 +1364,9 @@ export function teamPower(s: RunState, pack: CwPack) {
     nodes: globalIndex(s.plane, s.node) + 1, av: av ?? 150, boss, storeLevel: s.level, isBasic: (i) => isBasic(pack, i),
   };
   const effects = teamBonds.map((b) => bondEffect(pack, b, bctx));
+  // Every character's kit for where they stand: team buffs, enemy debuffs, ally actions, shields, healing, named summons (kits.ts).
+  const kits = fighters.map((x) => ({ x, k: kitEffect(pack.info?.[x.u.name], x.u.name, x.u.stars, x.place, x.u.cost) }));
+  const kitSquad = kits.reduce<Stats>((a, { k }) => addStats(a, k.squad), zeroStats());
   const memberOf = (e: (typeof effects)[number], name: string) => teamBonds.find((b) => b.bond.name === e.bond)?.bond.members.includes(name) ?? false;
   // 4.7 extras: Trailblaze Store stats, Plot Armor (options, Plot Armor Bonds, Roll-Call 7).
   const store = storeStats(s);
@@ -1382,6 +1386,7 @@ export function teamPower(s: RunState, pack: CwPack) {
       const own = e.perUnit.get(x.u.uid);
       if (own) st = addStats(st, own);
     }
+    st = addStats(st, kitSquad);
     st = addStats(st, { on: store.on, off: store.off, dmg: store.team, str: plot.strength, spd: plot.spd });
     const base = bases.get(x.u.uid) ?? 0;
     return { uid: x.u.uid, name: x.u.name, place: x.place, power: base * powerMult(st, x.place), noBonds: base * powerMult(noBonds, x.place), spd: st.spd, plot: plot.strength, stats: st };
@@ -1400,7 +1405,14 @@ export function teamPower(s: RunState, pack: CwPack) {
   const units = per.reduce((n, x) => n + x.power, 0);
   const bonus = units / Math.max(1, per.reduce((n, x) => n + x.noBonds, 0)) - 1;
   // Bond summons fight too (Crimson Thorns, Starskiff, Quintet Joint, Soul, Aha, chimeras, Svarog, Dan Heng • Permansor Terrae…).
-  const summons: SummonPower[] = effects.flatMap((e) => e.summons).map((m) => {
+  // Named summons from kits (Numby, Lightning-Lord, Little Ica…) replace the Summon Bond's generic ones and get its Summon Power.
+  const summonBond = effects.find((e) => e.bond === "Summon");
+  const summonPowerLevel = summonBond ? Number(/Summon Power (\d)/.exec(summonBond.summons[0]?.note ?? "")?.[1] ?? 0) : 0;
+  const kitOwners = new Set(kits.filter(({ k }) => k.summons.length).map(({ x }) => x.u.name));
+  const kitSummons: Summon[] = kits.flatMap(({ x, k }) => k.summons.map((sm) => ({ name: sm.name, bond: `${x.u.name}'s kit`, emoji: "✨", spd: 110, share: 0,
+    power: (per.find((p) => p.uid === x.u.uid)?.power ?? 0) * sm.share * (summonBond && summonBond.summons.some((g) => g.name === `${x.u.name}'s summon`) ? 1 + 0.25 * summonPowerLevel : 1), note: sm.note })));
+  const bondSummons = effects.flatMap((e) => e.summons).filter((m) => !(m.bond === "Summon" && kitOwners.has(m.name.replace(/'s summon$/, ""))));
+  const summons: SummonPower[] = [...bondSummons, ...kitSummons].map((m) => {
     if (m.character) {
       const src = fighters.find((x) => x.u.name === "Dan Heng • Imbibitor Lunae");
       const copy: Unit = { uid: -1, name: m.character.name, cost: m.character.cost, stars: m.character.stars, items: (src?.u.items ?? []).slice(0, m.character.stars) };
@@ -1414,7 +1426,7 @@ export function teamPower(s: RunState, pack: CwPack) {
   const robot = robotFor(s, kind);
   const robotBonus = robot ? (robot.mult / 100) * Math.max(1, Math.floor(((av ?? 150) * robot.spd) / 10000)) * 0.01 : 0;
   const power = (units + summonPower + elationPower) * (1 + express.bonus + robotBonus + elation.repellency * 0.5);
-  return { raw, bonus, power, bonds, idle, per, summons, effects, express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7, squadItems, elation, elationPower, ahaStar: aStar };
+  return { raw, bonus, power, bonds, idle, per, summons, effects, kits: kits.map(({ x, k }) => ({ uid: x.u.uid, name: x.u.name, kit: k })), express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7, squadItems, elation, elationPower, ahaStar: aStar };
 }
 
 /** Average strength of a cost at a (fractional) star level, from the pack's character pages. */

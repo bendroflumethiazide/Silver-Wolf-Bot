@@ -17,6 +17,7 @@ import { openBox, shiftEarlier } from "../currencywars/escapade";
 import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
 import { offerGrades, shiftGrade } from "../currencywars/strategyGrades";
 import { abilityCard } from "../currencywars/abilities";
+import { kitCoverage, kitEffect, starValue } from "../currencywars/kits";
 import { ahaSpeed, PUNCHLINE, simulateElation, type ElationUnit } from "../currencywars/elation";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
 import { createRng } from "../warp/simulator";
@@ -1624,5 +1625,53 @@ describe("Elation in a run", () => {
   it("a squad without Elation characters is unchanged", () => {
     const s = at47(["Kafka", "Welt"], { plane: 1, node: 0 });
     expect(teamPower(s, PE).elation.active).toBe(false);
+  });
+});
+
+// --------------------------------------------------------------------------------------------- kits (every character's Currency Wars abilities)
+
+const kitInfo = (rows: [string, string, string][], field: "on" | "off" | "both" = "on", group = "On Field") => ({ cost: 3, field, roles: [], bonds: [], onField: [100, 200, 300], offField: [100, 200, 300], hp: [0, 30, 60], abilities: [{ group, list: rows.map(([name, t, effect]) => ({ name, types: [t], effect })) }] });
+
+describe("character kits in combat", () => {
+  it("reads star values", () => {
+    expect(starValue("80%/120%/200%", 2)).toBe(120);
+    expect(starValue("1,600%/2,000%/16,000%", 3)).toBe(16000);
+    expect(starValue("50", 3)).toBe(50);
+  });
+
+  it("squad buffs and enemy debuffs count; a character's buffs to themselves are already in their strength", () => {
+    const hanya = kitEffect(kitInfo([["Sanction", "Ultimate (Change)", "The SPD of other members in the ally squad also increases by an amount equal to 10%/14%/18% of Hanya's SPD, and the ally squad's ATK increases by 80%/120%/200%, lasting for 2 turn(s)."]]) as never, "Hanya", 2, "on");
+    expect(hanya.squad.dmg).toBeGreaterThan(0);
+    const cerydra = kitEffect(kitInfo([["Talent", "Talent (Change)", "Cerydra's CRIT Rate increases by 100% and CRIT DMG increases by 300%/360%/420%/480%."]]) as never, "Cerydra", 2, "on");
+    expect(cerydra.squad).toEqual({});
+    expect(cerydra.self).toEqual({});
+    expect(cerydra.lines[0].status).toBe("strength");
+    // "this unit's CRIT DMG …, and DMG dealt by the ally squad …": only the squad part is added.
+    const anaxa = kitEffect(kitInfo([["Talent", "Talent (New)", "While Anaxa is on the field, this unit's CRIT DMG increases by 60%/100%/140%/180%, and DMG dealt by the ally squad increases by 30%/40%/50%/60%."]]) as never, "Anaxa", 1, "on");
+    expect(anaxa.squad.dmg).toBeCloseTo(0.3 * 0.6, 5);
+    const tribbie = kitEffect(kitInfo([["Zone", "Ultimate (Change)", "While the Zone lasts, increases enemy targets' DMG taken by 30.0%."]]) as never, "Tribbie", 1, "on");
+    expect(tribbie.squad.dmg).toBeCloseTo(0.3 * 0.6, 5);
+  });
+
+  it("named summons become units; immediate actions speed the squad; shields count once", () => {
+    const topaz = kitEffect(kitInfo([["Debt Collection", "Talent (Change)", "At the start of combat, summons Numby. When Numby takes action, additionally launches a Follow-Up ATK."]]) as never, "Topaz & Numby", 2, "on");
+    expect(topaz.summons.map((x) => x.name)).toEqual(["Numby"]);
+    const sunday = kitEffect(kitInfo([["Benison", "Skill (Change)", "Enables designated on-field ally character and their summon to immediately take action, increases their DMG dealt by 30%/45%/60%/75%."]]) as never, "Sunday", 1, "off");
+    expect(sunday.squad.spd).toBeGreaterThan(0);
+    const aven = kitEffect(kitInfo([["A", "Skill (Change)", "Provides a shield to all on-field allies."], ["B", "Talent (Change)", "Provides all on-field allies with a Shield."]]) as never, "Aventurine", 1, "on");
+    expect(aven.squad.mit).toBeCloseTo(0.08 + 0.08 * 0.15, 5);
+    expect(kitCoverage(aven).modelled).toBe(2);
+  });
+
+  it("in a fight: a kit summon is a unit on the turn order, and squad buffs raise everyone", () => {
+    const withTopaz: CwPack = { ...P47, characters: [...P47.characters, { name: "Topaz & Numby", cost: 3 }], info: { ...P47.info, "Topaz & Numby": kitInfo([["Debt Collection", "Talent (Change)", "At the start of combat, summons Numby. All allies' ATK increases by 40%."]]) as never } };
+    const s = at47(["Kafka"], { plane: 0, node: 3, on: [u47(1, "Kafka"), { uid: 2, name: "Topaz & Numby", cost: 3, stars: 2, items: [] }, null, null] });
+    const tp = teamPower(s, withTopaz);
+    expect(tp.summons.some((m) => m.name === "Numby" && m.power > 0)).toBe(true);
+    const kafka = tp.per.find((p) => p.name === "Kafka")!;
+    const alone = teamPower({ ...s, on: [u47(1, "Kafka"), null, null, null] }, withTopaz).per.find((p) => p.name === "Kafka")!;
+    expect(kafka.power).toBeGreaterThan(alone.power);
+    const tl = battle(s, withTopaz).last!.timeline!;
+    expect(tl.units.some((u) => u.name === "Numby" && u.summon)).toBe(true);
   });
 });
