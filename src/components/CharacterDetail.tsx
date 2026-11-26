@@ -5,6 +5,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { ArrowLeft, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { BuildCard } from "@/components/BuildCard";
+import { RecommendedBuildFor } from "@/components/RecommendedBuild";
 import { blankOwned, CharacterEditor } from "@/components/CharacterEditor";
 import { GameImage } from "@/components/GameImage";
 import { WolfComment } from "@/components/SilverWolf";
@@ -180,7 +181,7 @@ export function CharacterDetail({ id }: { id: string }) {
 
       {tab === "build" && (owned
         ? <BuildCard charId={id} owned={owned} />
-        : <Empty title="Not owned">Mark this character as owned and import their relics to get Silver Wolf&apos;s build rating.</Empty>)}
+        : <div className="space-y-4"><RecommendedBuildFor charId={id} /><p className="text-center text-xs text-muted">Own this character? Mark them as owned to get Silver Wolf&apos;s rating of your build.</p></div>)}
 
       {owned && editing && <CharacterEditor key={owned.updatedAt} open={editing} onClose={() => setEditing(false)} initial={owned} name={name} />}
     </div>

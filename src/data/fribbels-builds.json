@@ -1,0 +1,4494 @@
+{
+ "source": "https://github.com/fribbels/hsr-optimizer",
+ "commit": "cedb61186095ca632784e38a01e638f1ca6f6f2f",
+ "license": "MIT License, Copyright (c) 2024 Fribbels",
+ "generated": "2026-11-26",
+ "characters": {
+  "1001": {
+   "name": "March7th",
+   "weights": {
+    "DEF": 1,
+    "DEF%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "DEF%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "DEF%",
+     "SPD"
+    ],
+    "NECK": [
+     "DEF%"
+    ],
+    "OBJECT": [
+     "DEF%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21002"
+  },
+  "1002": {
+   "name": "DanHeng",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Pioneer Diver of Dead Waters"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "21003"
+  },
+  "1003": {
+   "name": "Himeko",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Fire DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Ashblazing Grand Duke"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves"
+   ],
+   "teammates": [
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "23000"
+  },
+  "1004": {
+   "name": "Welt",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1,
+    "Effect Hit Rate": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Imaginary DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23004"
+  },
+  "1005": {
+   "name": "Kafka",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "defaultLightCone": "23006"
+  },
+  "1006": {
+   "name": "SilverWolf",
+   "weights": {
+    "SPD": 1,
+    "Effect Hit Rate": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [
+     "Quantum DMG Boost",
+     "ATK%",
+     "HP%",
+     "DEF%"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "ATK%",
+     "Break Effect"
+    ]
+   },
+   "defaultLightCone": "23007"
+  },
+  "1008": {
+   "name": "Arlan",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1403",
+     "lightCone": "23038"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "21012"
+  },
+  "1009": {
+   "name": "Asta",
+   "weights": {
+    "DEF": 0.25,
+    "DEF%": 0.25,
+    "HP": 0.25,
+    "HP%": 0.25,
+    "SPD": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21011"
+  },
+  "1013": {
+   "name": "Herta",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Ashblazing Grand Duke"
+    ],
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Hunter of Glacial Forest"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves"
+   ],
+   "teammates": [
+    {
+     "id": "1401",
+     "lightCone": "23037"
+    },
+    {
+     "id": "1403",
+     "lightCone": "23038"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "21006"
+  },
+  "1014": {
+   "name": "Saber",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Wavestrider Captain"
+    ],
+    [
+     "Scholar Lost in Erudition"
+    ]
+   ],
+   "ornamentSets": [
+    "Inert Salsotto",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1509",
+     "lightCone": null
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "23045"
+  },
+  "1015": {
+   "name": "Archer",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Wavestrider Captain"
+    ],
+    [
+     "Genius of Brilliant Stars"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Tengoku@Livestream"
+   ],
+   "teammates": [
+    {
+     "id": "1306",
+     "lightCone": "21018"
+    },
+    {
+     "id": "1508",
+     "lightCone": null
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23046"
+  },
+  "1101": {
+   "name": "Bronya",
+   "weights": {
+    "SPD": 1,
+    "CRIT DMG": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23003"
+  },
+  "1102": {
+   "name": "Seele",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "defaultLightCone": "23001"
+  },
+  "1103": {
+   "name": "Serval",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Pioneer Diver of Dead Waters"
+    ],
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Band of Sizzling Thunder"
+    ],
+    [
+     "Eagle of Twilight Line"
+    ]
+   ],
+   "ornamentSets": [
+    "Firmament Frontline: Glamoth",
+    "Rutilant Arena",
+    "Sprightly Vonwacq"
+   ],
+   "teammates": [
+    {
+     "id": "1401",
+     "lightCone": "23037"
+    },
+    {
+     "id": "1403",
+     "lightCone": "23038"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "21013"
+  },
+  "1104": {
+   "name": "Gepard",
+   "weights": {
+    "DEF": 1,
+    "DEF%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 0.75,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "DEF%"
+    ],
+    "FOOT": [
+     "DEF%",
+     "SPD"
+    ],
+    "NECK": [
+     "DEF%"
+    ],
+    "OBJECT": [
+     "DEF%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23005"
+  },
+  "1105": {
+   "name": "Natasha",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "HP%",
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "HP%",
+     "SPD"
+    ],
+    "NECK": [
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21000"
+  },
+  "1106": {
+   "name": "Pela",
+   "weights": {
+    "DEF": 0.25,
+    "DEF%": 0.25,
+    "HP": 0.25,
+    "HP%": 0.25,
+    "SPD": 1,
+    "Effect Hit Rate": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "Effect Hit Rate",
+     "HP%",
+     "DEF%"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [
+     "HP%",
+     "DEF%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21001"
+  },
+  "1107": {
+   "name": "Clara",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Physical DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Champion of Streetwise Boxing"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves"
+   ],
+   "teammates": [
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1306",
+     "lightCone": "21018"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23002"
+  },
+  "1108": {
+   "name": "Sampo",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "ATK%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "ATK%",
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "ATK%",
+    "Effect Hit Rate",
+    "ATK",
+    "CRIT Rate",
+    "CRIT DMG"
+   ],
+   "relicSets": [
+    [
+     "Prisoner in Deep Confinement"
+    ]
+   ],
+   "ornamentSets": [
+    "Revelry by the Sea",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1005",
+     "lightCone": "23006"
+    },
+    {
+     "id": "1307",
+     "lightCone": "23022"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "21008"
+  },
+  "1109": {
+   "name": "Hook",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Fire DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Pioneer Diver of Dead Waters"
+    ],
+    [
+     "Scholar Lost in Erudition"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "21005"
+  },
+  "1110": {
+   "name": "Lynx",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "HP%",
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "HP%",
+     "SPD"
+    ],
+    "NECK": [
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21028"
+  },
+  "1111": {
+   "name": "Luka",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 1,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "ATK%",
+     "Physical DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "Break Effect",
+    "ATK%",
+    "ATK",
+    "Effect Hit Rate",
+    "CRIT Rate"
+   ],
+   "relicSets": [
+    [
+     "Prisoner in Deep Confinement"
+    ]
+   ],
+   "ornamentSets": [
+    "Talia: Kingdom of Banditry",
+    "Firmament Frontline: Glamoth",
+    "Revelry by the Sea"
+   ],
+   "teammates": [
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "21015"
+  },
+  "1112": {
+   "name": "Topaz",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "Fire DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Ashblazing Grand Duke"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves",
+    "The Wondrous BananAmusement Park"
+   ],
+   "teammates": [
+    {
+     "id": "1504",
+     "lightCone": "23056"
+    },
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "23016"
+  },
+  "1201": {
+   "name": "Qingque",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Genius of Brilliant Stars"
+    ],
+    [
+     "Poet of Mourning Collapse"
+    ],
+    [
+     "Sacerdos' Relived Ordeal"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Tengoku@Livestream"
+   ],
+   "teammates": [
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1306",
+     "lightCone": "23034"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "21034"
+  },
+  "1202": {
+   "name": "Tingyun",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "DEF": 0.25,
+    "DEF%": 0.25,
+    "HP": 0.25,
+    "HP%": 0.25,
+    "SPD": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "HP%",
+     "DEF%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [
+     "HP%",
+     "DEF%",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21032"
+  },
+  "1203": {
+   "name": "Luocha",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "Outgoing Healing Boost",
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "ATK%",
+     "HP%",
+     "DEF%"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23008"
+  },
+  "1204": {
+   "name": "JingYuan",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Ashblazing Grand Duke"
+    ]
+   ],
+   "ornamentSets": [
+    "The Wondrous BananAmusement Park",
+    "Inert Salsotto"
+   ],
+   "teammates": [
+    {
+     "id": "1313",
+     "lightCone": "23034"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "23010"
+  },
+  "1205": {
+   "name": "Blade",
+   "weights": {
+    "ATK": 0.25,
+    "ATK%": 0.25,
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "Wind DMG Boost",
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%"
+    ]
+   },
+   "defaultLightCone": "23009"
+  },
+  "1206": {
+   "name": "Sushang",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Physical DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK%",
+    "Break Effect",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Champion of Streetwise Boxing"
+    ],
+    [
+     "Iron Cavalry Against the Scourge"
+    ]
+   ],
+   "ornamentSets": [
+    "Firmament Frontline: Glamoth",
+    "Talia: Kingdom of Banditry",
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "21010"
+  },
+  "1207": {
+   "name": "Yukong",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Imaginary DMG Boost"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "ATK%"
+    ]
+   },
+   "defaultLightCone": "21025"
+  },
+  "1208": {
+   "name": "FuXuan",
+   "weights": {
+    "DEF": 0.75,
+    "DEF%": 0.75,
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "HP%",
+     "DEF%"
+    ],
+    "FOOT": [
+     "HP%",
+     "DEF%",
+     "SPD"
+    ],
+    "NECK": [
+     "HP%",
+     "DEF%"
+    ],
+    "OBJECT": [
+     "HP%",
+     "DEF%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23011"
+  },
+  "1209": {
+   "name": "Yanqing",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Hunter of Glacial Forest"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1306",
+     "lightCone": "23021"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23012"
+  },
+  "1210": {
+   "name": "Guinaifen",
+   "weights": {
+    "ATK": 0.5,
+    "ATK%": 0.5,
+    "DEF": 0.25,
+    "DEF%": 0.25,
+    "HP": 0.25,
+    "HP%": 0.25,
+    "SPD": 1,
+    "Effect Hit Rate": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Fire DMG Boost"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "ATK%"
+    ]
+   },
+   "defaultLightCone": "21015"
+  },
+  "1211": {
+   "name": "Bailu",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23013"
+  },
+  "1212": {
+   "name": "Jingliu",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23014"
+  },
+  "1213": {
+   "name": "ImbibitorLunae",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Imaginary DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Musketeer of Wild Wheat"
+    ],
+    [
+     "Genius of Brilliant Stars"
+    ],
+    [
+     "Wastelander of Banditry Desert"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Tengoku@Livestream"
+   ],
+   "teammates": [
+    {
+     "id": "1306",
+     "lightCone": "23034"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23015"
+  },
+  "1214": {
+   "name": "Xueyi",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "Quantum DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "Break Effect",
+    "ATK%",
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Genius of Brilliant Stars"
+    ],
+    [
+     "Poet of Mourning Collapse"
+    ]
+   ],
+   "ornamentSets": [
+    "Talia: Kingdom of Banditry",
+    "Inert Salsotto",
+    "Space Sealing Station",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "21019"
+  },
+  "1215": {
+   "name": "Hanya",
+   "weights": {
+    "DEF": 0.25,
+    "DEF%": 0.25,
+    "HP": 0.25,
+    "HP%": 0.25,
+    "SPD": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21018"
+  },
+  "1217": {
+   "name": "Huohuo",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "HP%",
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23017"
+  },
+  "1218": {
+   "name": "Jiaoqiu",
+   "weights": {
+    "ATK": 0.5,
+    "ATK%": 0.5,
+    "SPD": 1,
+    "Effect Hit Rate": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23029"
+  },
+  "1220": {
+   "name": "Feixiao",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "ATK%",
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Wind-Soaring Valorous"
+    ],
+    [
+     "The Ashblazing Grand Duke"
+    ],
+    [
+     "Eagle of Twilight Line"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves"
+   ],
+   "teammates": [
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1504",
+     "lightCone": "23056"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23031"
+  },
+  "1221": {
+   "name": "Yunli",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Physical DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Wind-Soaring Valorous"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves"
+   ],
+   "teammates": [
+    {
+     "id": "1306",
+     "lightCone": "21018"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "23030"
+  },
+  "1222": {
+   "name": "Lingsha",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Outgoing Healing Boost",
+     "DEF%",
+     "HP%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "DEF%",
+     "HP%",
+     "Fire DMG Boost"
+    ],
+    "OBJECT": [
+     "Break Effect",
+     "Energy Regeneration Rate",
+     "ATK%"
+    ]
+   },
+   "defaultLightCone": "23032"
+  },
+  "1223": {
+   "name": "Moze",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "ATK%",
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Pioneer Diver of Dead Waters"
+    ],
+    [
+     "The Ashblazing Grand Duke"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves",
+    "Izumo Gensei and Takama Divine Realm"
+   ],
+   "teammates": [
+    {
+     "id": "1220",
+     "lightCone": "23031"
+    },
+    {
+     "id": "1504",
+     "lightCone": "23056"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "21047"
+  },
+  "1224": {
+   "name": "March7thImaginary",
+   "weights": {
+    "SPD": 1,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "Break Effect",
+    "ATK%",
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Iron Cavalry Against the Scourge"
+    ],
+    [
+     "Musketeer of Wild Wheat"
+    ],
+    [
+     "Wastelander of Banditry Desert"
+    ]
+   ],
+   "ornamentSets": [
+    "Talia: Kingdom of Banditry",
+    "Forge of the Kalpagni Lantern",
+    "Rutilant Arena",
+    "Izumo Gensei and Takama Divine Realm"
+   ],
+   "teammates": [
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "24001"
+  },
+  "1225": {
+   "name": "Fugue",
+   "weights": {
+    "SPD": 1,
+    "Effect Hit Rate": 1,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "Break Effect",
+    "ATK%",
+    "CRIT Rate",
+    "CRIT DMG",
+    "Effect Hit Rate"
+   ],
+   "relicSets": [
+    [
+     "Thief of Shooting Meteor"
+    ],
+    [
+     "Eagle of Twilight Line"
+    ]
+   ],
+   "ornamentSets": [
+    "Forge of the Kalpagni Lantern",
+    "Talia: Kingdom of Banditry"
+   ],
+   "teammates": [
+    {
+     "id": "1310",
+     "lightCone": "23025"
+    },
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "23035"
+  },
+  "1301": {
+   "name": "Gallagher",
+   "weights": {
+    "SPD": 1,
+    "Effect RES": 0.5,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "Break Effect"
+    ]
+   },
+   "defaultLightCone": "21035"
+  },
+  "1302": {
+   "name": "Argenti",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "Physical DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Champion of Streetwise Boxing"
+    ]
+   ],
+   "ornamentSets": [
+    "Inert Salsotto",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1401",
+     "lightCone": "23037"
+    },
+    {
+     "id": "1403",
+     "lightCone": "23038"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23018"
+  },
+  "1303": {
+   "name": "RuanMei",
+   "weights": {
+    "SPD": 1,
+    "Effect RES": 0.25,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "Break Effect"
+    ]
+   },
+   "defaultLightCone": "23019"
+  },
+  "1304": {
+   "name": "Aventurine",
+   "weights": {
+    "DEF": 1,
+    "DEF%": 1,
+    "SPD": 1,
+    "CRIT Rate": 0.25,
+    "CRIT DMG": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "DEF%",
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "DEF%",
+     "SPD"
+    ],
+    "NECK": [
+     "Imaginary DMG Boost",
+     "DEF%"
+    ],
+    "OBJECT": [
+     "DEF%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23023"
+  },
+  "1305": {
+   "name": "DrRatio",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Imaginary DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Pioneer Diver of Dead Waters"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves",
+    "Izumo Gensei and Takama Divine Realm"
+   ],
+   "teammates": [
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1306",
+     "lightCone": "21018"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23020"
+  },
+  "1306": {
+   "name": "Sparkle",
+   "weights": {
+    "SPD": 1,
+    "CRIT DMG": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23021"
+  },
+  "1307": {
+   "name": "BlackSwan",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "Wind DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "defaultLightCone": "23022"
+  },
+  "1308": {
+   "name": "Acheron",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "Lightning DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Pioneer Diver of Dead Waters"
+    ],
+    [
+     "The Ashblazing Grand Duke"
+    ]
+   ],
+   "ornamentSets": [
+    "Izumo Gensei and Takama Divine Realm"
+   ],
+   "teammates": [
+    {
+     "id": "1406",
+     "lightCone": "23043"
+    },
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23024"
+  },
+  "1309": {
+   "name": "Robin",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Physical DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23026"
+  },
+  "1310": {
+   "name": "Firefly",
+   "weights": {
+    "ATK": 0.5,
+    "ATK%": 0.5,
+    "SPD": 1,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%"
+    ],
+    "OBJECT": [
+     "Break Effect"
+    ]
+   },
+   "defaultLightCone": "23025"
+  },
+  "1312": {
+   "name": "Misha",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Pioneer Diver of Dead Waters"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Firmament Frontline: Glamoth",
+    "Inert Salsotto"
+   ],
+   "teammates": [
+    {
+     "id": "1303",
+     "lightCone": "23019"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "21042"
+  },
+  "1313": {
+   "name": "Sunday",
+   "weights": {
+    "SPD": 1,
+    "CRIT DMG": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG"
+    ],
+    "FOOT": [],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23034"
+  },
+  "1314": {
+   "name": "Jade",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Ashblazing Grand Duke"
+    ],
+    [
+     "Genius of Brilliant Stars"
+    ],
+    [
+     "Poet of Mourning Collapse"
+    ],
+    [
+     "Sacerdos' Relived Ordeal"
+    ]
+   ],
+   "ornamentSets": [
+    "Duran, Dynasty of Running Wolves",
+    "Izumo Gensei and Takama Divine Realm"
+   ],
+   "teammates": [
+    {
+     "id": "1401",
+     "lightCone": "23037"
+    },
+    {
+     "id": "1403",
+     "lightCone": "23038"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "23028"
+  },
+  "1315": {
+   "name": "Boothill",
+   "weights": {
+    "ATK": 0.25,
+    "ATK%": 0.25,
+    "SPD": 1,
+    "CRIT Rate": 0.25,
+    "CRIT DMG": 0.25,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "Break Effect",
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Thief of Shooting Meteor",
+     "Watchmaker, Master of Dream Machinations"
+    ],
+    [
+     "Iron Cavalry Against the Scourge"
+    ]
+   ],
+   "ornamentSets": [
+    "Talia: Kingdom of Banditry"
+   ],
+   "teammates": [
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "23027"
+  },
+  "1317": {
+   "name": "Rappa",
+   "weights": {
+    "ATK": 0.5,
+    "ATK%": 0.5,
+    "SPD": 1,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "Break Effect",
+    "ATK%",
+    "ATK",
+    "CRIT DMG",
+    "CRIT Rate"
+   ],
+   "relicSets": [
+    [
+     "Iron Cavalry Against the Scourge"
+    ],
+    [
+     "Eagle of Twilight Line"
+    ]
+   ],
+   "ornamentSets": [
+    "Talia: Kingdom of Banditry"
+   ],
+   "teammates": [
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1321",
+     "lightCone": "23050"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "23033"
+  },
+  "1321": {
+   "name": "TheDahlia",
+   "weights": {
+    "SPD": 1,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "Break Effect",
+    "ATK%",
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Iron Cavalry Against the Scourge"
+    ],
+    [
+     "Thief of Shooting Meteor"
+    ]
+   ],
+   "ornamentSets": [
+    "Forge of the Kalpagni Lantern"
+   ],
+   "teammates": [
+    {
+     "id": "1310",
+     "lightCone": "23025"
+    },
+    {
+     "id": "1225",
+     "lightCone": "23035"
+    },
+    {
+     "id": "1222",
+     "lightCone": "23032"
+    }
+   ],
+   "defaultLightCone": "23050"
+  },
+  "1401": {
+   "name": "TheHerta",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ]
+   ],
+   "ornamentSets": [
+    "Izumo Gensei and Takama Divine Realm",
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1405",
+     "lightCone": "23041"
+    },
+    {
+     "id": "1403",
+     "lightCone": "23038"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23037"
+  },
+  "1402": {
+   "name": "Aglaea",
+   "weights": {
+    "ATK": 0.5,
+    "ATK%": 0.5,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Hero of Triumphant Song"
+    ]
+   ],
+   "ornamentSets": [
+    "The Wondrous BananAmusement Park",
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1415",
+     "lightCone": "23052"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23036"
+  },
+  "1403": {
+   "name": "Tribbie",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate",
+     "HP%"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "Quantum DMG Boost",
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP"
+   ],
+   "relicSets": [
+    [
+     "Genius of Brilliant Stars"
+    ],
+    [
+     "Longevous Disciple"
+    ],
+    [
+     "Poet of Mourning Collapse"
+    ]
+   ],
+   "ornamentSets": [
+    "Bone Collection's Serene Demesne"
+   ],
+   "teammates": [
+    {
+     "id": "1401",
+     "lightCone": "23037"
+    },
+    {
+     "id": "1405",
+     "lightCone": "23041"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23038"
+  },
+  "1404": {
+   "name": "Mydei",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate",
+     "HP%"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "Imaginary DMG Boost",
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ]
+   ],
+   "ornamentSets": [
+    "Bone Collection's Serene Demesne",
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1415",
+     "lightCone": "23052"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23039"
+  },
+  "1405": {
+   "name": "Anaxa",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ],
+    [
+     "Genius of Brilliant Stars"
+    ],
+    [
+     "Pioneer Diver of Dead Waters"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Firmament Frontline: Glamoth",
+    "Izumo Gensei and Takama Divine Realm",
+    "Space Sealing Station"
+   ],
+   "teammates": [
+    {
+     "id": "1415",
+     "lightCone": "23052"
+    },
+    {
+     "id": "1412",
+     "lightCone": "23048"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23041"
+  },
+  "1406": {
+   "name": "Cipher",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1,
+    "Effect Hit Rate": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "ATK%",
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK",
+    "Effect Hit Rate"
+   ],
+   "relicSets": [
+    [
+     "Pioneer Diver of Dead Waters"
+    ],
+    [
+     "Genius of Brilliant Stars"
+    ]
+   ],
+   "ornamentSets": [
+    "Inert Salsotto",
+    "Duran, Dynasty of Running Wolves",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1220",
+     "lightCone": "23031"
+    },
+    {
+     "id": "1504",
+     "lightCone": "23056"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ],
+   "defaultLightCone": "23043"
+  },
+  "1407": {
+   "name": "Castorice",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "HP%"
+    ],
+    "FOOT": [
+     "HP%"
+    ],
+    "NECK": [
+     "HP%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "HP%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP"
+   ],
+   "relicSets": [
+    [
+     "Poet of Mourning Collapse"
+    ]
+   ],
+   "ornamentSets": [
+    "Bone Collection's Serene Demesne"
+   ],
+   "teammates": [
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1413",
+     "lightCone": "23049"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23040"
+  },
+  "1408": {
+   "name": "Phainon",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Physical DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Wavestrider Captain"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1415",
+     "lightCone": "23052"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1412",
+     "lightCone": "23048"
+    }
+   ],
+   "defaultLightCone": "23044"
+  },
+  "1409": {
+   "name": "Hyacine",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "CRIT DMG": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "HP%",
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "HP%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP",
+    "SPD"
+   ],
+   "relicSets": [
+    [
+     "Warrior Goddess of Sun and Thunder"
+    ],
+    [
+     "World-Remaking Deliverer"
+    ],
+    [
+     "Hero of Triumphant Song"
+    ],
+    [
+     "Eagle of Twilight Line"
+    ],
+    [
+     "Messenger Traversing Hackerspace"
+    ]
+   ],
+   "ornamentSets": [
+    "Giant Tree of Rapt Brooding",
+    "Bone Collection's Serene Demesne",
+    "Arcadia of Woven Dreams"
+   ],
+   "teammates": [
+    {
+     "id": "1407",
+     "lightCone": "23040"
+    },
+    {
+     "id": "1413",
+     "lightCone": "23049"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    }
+   ],
+   "defaultLightCone": "23042"
+  },
+  "1410": {
+   "name": "Hysilens",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "Physical DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "ATK%",
+    "Effect Hit Rate",
+    "ATK",
+    "CRIT Rate",
+    "CRIT DMG"
+   ],
+   "relicSets": [
+    [
+     "Prisoner in Deep Confinement"
+    ]
+   ],
+   "ornamentSets": [
+    "Revelry by the Sea",
+    "Pan-Cosmic Commercial Enterprise"
+   ],
+   "teammates": [
+    {
+     "id": "1005",
+     "lightCone": "23006"
+    },
+    {
+     "id": "1307",
+     "lightCone": "23022"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "23047"
+  },
+  "1412": {
+   "name": "Cerydra",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "CRIT DMG": 0.75,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "ATK%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "23048"
+  },
+  "1413": {
+   "name": "Evernight",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "HP%"
+    ],
+    "FOOT": [
+     "HP%",
+     "SPD"
+    ],
+    "NECK": [
+     "HP%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "HP%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP"
+   ],
+   "relicSets": [
+    [
+     "World-Remaking Deliverer"
+    ],
+    [
+     "Poet of Mourning Collapse"
+    ]
+   ],
+   "ornamentSets": [
+    "Bone Collection's Serene Demesne",
+    "Arcadia of Woven Dreams"
+   ],
+   "teammates": [
+    {
+     "id": "1415",
+     "lightCone": "23052"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23049"
+  },
+  "1414": {
+   "name": "PermansorTerrae",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "ATK%"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "ATK%"
+    ]
+   },
+   "defaultLightCone": "23051"
+  },
+  "1415": {
+   "name": "Cyrene",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "HP%",
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "HP%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "HP%"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP",
+    "SPD"
+   ],
+   "relicSets": [
+    [
+     "World-Remaking Deliverer"
+    ]
+   ],
+   "ornamentSets": [
+    "Bone Collection's Serene Demesne",
+    "Amphoreus, The Eternal Land",
+    "Arcadia of Woven Dreams"
+   ],
+   "teammates": [
+    {
+     "id": "1413",
+     "lightCone": "23049"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23052"
+  },
+  "1501": {
+   "name": "Sparxie",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "Fire DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Ever-Glorious Magical Girl"
+    ]
+   ],
+   "ornamentSets": [
+    "Tengoku@Livestream",
+    "Punklorde Stage Zero",
+    "Rutilant Arena",
+    "Izumo Gensei and Takama Divine Realm"
+   ],
+   "teammates": [
+    {
+     "id": "1511",
+     "lightCone": "23065"
+    },
+    {
+     "id": "1502",
+     "lightCone": "21064"
+    },
+    {
+     "id": "1503",
+     "lightCone": "23055"
+    }
+   ],
+   "defaultLightCone": "23053"
+  },
+  "1502": {
+   "name": "Yaoguang",
+   "weights": {
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK",
+    "SPD"
+   ],
+   "relicSets": [
+    [
+     "Ever-Glorious Magical Girl"
+    ],
+    [
+     "Diviner of Distant Reach"
+    ]
+   ],
+   "ornamentSets": [
+    "Tengoku@Livestream",
+    "Punklorde Stage Zero"
+   ],
+   "teammates": [
+    {
+     "id": "1505",
+     "lightCone": "23058"
+    },
+    {
+     "id": "1511",
+     "lightCone": "23065"
+    },
+    {
+     "id": "1503",
+     "lightCone": "23055"
+    }
+   ],
+   "defaultLightCone": "23054"
+  },
+  "1503": {
+   "name": "Pearl",
+   "weights": {
+    "DEF": 1,
+    "DEF%": 1,
+    "SPD": 1,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "DEF%",
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "SPD",
+     "DEF%"
+    ],
+    "NECK": [
+     "DEF%"
+    ],
+    "OBJECT": [
+     "Energy Regeneration Rate",
+     "DEF%"
+    ]
+   },
+   "defaultLightCone": "23055"
+  },
+  "1504": {
+   "name": "Ashveil",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Ashblazing Grand Duke"
+    ],
+    [
+     "Pioneer Diver of Dead Waters"
+    ]
+   ],
+   "ornamentSets": [
+    "City of Converging Stars",
+    "Duran, Dynasty of Running Wolves",
+    "Izumo Gensei and Takama Divine Realm"
+   ],
+   "teammates": [
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1513",
+     "lightCone": "23064"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23056"
+  },
+  "1505": {
+   "name": "Evanescia",
+   "weights": {
+    "ATK": 0.25,
+    "ATK%": 0.25,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [],
+    "NECK": [],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Ever-Glorious Magical Girl"
+    ]
+   ],
+   "ornamentSets": [
+    "Punklorde Stage Zero",
+    "Tengoku@Livestream"
+   ],
+   "teammates": [
+    {
+     "id": "1502",
+     "lightCone": "21064"
+    },
+    {
+     "id": "1511",
+     "lightCone": "23065"
+    },
+    {
+     "id": "1503",
+     "lightCone": "23055"
+    }
+   ],
+   "defaultLightCone": "23058"
+  },
+  "1506": {
+   "name": "SilverWolfLv999",
+   "weights": {
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": []
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "SPD",
+    "DEF%",
+    "HP%"
+   ],
+   "relicSets": [
+    [
+     "Ever-Glorious Magical Girl"
+    ]
+   ],
+   "ornamentSets": [
+    "Punklorde Stage Zero"
+   ],
+   "teammates": [
+    {
+     "id": "1511",
+     "lightCone": "23065"
+    },
+    {
+     "id": "1502",
+     "lightCone": "21064"
+    },
+    {
+     "id": "1503",
+     "lightCone": "23055"
+    }
+   ],
+   "defaultLightCone": "23057"
+  },
+  "1507": {
+   "name": "MortenaxBlade",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "CRIT Rate",
+     "HP%"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "Fire DMG Boost",
+     "HP%"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP",
+    "SPD"
+   ],
+   "relicSets": [
+    [
+     "Divine-Querying Master Smith"
+    ],
+    [
+     "Guard of Wuthering Snow"
+    ]
+   ],
+   "ornamentSets": [
+    "Bone Collection's Serene Demesne"
+   ],
+   "teammates": [
+    {
+     "id": "1504",
+     "lightCone": "23056"
+    },
+    {
+     "id": "1513",
+     "lightCone": "23064"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23059"
+  },
+  "1508": {
+   "name": "RinTohsaka",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Genius of Brilliant Stars"
+    ]
+   ],
+   "ornamentSets": [
+    "Tengoku@Livestream"
+   ]
+  },
+  "1509": {
+   "name": "Gilgamesh",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Lightning DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ]
+   ],
+   "ornamentSets": [
+    "Cosmic Life Sciences Institute"
+   ]
+  },
+  "1510": {
+   "name": "HimekoNova",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Fire DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "As Navigator Isee Sees It"
+    ]
+   ],
+   "ornamentSets": [
+    "Fallen Star Anchorage"
+   ],
+   "teammates": [
+    {
+     "id": "1004",
+     "lightCone": "23004"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1414",
+     "lightCone": "23051"
+    }
+   ]
+  },
+  "1511": {
+   "name": "AeonAha",
+   "weights": {
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": []
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "SPD",
+    "HP%",
+    "DEF%",
+    "HP"
+   ],
+   "relicSets": [
+    [
+     "Ever-Glorious Magical Girl"
+    ],
+    [
+     "Dreamlit Actor"
+    ],
+    [
+     "Diviner of Distant Reach"
+    ],
+    [
+     "Sacerdos' Relived Ordeal"
+    ]
+   ],
+   "ornamentSets": [
+    "Punklorde Stage Zero",
+    "God's Moment of Joy"
+   ],
+   "teammates": [
+    {
+     "id": "1506",
+     "lightCone": "23057"
+    },
+    {
+     "id": "1502",
+     "lightCone": "21064"
+    },
+    {
+     "id": "1503",
+     "lightCone": "23055"
+    }
+   ],
+   "defaultLightCone": "23065"
+  },
+  "1512": {
+   "name": "RobinSummeretto",
+   "weights": {
+    "HP": 1,
+    "HP%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "HP%"
+    ],
+    "FOOT": [
+     "SPD",
+     "HP%"
+    ],
+    "NECK": [
+     "HP%",
+     "Wind DMG Boost"
+    ],
+    "OBJECT": [
+     "HP%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "HP%",
+    "HP",
+    "SPD"
+   ],
+   "relicSets": [
+    [
+     "World-Remaking Deliverer"
+    ]
+   ],
+   "ornamentSets": [
+    "Amphoreus, The Eternal Land"
+   ],
+   "teammates": [
+    {
+     "id": "1402",
+     "lightCone": "23036"
+    },
+    {
+     "id": "1415",
+     "lightCone": "23052"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23063"
+  },
+  "1513": {
+   "name": "AventurineWaveflair",
+   "weights": {
+    "ATK": 0.25,
+    "ATK%": 0.25,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "SPD",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Ever-Glorious Magical Girl"
+    ]
+   ],
+   "ornamentSets": [
+    "Punklorde Stage Zero"
+   ],
+   "teammates": [
+    {
+     "id": "1504",
+     "lightCone": "23056"
+    },
+    {
+     "id": "1511",
+     "lightCone": "23065"
+    },
+    {
+     "id": "1409",
+     "lightCone": "23042"
+    }
+   ],
+   "defaultLightCone": "23064"
+  },
+  "1514": {
+   "name": "Ellen",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "ATK%"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Ice DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT Rate",
+    "CRIT DMG",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "The Edacious Heretic"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1515",
+     "lightCone": "23067"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "23066"
+  },
+  "1515": {
+   "name": "AstraYao",
+   "weights": {
+    "ATK": 1,
+    "ATK%": 1,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "ATK%",
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Quantum DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "ATK%",
+    "ATK",
+    "CRIT Rate",
+    "CRIT DMG",
+    "HP%"
+   ],
+   "relicSets": [
+    [
+     "The Edacious Heretic"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena"
+   ],
+   "teammates": [
+    {
+     "id": "1514",
+     "lightCone": "23066"
+    },
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "23067"
+  },
+  "8001": {
+   "name": "TrailblazerDestructionCaelus",
+   "weights": {
+    "ATK": 0.75,
+    "ATK%": 0.75,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG",
+     "Effect Hit Rate"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [
+     "ATK%",
+     "Physical DMG Boost"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Break Effect"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Scholar Lost in Erudition"
+    ]
+   ],
+   "ornamentSets": [
+    "Rutilant Arena",
+    "Firmament Frontline: Glamoth"
+   ],
+   "teammates": [
+    {
+     "id": "1512",
+     "lightCone": "23063"
+    },
+    {
+     "id": "1507",
+     "lightCone": "23059"
+    },
+    {
+     "id": "1217",
+     "lightCone": "23017"
+    }
+   ],
+   "defaultLightCone": "24000"
+  },
+  "8003": {
+   "name": "TrailblazerPreservationCaelus",
+   "weights": {
+    "DEF": 1,
+    "DEF%": 1,
+    "SPD": 1,
+    "Effect Hit Rate": 0.75,
+    "Effect RES": 0.5
+   },
+   "mainStats": {
+    "BODY": [
+     "DEF%"
+    ],
+    "FOOT": [
+     "DEF%",
+     "SPD"
+    ],
+    "NECK": [
+     "DEF%"
+    ],
+    "OBJECT": [
+     "DEF%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21009"
+  },
+  "8005": {
+   "name": "TrailblazerHarmonyCaelus",
+   "weights": {
+    "SPD": 1,
+    "Effect RES": 0.25,
+    "Break Effect": 1
+   },
+   "mainStats": {
+    "BODY": [],
+    "FOOT": [
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "Break Effect",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "21004"
+  },
+  "8007": {
+   "name": "TrailblazerRemembranceCaelus",
+   "weights": {
+    "SPD": 1,
+    "CRIT DMG": 1,
+    "Effect RES": 0.25
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT DMG",
+     "Outgoing Healing Boost"
+    ],
+    "FOOT": [
+     "ATK%",
+     "SPD"
+    ],
+    "NECK": [],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "defaultLightCone": "22006"
+  },
+  "8009": {
+   "name": "TrailblazerElationCaelus",
+   "weights": {
+    "ATK": 0.25,
+    "ATK%": 0.25,
+    "SPD": 1,
+    "CRIT Rate": 1,
+    "CRIT DMG": 1
+   },
+   "mainStats": {
+    "BODY": [
+     "CRIT Rate",
+     "CRIT DMG"
+    ],
+    "FOOT": [
+     "SPD",
+     "ATK%"
+    ],
+    "NECK": [
+     "Lightning DMG Boost",
+     "ATK%"
+    ],
+    "OBJECT": [
+     "ATK%",
+     "Energy Regeneration Rate"
+    ]
+   },
+   "substats": [
+    "CRIT DMG",
+    "CRIT Rate",
+    "ATK%",
+    "ATK"
+   ],
+   "relicSets": [
+    [
+     "Ever-Glorious Magical Girl"
+    ],
+    [
+     "Diviner of Distant Reach"
+    ]
+   ],
+   "ornamentSets": [
+    "Punklorde Stage Zero"
+   ],
+   "teammates": [
+    {
+     "id": "1502",
+     "lightCone": "21064"
+    },
+    {
+     "id": "1511",
+     "lightCone": "23065"
+    },
+    {
+     "id": "1503",
+     "lightCone": "23055"
+    }
+   ],
+   "defaultLightCone": "24006"
+  }
+ }
+}

@@ -8,8 +8,9 @@ import { buildComment } from "@/lib/companion/comments";
 import { getDb, kvGet, kvSet, newId, nowIso } from "@/lib/db";
 import { evaluateBuild, type SlotResult } from "@/lib/builds/evaluate";
 import { recommendBuild, type SavedBuild } from "@/lib/builds/recommend";
+import { RecommendedBuild } from "./RecommendedBuild";
 import { computeStats, mainStatValue, SLOT_INDEX } from "@/lib/builds/stats";
-import { characterDisplayName, formatSkillDesc } from "@/lib/gamedata/types";
+import { characterDisplayName } from "@/lib/gamedata/types";
 import { useRelicProfiles } from "@/lib/hooks";
 import { formatStat, isPercentStat, MAIN_STATS_BY_SLOT, SLOT_LABEL, SUBSTAT_MAX_ROLL } from "@/lib/relics/stats";
 import { useApp } from "@/lib/store";
@@ -174,7 +175,7 @@ export function BuildCard({ charId, owned }: { charId: string; owned: OwnedChara
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5">
         <Panel title="What this build lacks">
           {e.lacks.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{e.lacks.map((l) => <li key={l}>{l}</li>)}</ol> : <p className="text-sm text-ok">Nothing flagged.</p>}
           {e.strengths.length > 0 && <p className="mt-3 text-xs text-muted">Strong points: {e.strengths.join(" · ")}</p>}
@@ -185,32 +186,9 @@ export function BuildCard({ charId, owned }: { charId: string; owned: OwnedChara
           </p>
         </Panel>
 
-        <Panel title="Silver Wolf's recommended build (stat-match pick)">
-          <div className="space-y-3 text-sm">
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-              {(["BODY", "FOOT", "NECK", "OBJECT"] as const).map((slot) => (
-                <div key={slot} className="flex justify-between gap-2"><span className="text-muted">{SLOT_LABEL[slot]}</span><span className="text-right">{(rec.mainStats[slot] ?? []).join(" / ") || "any"}</span></div>
-              ))}
-            </div>
-            <div><span className="text-muted">Substats: </span>{rec.substatPriority.map((s) => s.key).join(" > ") || "—"}</div>
-            <div>
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-faint">Cavern sets (stat match)</div>
-              <ul className="space-y-1">{rec.cavern.map((s) => <li key={s.setId} title={s.effects.join("\n")}>• {s.name} <span className="text-xs text-muted">{s.reasons.join(", ")}{s.ownedPieces ? ` · you own ${s.ownedPieces}` : ""}</span></li>)}</ul>
-            </div>
-            <div>
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-faint">Planar Ornaments (stat match)</div>
-              <ul className="space-y-1">{rec.planar.map((s) => <li key={s.setId} title={s.effects.join("\n")}>• {s.name} <span className="text-xs text-muted">{s.reasons.join(", ")}{s.ownedPieces ? ` · you own ${s.ownedPieces}` : ""}</span></li>)}</ul>
-            </div>
-            <div>
-              <div className="mb-1 font-mono text-[10px] uppercase tracking-wider text-faint">Light Cones on this Path</div>
-              <ul className="space-y-1">{rec.lightCones.map((l) => (
-                <li key={l.lcId} title={formatSkillDesc(game.lightConeRanks[l.lcId]?.desc ?? "", game.lightConeRanks[l.lcId]?.params, 1)}>• {l.name} <Stars n={l.rarity} /> {l.owned && <Badge tone="ok">owned</Badge>}</li>
-              ))}</ul>
-            </div>
-            <ul className="list-disc space-y-0.5 pl-4 text-[11px] text-faint">{rec.caveats.map((x) => <li key={x}>{x}</li>)}</ul>
-          </div>
-        </Panel>
       </div>
+
+      <RecommendedBuild charId={charId} rec={rec} />
 
       <Panel title="Saved builds from guides" actions={<Button size="sm" onClick={() => setEditing("new")}><Plus size={14} /> Save a build</Button>}>
         {!saved.length ? <Empty title="No saved builds">Add the build a guide recommends (with its link) and Silver Wolf checks your gear against it.</Empty> : (

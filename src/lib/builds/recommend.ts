@@ -1,18 +1,21 @@
 /**
- * Silver Wolf's recommended build, derived ONLY from game data and the character's scoring profile.
- * No community guide is involved. Set ranking uses each set's unconditional stat bonuses; conditional
- * effects (most 4-piece effects) are shown as text but not scored, and the UI says so.
+ * Recommended build. When Fribbels' HSR Optimizer has data for the character (most do), sets, main
+ * stats, substat order, Light Cone and teammates come from there (the community standard). Otherwise
+ * Silver Wolf ranks sets and Light Cones from game data and the scoring profile (stat-match).
  */
 import type { GameData } from "../gamedata/types";
 import { stripMarkup } from "../gamedata/types";
 import type { ScoringProfile } from "../relics/scoring";
 import { SUBSTAT_MAX_ROLL, type RelicSlot, type SubStatKey } from "../relics/stats";
+import { fribbelsBuild, setIdsByName, substatOrder } from "./fribbels";
 import type { OwnedLightCone, Relic } from "../types";
 
-export interface SetPick { setId: string; name: string; score: number; reasons: string[]; ownedPieces: number; effects: string[] }
+export interface SetPick { setId: string; name: string; score: number; reasons: string[]; ownedPieces: number; effects: string[]; /** 2+2 split partner, if this pick is two 2-piece sets. */ pairWith?: { setId: string; name: string } }
 export interface LcPick { lcId: string; name: string; rarity: number; owned: boolean; matched: string[] }
 
 export interface Recommendation {
+  source: "fribbels" | "stat-match";
+  teammates: { charId: string; lcId: string | null }[];
   mainStats: Partial<Record<RelicSlot, string[]>>;
   substatPriority: { key: SubStatKey; weight: number }[];
   cavern: SetPick[];
@@ -90,7 +93,38 @@ export function recommendBuild(
     .slice(0, 6)
     .map(({ l, matched }) => ({ lcId: l.id, name: l.name, rarity: l.rarity, owned: owned.has(l.id), matched }));
 
+  const fb = fribbelsBuild(charId);
+  if (fb && (fb.relicSets?.length || fb.ornamentSets?.length || fb.defaultLightCone)) {
+    const ids = setIdsByName(game);
+    const pick = (name: string, planar: boolean) => { const id = ids.get(name); return id && game.relicSets[id] ? scoreSet(id, planar) : null; };
+    const cavern = (fb.relicSets ?? []).map(([a, b2]) => {
+      const first = pick(a, false);
+      if (!first) return null;
+      const second = b2 ? pick(b2, false) : null;
+      return second ? { ...first, pairWith: { setId: second.setId, name: second.name } } : first;
+    }).filter((x): x is SetPick => !!x).slice(0, 4);
+    const planar = (fb.ornamentSets ?? []).map((n) => pick(n, true)).filter((x): x is SetPick => !!x).slice(0, 3);
+    const lcFirst = fb.defaultLightCone && game.lightCones[fb.defaultLightCone] ? [fb.defaultLightCone] : [];
+    const lcs = [...lcFirst, ...lightCones.map((l) => l.lcId).filter((id) => !lcFirst.includes(id))].slice(0, 6)
+      .map((id) => { const l = game.lightCones[id]; return { lcId: id, name: l.name, rarity: l.rarity, owned: owned.has(id), matched: lcScore(id).matched }; });
+    return {
+      source: "fribbels",
+      teammates: (fb.teammates ?? []).filter((t) => game.characters[t.id]).map((t) => ({ charId: t.id, lcId: t.lightCone && game.lightCones[t.lightCone] ? t.lightCone : null })),
+      mainStats: fb.mainStats,
+      substatPriority: substatOrder(fb).map((key) => ({ key, weight: fb.weights[key] ?? 0 })),
+      cavern: cavern.length ? cavern : rank(false),
+      planar: planar.length ? planar : rank(true),
+      lightCones: lcs,
+      caveats: [
+        "Sets, main stats, substats, Light Cone and teammates follow Fribbels' HSR Optimizer (community data).",
+        ...(cavern.length ? [] : ["No set data from Fribbels for this character yet; relic sets are Silver Wolf's stat-match picks."]),
+      ],
+    };
+  }
+
   return {
+    source: "stat-match",
+    teammates: [],
     mainStats: profile.mainStats,
     substatPriority: (Object.entries(profile.weights) as [SubStatKey, number][]).filter(([, w]) => w > 0).sort((a, b) => b[1] - a[1]).map(([key, weight]) => ({ key, weight })),
     cavern: rank(false),

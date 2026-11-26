@@ -6,6 +6,7 @@ import { SLOT_LABEL } from "./relics/stats";
 import type { AchievementProgress, BannerEntry, EventEntry, MapMarker, OwnedCharacter, OwnedLightCone, Relic } from "./types";
 import { EMPTY_PITY, type PityStore } from "./warp/pity";
 import { charHref } from "./links";
+import { fribbelsProfile } from "./builds/fribbels";
 
 export interface Objective {
   id: string;
@@ -54,6 +55,8 @@ export function playableCharacters(game: GameData | null) {
 
 export function profileFor(charId: string, game: GameData | null, saved: Record<string, ScoringProfile>): ScoringProfile {
   if (saved[charId]) return saved[charId];
+  const community = fribbelsProfile(charId);
+  if (community) return community;
   const path = game?.characters[charId]?.path ?? "";
   const tpl = PROFILE_TEMPLATES.find((t) => t.id === suggestTemplate(path))!;
   return { ...tpl, id: `auto-${charId}`, templateId: tpl.id };
