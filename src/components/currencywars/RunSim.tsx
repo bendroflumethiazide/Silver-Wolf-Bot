@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { WolfComment } from "@/components/SilverWolf";
 import { kvGet, kvSet } from "@/lib/db";
 import {
-  advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre,
+  advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
 } from "@/lib/currencywars/run";
@@ -14,7 +14,8 @@ import type { CwPack } from "@/lib/currencywars/sim";
 import { BattleView } from "./BattleView";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Notice, Panel } from "../ui";
-import { BondList, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
+import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
+import { BondTracker, TrackMark } from "./tracking";
 
 const RUN_KEY = "cwRun";
 const NODE_ICON: Record<NodeKind, LucideIcon> = { Reward: Gift, Strategy: Flag, Combat: Swords, Supply: Package, Encounter: Dices, Boss: Skull };
@@ -96,7 +97,7 @@ function UnitTile({ u, place, pack, selected, onClick, label }: { u: Unit | null
       <Portrait name={u.name} cost={u.cost} size={34} className="!ring-1" />
       <span className="mt-0.5 w-full truncate text-[9px] leading-tight">{u.name}</span>
       {u.items.length > 0 && <span className="absolute bottom-0.5 right-0.5 flex gap-px">{u.items.map((it, i) => <ItemIcon key={i} pack={pack} name={it} size={9} />)}</span>}
-      {idle && <span className="absolute right-0.5 top-0.5 rounded bg-rose-500/80 px-0.5 text-[8px] font-bold">IDLE</span>}
+      {idle ? <span className="absolute right-0.5 top-0.5 rounded bg-rose-500/80 px-0.5 text-[8px] font-bold">IDLE</span> : <TrackMark pack={pack} name={u.name} items={u.items} />}
     </button>
   );
 }
@@ -169,6 +170,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
   const [sel, setSel] = useState<Sel>(null);
   /** An equipped item whose details are open. */
   const [peek, setPeek] = useState<string | null>(null);
+  /** A Bond whose members are shown (from a selected character's Bond tags). */
+  const [bondPeek, setBondPeek] = useState<string | null>(null);
   /** The fight being watched (by tick), so a reload shows the result instead of replaying. */
   const [watching, setWatching] = useState<number | null>(null);
   useEffect(() => { let live = true; void kvGet<RunState | null>(RUN_KEY, null).then((r) => { if (live) setRun(r); }); return () => { live = false; }; }, []);
@@ -298,7 +301,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
 
       <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
         <Panel title={`Bonds${tp?.bonds.length ? ` (${tp.bonds.length} active)` : ""}`}>
-          <BondList states={tp?.bonds ?? []} />
+          <BondList pack={pack} states={tp?.bonds ?? []} have={new Set(units(run).map((u) => u.name))} />
           {tp && <BondsInactive run={run} pack={pack} />}
         </Panel>
 
@@ -335,9 +338,12 @@ export function RunSim({ pack }: { pack: CwPack }) {
             {selUnit && sel?.kind === "unit" && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/[0.06] p-2 text-xs">
                 <Portrait name={selUnit.name} cost={selUnit.cost} size={30} />
-                <span className="min-w-0 flex-1">
+                <span className="min-w-[12rem] flex-1">
                   <b className="text-text">{"★".repeat(selUnit.stars)} {selUnit.name}</b> <FieldTag field={pack.info?.[selUnit.name]?.field} />
-                  <span className="block text-muted">{bondsOf(pack, selUnit.name).join(" · ")} · On-Field {Math.round(unitPower(selUnit, "on", pack))} / Off-Field {Math.round(unitPower(selUnit, "off", pack))}</span>
+                  <span className="mt-0.5 flex flex-wrap items-center gap-1 text-muted">
+                    {bondsOf(pack, selUnit.name).map((b) => <button key={b} type="button" onClick={() => setBondPeek(bondPeek === b ? null : b)} aria-expanded={bondPeek === b} className={cx("rounded border px-1 py-0.5 text-[10px]", bondPeek === b ? "border-cyan text-cyan" : "border-line hover:text-text")}>{b}</button>)}
+                    <span>· On-Field {Math.round(unitPower(selUnit, "on", pack))} / Off-Field {Math.round(unitPower(selUnit, "off", pack))}</span>
+                  </span>
                   {selUnit.items.length > 0 && <span className="mt-1 flex flex-wrap gap-1">{selUnit.items.map((it, i) => <button key={i} type="button" onClick={() => { setPeek(it); setSel(null); }} className="inline-flex items-center gap-1 rounded border border-line px-1 py-0.5 hover:border-cyan/50"><ItemIcon pack={pack} name={it} size={11} />{it}</button>)}</span>}
                   <span className="block text-faint">Tap a slot to move it there.</span>
                 </span>
@@ -348,10 +354,12 @@ export function RunSim({ pack }: { pack: CwPack }) {
                 <button type="button" onClick={() => setSel(null)} aria-label="Cancel" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>
               </div>
             )}
+            {selUnit && sel?.kind === "unit" && bondPeek && <BondMembers pack={pack} bond={bondPeek} have={new Set(units(run).map((u) => u.name))} />}
           </div>
 
           <div className={cx("glass space-y-2 p-3", !prep && "pointer-events-none opacity-50")} aria-disabled={!prep}>
             <div className="flex flex-wrap items-center justify-between gap-2"><span className="text-xs text-muted">Shop · Lv.{run.level} odds</span><div className="w-full sm:w-72"><OddsBar odds={odds} /></div></div>
+            <BondTracker pack={pack} />
             <div className="grid grid-cols-5 gap-1.5">
               {run.shop.map((slot, i) => slot
                 ? <CharCard key={i} pack={pack} name={slot.name} cost={slot.cost} stars={slot.stars} onClick={() => update((s) => buy(s, pack, i))} disabled={run.gold < slot.cost * (slot.stars === 2 ? 3 : 1)} footer={slot.cost * (slot.stars === 2 ? 3 : 1)} highlight={deployed(run).concat(run.bench.filter(Boolean) as Unit[]).some((u) => u.name === slot.name)} />

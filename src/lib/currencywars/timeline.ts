@@ -30,6 +30,8 @@ export interface Timeline {
   limit: number | null;
   won: boolean;
   kills: number;
+  /** Every turn taken (who acted, at what AV), for the turn-order bar. */
+  turns?: { t: number; id: string }[];
 }
 
 export interface TimelineInput {
@@ -83,6 +85,7 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   const weight = acts.reduce((n, x) => n + x.ally.power, 0) || 1;
 
   const hp = new Map(units.map((u) => [u.id, u.maxHp]));
+  const turns: { t: number; id: string }[] = acts.map((a) => ({ t: a.t, id: a.ally.u.id }));
   let dealt = 0, kills = 0, wave = 1;
   const phaseMarks = new Map<string, number>();
   const alive = (w: number) => enemies.filter((e) => e.wave === w && (hp.get(e.id) ?? 0) > 0);
@@ -100,6 +103,7 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
       if (attackers.length && victims.length) {
         const from = attackers[Math.floor(rng() * attackers.length)];
         const to = victims[Math.floor(rng() * victims.length)].u;
+        turns.push({ t, id: from.id });
         const amount = Math.round(to.maxHp * pressure * (from.boss ? 0.32 : from.elite ? 0.22 : 0.14) * (0.8 + rng() * 0.4));
         const left = (hp.get(to.id) ?? 0) - amount;
         events.push({ t, kind: "hit", from: from.id, to: to.id, amount });
@@ -146,7 +150,8 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   enemyTurns(end);
   events.push({ t: end, kind: "end", text: won ? "All enemies defeated" : limit === null ? "Fight over" : "Out of Action Value" });
   events.sort((a, b) => a.t - b.t);
-  return { units, events, end, limit, won, kills };
+  turns.sort((a, b) => a.t - b.t);
+  return { units, events, end, limit, won, kills, turns };
 }
 
 /** HP of every unit at AV time `t`. */
@@ -160,4 +165,20 @@ export function hpAt(tl: Timeline, t: number): Map<string, number> {
     else if (e.kind === "revive") hp.set(e.to, e.amount ?? 0);
   }
   return hp;
+}
+
+/** Turns from the timeline (older saved fights have none recorded: rebuild them from hits). */
+export function turnsOf(tl: Timeline): { t: number; id: string }[] {
+  if (tl.turns?.length) return tl.turns;
+  const seen = new Set<string>();
+  return tl.events.filter((e) => e.kind === "hit" && e.from && !seen.has(`${e.from}@${e.t}`) && seen.add(`${e.from}@${e.t}`)).map((e) => ({ t: e.t, id: e.from! }));
+}
+
+/** Who acts next from AV `t`: the current actor (if one just acted) and the upcoming turns. */
+export function turnOrder(tl: Timeline, t: number, count = 8): { current: { t: number; id: string } | null; next: { t: number; id: string; av: number }[] } {
+  const all = turnsOf(tl);
+  const hp = hpAt(tl, t);
+  const current = [...all].reverse().find((x) => x.t <= t && x.t > t - 6) ?? null;
+  const next = all.filter((x) => x.t > t && x.t <= tl.end && (hp.get(x.id) ?? 1) > 0).slice(0, count).map((x) => ({ ...x, av: Math.max(0, Math.round(x.t - t)) }));
+  return { current, next };
 }

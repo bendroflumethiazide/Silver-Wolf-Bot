@@ -11,6 +11,7 @@ import { boardBonds, boardGold, bondVariants, chanceToSee, rollShop, withVariant
 import { createRng } from "@/lib/warp/simulator";
 import { Button, cx, Empty, Notice, Panel } from "../ui";
 import { BondList, bondsOf, CharCard, COST_TEXT, FieldTag, OddsBar, Portrait } from "./shared";
+import { BondTracker } from "./tracking";
 
 const BOARD_KEY = "cwBoard";
 const defaultPlace = (field?: CwField): "on" | "off" => (field === "off" ? "off" : "on");
@@ -90,10 +91,11 @@ export function TeamBuilder({ pack }: { pack: CwPack }) {
               </select>
             </label>
           ))}
-          <BondList states={bonds} />
+          <BondList pack={pack} states={bonds} have={new Set(board.map((u) => u.name))} />
         </Panel>
 
         <Panel title="Characters" className="min-w-0 xl:order-2">
+          <div className="mb-2"><BondTracker pack={pack} /></div>
           <label className="relative mb-2 block">
             <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-faint" />
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name or bond" aria-label="Search characters" className="w-full !pl-8" />

@@ -254,6 +254,12 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await page.getByRole("button", { name: "Battle", exact: true }).click();
   await expect(page.getByText(/Elapsed/)).toBeVisible();
   await expect(page.getByText("Your squad")).toBeVisible();
+  // Turn order with Action Value, which can be hidden.
+  const order = page.getByLabel("Turn order");
+  await expect(order.getByText(/Cycle/)).toBeVisible();
+  await expect(order.locator("li").first()).toBeVisible();
+  await page.getByRole("button", { name: "AV", exact: true }).click();
+  await expect(page.getByRole("button", { name: "AV", exact: true })).toHaveAttribute("aria-pressed", "false");
   await page.getByRole("radio", { name: "4×" }).click();
   await expect(page.getByRole("radio", { name: "4×" })).toHaveAttribute("aria-checked", "true");
   await page.getByRole("button", { name: "Skip" }).click();
@@ -292,9 +298,20 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await page.getByRole("button", { name: "Prismatic", exact: true }).click();
   await expect(page.getByText("Gold Plan A")).toHaveCount(0);
   await page.getByRole("tab", { name: "Team builder" }).click();
+  // Bond Tracking: characters with a tracked Bond get a thumbs-up.
+  await expect(page.getByRole("img", { name: /Tracked bond/ })).toHaveCount(0);
+  await page.getByLabel("Track a bond").selectOption("Grove Guild");
+  await expect(page.getByRole("button", { name: "Stop tracking Grove Guild" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Fx Iris" }).getByRole("img", { name: "Tracked bond: Grove Guild" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Fx Dune" }).getByRole("img", { name: /Tracked bond/ })).toHaveCount(0);
   await page.getByLabel("Search characters").fill("Fx Iris");
   await page.getByRole("button", { name: /Fx Iris/ }).first().click();
   await expect(page.getByText("Off-Field (1)")).toBeVisible();
+  // Opening a Bond shows its members as little portraits.
+  await page.getByRole("button", { name: /Grove Guild/ }).first().click();
+  const members = page.getByRole("list", { name: "Grove Guild members" });
+  await expect(members.getByRole("listitem")).toHaveCount(4);
+  await expect(members.getByText("Fx Ash")).toBeVisible();
   await page.goto("/guides/view?g=currency-wars");
   await expect(page.getByRole("heading", { name: /Every mechanic/ })).toBeVisible();
   await page.goto("/guides/view?g=crystal-ores");

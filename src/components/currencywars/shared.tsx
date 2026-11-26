@@ -1,6 +1,7 @@
 "use client";
 
-import { Award, Clover, Coins, Crosshair, Flower2, Footprints, Gem, Pickaxe, Shield, Sparkles, Sword, Zap, type LucideIcon } from "lucide-react";
+import { Award, ThumbsUp, Clover, Coins, Crosshair, Flower2, Footprints, Gem, Pickaxe, Shield, Sparkles, Sword, Zap, type LucideIcon } from "lucide-react";
+import { bondFamily, bondsOf, membersOf } from "@/lib/currencywars/bonds";
 import { emblemBond, oreGold, oreTier } from "@/lib/currencywars/items";
 import { useState } from "react";
 import { cwCharacterId } from "@/lib/currencywars/names";
@@ -9,6 +10,7 @@ import type { BondState, CwPack } from "@/lib/currencywars/sim";
 import { useApp } from "@/lib/store";
 import { GameImage } from "../GameImage";
 import { cx } from "../ui";
+import { TrackMark, useTracked } from "./tracking";
 
 export const COST_RING: Record<number, string> = { 1: "ring-zinc-400", 2: "ring-emerald-400", 3: "ring-sky-400", 4: "ring-violet-400", 5: "ring-amber-400", 7: "ring-rose-400" };
 export const COST_TEXT: Record<number, string> = { 1: "text-zinc-300", 2: "text-emerald-300", 3: "text-sky-300", 4: "text-violet-300", 5: "text-amber-300", 7: "text-rose-300" };
@@ -41,12 +43,35 @@ export function FieldTag({ field }: { field?: CwField }) {
   return <span className={cx("rounded px-1 text-[9px] font-semibold uppercase tracking-wide", field === "on" ? "bg-rose-500/20 text-rose-200" : field === "off" ? "bg-sky-500/20 text-sky-200" : "bg-white/10 text-muted")}>{FIELD_LABEL[field]}</span>;
 }
 
-/** Bonds a character belongs to: from their own page, else from the bond lists. */
-export function bondsOf(pack: CwPack, name: string): string[] {
-  const fromPage = pack.info?.[name]?.bonds;
-  if (fromPage?.length) return fromPage;
-  // Variant bonds ("Phantasmoon Games: Wishpower") collapse to their family name.
-  return [...new Set(pack.bonds.filter((b) => b.members.includes(name)).map((b) => b.name.replace(/: .*$/, "")))];
+export { bondsOf };
+
+/** A Bond's members as small portraits (owned/deployed ones bright), with a Track toggle. */
+export function BondMembers({ pack, bond, have, compact }: { pack: CwPack; bond: string; have?: Set<string>; compact?: boolean }) {
+  const { tracked, toggle } = useTracked();
+  const fam = bondFamily(bond);
+  const members = membersOf(pack, fam);
+  const on = tracked.includes(fam);
+  const costOf = (n: string) => pack.characters.find((c) => c.name === n)?.cost;
+  return (
+    <div className={cx("space-y-1.5", !compact && "rounded-lg border border-line bg-black/20 p-2")}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-text">{fam} · {members.length} member{members.length === 1 ? "" : "s"}</span>
+        <button type="button" onClick={() => toggle(fam)} aria-pressed={on} className={cx("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]", on ? "border-emerald-400/60 bg-emerald-400/15 text-emerald-100" : "border-line text-muted hover:text-text")}>
+          <ThumbsUp size={10} /> {on ? "Tracking" : "Track"}
+        </button>
+      </div>
+      {members.length ? (
+        <ul className="flex flex-wrap gap-1.5" aria-label={`${fam} members`}>
+          {members.map((m) => (
+            <li key={m} className={cx("flex w-12 flex-col items-center gap-0.5 text-center", have && !have.has(m) && "opacity-45")} title={`${m}${costOf(m) ? ` · ${costOf(m)} gold` : ""}`}>
+              <Portrait name={m} cost={costOf(m)} size={30} className="!ring-1" />
+              <span className="line-clamp-2 w-full text-[9px] leading-tight text-muted">{m}</span>
+            </li>
+          ))}
+        </ul>
+      ) : <p className="text-[10px] text-faint">No native members: it activates through Plot Armor.</p>}
+    </div>
+  );
 }
 
 /** A shop-style character card: portrait, bond tags, name and cost. */
@@ -55,9 +80,10 @@ export function CharCard({ pack, name, cost, stars, onClick, disabled, footer, h
 }) {
   const bonds = bondsOf(pack, name);
   return (
-    <button type="button" onClick={onClick} disabled={disabled}
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={name}
       className={cx("relative flex min-w-0 flex-col items-center gap-1 rounded-xl border bg-gradient-to-b p-1.5 pb-2 text-center transition disabled:cursor-not-allowed disabled:opacity-40", COST_CARD[cost] ?? COST_CARD[1], highlight && "ring-2 ring-cyan", onClick && !disabled && "hover:brightness-125")}>
       {stars && stars > 1 && <span className="absolute left-1.5 top-1 text-[10px] text-amber-300">{"★".repeat(stars)}</span>}
+      <TrackMark pack={pack} name={name} className="right-1 top-1" />
       <Portrait name={name} cost={cost} size={48} />
       <span className="flex w-full flex-wrap justify-center gap-0.5">{bonds.slice(0, 2).map((b) => <span key={b} className="max-w-full truncate rounded bg-black/30 px-1 text-[9px] text-muted">{b}</span>)}</span>
       <span className="line-clamp-2 w-full text-[11px] font-medium leading-tight">{name}</span>
@@ -77,7 +103,8 @@ export function OddsBar({ odds }: { odds: number[] }) {
 }
 
 /** Game-style bond list: tier badge with the count, name, and every threshold. */
-export function BondList({ states, empty = "Bonds light up as you deploy characters." }: { states: BondState[]; empty?: string }) {
+export function BondList({ pack, states, have, empty = "Bonds light up as you deploy characters." }: { pack: CwPack; states: BondState[]; have?: Set<string>; empty?: string }) {
+  const { tracked } = useTracked();
   const [open, setOpen] = useState<string | null>(null);
   if (!states.length) return <p className="text-xs text-muted">{empty}</p>;
   return (
@@ -90,7 +117,7 @@ export function BondList({ states, empty = "Bonds light up as you deploy charact
               className={cx("flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left", b.active ? "bg-white/[0.06]" : "opacity-70 hover:opacity-100")}>
               <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center text-xs font-bold ring-1 [clip-path:polygon(25%_0,75%_0,100%_50%,75%_100%,25%_100%,0_50%)]", b.tier ? TIER_HEX[b.tier] : "bg-white/10 text-muted ring-white/10")}>{b.count}</span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-medium">{b.bond.name}</span>
+                <span className="flex items-center gap-1 truncate text-xs font-medium">{b.bond.name}{tracked.includes(bondFamily(b.bond.name)) && <ThumbsUp size={10} className="shrink-0 text-emerald-400" aria-label="tracked" />}</span>
                 <span className="block text-[10px] text-faint">
                   {b.bond.levels.map((l, i) => <span key={l.count}>{i > 0 && "/"}<span className={b.count >= l.count ? "font-semibold text-cyan" : ""}>{l.count}</span></span>)}
                 </span>
@@ -100,7 +127,8 @@ export function BondList({ states, empty = "Bonds light up as you deploy charact
               <div className="mb-1 ml-9 space-y-1 text-[11px] text-muted">
                 {b.bond.summary && <p>{b.bond.summary}</p>}
                 {b.bond.levels.map((l) => <p key={l.count} className={cx(b.active?.count === l.count && "text-text")}><b className={b.count >= l.count ? "text-cyan" : "text-faint"}>({l.count})</b> {l.effect}</p>)}
-                <p className="text-faint">{b.bond.category} · {b.bond.members.join(", ") || "via Plot Armor"}</p>
+                <p className="text-faint">{b.bond.category}</p>
+                <BondMembers pack={pack} bond={b.bond.name} have={have} />
               </div>
             )}
           </li>

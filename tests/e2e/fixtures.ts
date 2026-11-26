@@ -157,7 +157,7 @@ ${table("Equipment !! Tags !! Stats !! Effect !! Users !! Synthesis", [["[[File:
 ==Bosses==
 ${table("Boss !! Elite !! Normal", ["North", "South", "East", "West"].map((n) => [`Fixture ${n} Co.`, `{{Card|Fixture ${n} Boss}}`, `{{Card List|${n} Elite|delim=;}}`, `{{Card List|${n} Grunt; ${n} Scout|delim=;}}`]))}`,
   };
-  const info = (name: string, cost: number) => `{{Currency Wars Character Infobox\n|name = ${name}\n|cost = ${cost}\n|field = ${field[name]}\n|role1 = DPS\n|bond1 = Grove Guild\n}}\n{{Currency Wars Character Details\n${[1, 2, 3].map((i) => `|hp${i} = ${(i - 1) * 30}%\n|on_field${i} = ${field[name] === "Off Field" ? 100 : (90 + cost * 20) * i}\n|off_field${i} = ${field[name] === "On Field" ? 0 : (90 + cost * 20) * i}`).join("\n")}\n}}`;
+  const info = (name: string, cost: number) => `{{Currency Wars Character Infobox\n|name = ${name}\n|cost = ${cost}\n|field = ${field[name]}\n|role1 = DPS\n|bond1 = ${["Fx Ash", "Fx Birch", "Fx Fern", "Fx Iris"].includes(name) ? "Grove Guild" : "Fixture School"}\n}}\n{{Currency Wars Character Details\n${[1, 2, 3].map((i) => `|hp${i} = ${(i - 1) * 30}%\n|on_field${i} = ${field[name] === "Off Field" ? 100 : (90 + cost * 20) * i}\n|off_field${i} = ${field[name] === "On Field" ? 0 : (90 + cost * 20) * i}`).join("\n")}\n}}`;
   const cost = Object.fromEntries(Object.entries(costs).flatMap(([c, ns]) => ns.map((n) => [n, Number(c)])));
   await page.route("https://honkai-star-rail.fandom.com/api.php**", async (route) => {
     const u = new URL(route.request().url());

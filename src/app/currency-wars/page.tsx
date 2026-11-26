@@ -8,6 +8,7 @@ import { EquipmentTable } from "@/components/currencywars/EquipmentTable";
 import { Investments } from "@/components/currencywars/Investments";
 import { RunSim } from "@/components/currencywars/RunSim";
 import { TeamBuilder } from "@/components/currencywars/TeamBuilder";
+import { TrackedProvider } from "@/components/currencywars/tracking";
 import { Button, ErrorBox, Notice, PageHeader, Panel, Tabs } from "@/components/ui";
 import { kvGet, kvSet } from "@/lib/db";
 import { CW_PACK_KEY, CW_PACK_SCHEMA, downloadCwPack, type CwPack } from "@/lib/currencywars/sim";
@@ -34,7 +35,7 @@ export default function CurrencyWarsPage() {
       {err && <ErrorBox>{err}</ErrorBox>}
       {outdated && <Notice tone="warn" title="New Currency Wars data available" open>Press Update to download equipment, Investment Environments and Strategies, opponents, difficulty ranks and character stats. The simulator needs them.</Notice>}
       {pack === undefined ? null : pack ? (
-        <>
+        <TrackedProvider>
           <Tabs<Tab> value={tab} onChange={setTab} tabs={[
             { id: "run", label: "Run simulator" },
             { id: "builder", label: "Team builder" },
@@ -46,7 +47,7 @@ export default function CurrencyWarsPage() {
           {tab === "equipment" && <EquipmentTable pack={pack} />}
           {tab === "investments" && <Investments pack={pack} />}
           <p className="text-[11px] text-faint">Data from the <a className="underline" href={WIKI.page(`Currency Wars: ${pack.season}`)} target="_blank" rel="noreferrer">{WIKI.name}</a> ({WIKI.license}), downloaded {pack.fetchedAt.slice(0, 10)}. Game content © HoYoverse.</p>
-        </>
+        </TrackedProvider>
       ) : (
         <Panel>
           <div className="flex flex-col items-center gap-3 py-6 text-center">

@@ -81,6 +81,15 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.5.0 Bond Tracking, turn order, Bond members
+
+- **Bond Tracking** (like the game's): pick Bonds to track in the shop bar or the team builder; every character in a tracked Bond (or wearing its Emblem) gets a thumbs-up in the shop, Supply, board, bench and character list. Saved on the device, shared by both tabs.
+- **Turn order** in the battle viewer, like the game's left-hand bar: who's acting, the next turns of squad and enemies, Action Value until each (toggle "AV"), and the current cycle. Vertical on desktop, a strip on phones.
+- **Bond members:** opening a Bond (in the Bonds list, or a selected character's Bond tags) shows every member as a small portrait, owned ones bright, with a Track button.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **166/166** · E2E **13/13** on the server build and the static web edition (tracking marks, member portraits, turn order and AV toggle). Checked on real wiki data at desktop and phone width: no console errors, no horizontal overflow.
+
 ## 2026-11-26 · 1.4.0 Currency Wars items, ores and battle viewer
 
 - **Bug fixed:** Investment Environments that grant Emblems (e.g. "Labor Dispatch Contract": "Gain a random emblem…") gave nothing, because Emblems weren't modelled. Emblems are now parsed from the wiki (21), land in Items, put their wearer in their Bond (counting toward it), and Labor Dispatch Contract also gives a character of that Bond at each Boss node. "Obtain a X Emblem" environments and Lottery Purchase work too.

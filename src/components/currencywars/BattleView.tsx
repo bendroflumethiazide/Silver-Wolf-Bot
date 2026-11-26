@@ -1,8 +1,8 @@
 "use client";
 
-import { FastForward, Pause, Play, SkipForward } from "lucide-react";
+import { FastForward, Hourglass, Pause, Play, SkipForward, Skull } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { hpAt, type Timeline, type TlUnit } from "@/lib/currencywars/timeline";
+import { hpAt, turnOrder, type Timeline, type TlUnit } from "@/lib/currencywars/timeline";
 import { Button, cx, Panel } from "../ui";
 import { Portrait } from "./shared";
 
@@ -38,11 +38,52 @@ function UnitRow({ u, hp, hit, down }: { u: TlUnit; hp: number; hit: boolean; do
   );
 }
 
+function TurnAvatar({ u, size }: { u: TlUnit; size: number }) {
+  if (u.side === "ally") return <Portrait name={u.name} cost={u.cost} size={size} className="!ring-1" />;
+  const initials = u.name.replace(/[^A-Za-z ]/g, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+  return (
+    <span className={cx("inline-flex shrink-0 items-center justify-center rounded-full font-bold ring-1", u.boss ? "bg-rose-700/70 text-rose-100 ring-rose-300/70" : u.elite ? "bg-amber-600/50 text-amber-50 ring-amber-200/60" : "bg-slate-600/60 text-slate-100 ring-white/30")} style={{ width: size, height: size, fontSize: size * 0.34 }}>
+      {u.boss ? <Skull size={size * 0.5} aria-hidden /> : initials}
+    </span>
+  );
+}
+
+/** Turn order like the game's left-hand bar: who's acting now, who's next, and Action Value until each turn. */
+function TurnOrder({ tl, t, showAv }: { tl: Timeline; t: number; showAv: boolean }) {
+  const { current, next } = turnOrder(tl, t, 8);
+  const unit = (id: string) => tl.units.find((u) => u.id === id);
+  const rows = [...(current ? [{ ...current, av: 0, now: true }] : []), ...next.map((n) => ({ ...n, now: false }))];
+  const cycle = Math.floor(t / 100) + 1;
+  return (
+    <div className="min-w-0" aria-label="Turn order">
+      <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Turn order</p>
+      <div className="relative overflow-x-auto md:overflow-visible">
+        <ol className="flex gap-1.5 pb-1 md:flex-col md:pb-0">
+          {rows.map((r, i) => {
+            const u = unit(r.id);
+            if (!u) return null;
+            return (
+              <li key={`${r.id}-${r.t}-${i}`} title={`${u.name}${showAv ? ` · ${r.av} AV` : ""}`}
+                className={cx("relative flex shrink-0 items-center gap-1.5 rounded-lg border px-1 py-1 md:pr-2", r.now ? "border-cyan bg-cyan/15" : u.side === "ally" ? "border-sky-400/30 bg-sky-400/[0.06]" : "border-rose-400/30 bg-rose-400/[0.06]", u.boss && "py-1.5")}>
+                <TurnAvatar u={u} size={u.boss ? 34 : 28} />
+                <span className="hidden min-w-0 flex-1 truncate text-[10px] md:block">{u.name}</span>
+                {showAv && <span className={cx("absolute bottom-0 right-0 rounded-tl-md rounded-br-lg px-1 font-mono text-[10px] font-semibold md:static md:rounded md:bg-transparent", r.now ? "bg-cyan text-black md:text-cyan" : "bg-black/70 text-text")}>{r.now ? "▶" : r.av}</span>}
+              </li>
+            );
+          })}
+        </ol>
+      </div>
+      <p className="mt-1.5 flex items-center gap-1 text-[11px] text-muted"><Hourglass size={12} aria-hidden /> Cycle <b className="text-text">{cycle}</b></p>
+    </div>
+  );
+}
+
 /** Watch a fight play out. The outcome is already decided; this shows how it went. */
 export function BattleView({ timeline, title, onDone }: { timeline: Timeline; title: string; onDone: () => void }) {
   const [t, setT] = useState(0);
   const [speed, setSpeed] = useState<(typeof SPEEDS)[number]>(1);
   const [playing, setPlaying] = useState(true);
+  const [showAv, setShowAv] = useState(true);
   const raf = useRef<number | null>(null);
   const last = useRef<number | null>(null);
   const done = t >= timeline.end;
@@ -78,6 +119,7 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
     <Panel title={title} actions={
       <div className="flex flex-wrap items-center gap-1.5">
         <Button size="sm" variant="ghost" onClick={() => setPlaying((p) => !p)} disabled={done} aria-label={playing ? "Pause" : "Play"}>{playing && !done ? <Pause size={13} /> : <Play size={13} />}</Button>
+        <button type="button" onClick={() => setShowAv((v) => !v)} aria-pressed={showAv} className={cx("rounded-lg border px-2 py-1 text-xs", showAv ? "border-cyan/60 text-cyan" : "border-line text-muted")}>AV</button>
         <div className="flex rounded-lg border border-line" role="radiogroup" aria-label="Battle speed">
           {SPEEDS.map((x) => <button key={x} type="button" role="radio" aria-checked={speed === x} onClick={() => setSpeed(x)} className={cx("px-2 py-1 text-xs", speed === x ? "bg-cyan/20 text-cyan" : "text-muted")}>{x}×</button>)}
         </div>
@@ -91,12 +133,13 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
         <span>{waves > 1 ? `Wave ${Math.min(wave, waves)} of ${waves}` : enemies.some((e) => e.boss) ? "Boss fight" : " "}</span>
       </div>
       {timeline.limit !== null && <div className="mb-3 h-1.5 overflow-hidden rounded-full bg-white/5"><div className="h-full bg-gradient-to-r from-cyan to-violet-400" style={{ width: `${(Math.min(t, timeline.limit) / timeline.limit) * 100}%` }} /></div>}
-      <div className="grid gap-3 md:grid-cols-2">
-        <div>
+      <div className="grid gap-3 md:grid-cols-[9.5rem_minmax(0,1fr)_minmax(0,1fr)]">
+        <TurnOrder tl={timeline} t={t} showAv={showAv} />
+        <div className="min-w-0">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-300">Your squad</p>
           <ul className="space-y-1">{allies.map((u) => <UnitRow key={u.id} u={u} hp={hp.get(u.id) ?? 0} hit={recent.has(u.id)} down={(hp.get(u.id) ?? 0) <= 0 && !u.idle} />)}</ul>
         </div>
-        <div>
+        <div className="min-w-0">
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-rose-300">Enemies</p>
           <ul className="space-y-1">{enemies.map((u) => <UnitRow key={u.id} u={u} hp={hp.get(u.id) ?? 0} hit={recent.has(u.id)} down={(hp.get(u.id) ?? 0) <= 0} />)}</ul>
         </div>

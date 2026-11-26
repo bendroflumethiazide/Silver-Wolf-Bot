@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildTimeline, hpAt } from "../currencywars/timeline";
+import { buildTimeline, hpAt, turnOrder, turnsOf } from "../currencywars/timeline";
+import { bondNames, membersOf, trackedMatches } from "../currencywars/bonds";
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
@@ -542,5 +543,43 @@ describe("battle timeline", () => {
     const tl = buildTimeline({ allies, enemies: [{ name: "Big Boss", boss: true }], waves: 1, won: true, cleared: 1, ratio: 1.2, limit: 150, bossPhases: 3, reviveCost: 35 }, createRng("b"));
     expect(tl.events.filter((e) => e.kind === "phase")).toHaveLength(2);
     expect(tl.events.some((e) => e.kind === "kill")).toBe(true);
+  });
+});
+
+describe("Bond Tracking and bond members", () => {
+  it("matches characters by Bond, collapses variants, and counts worn Emblems", () => {
+    expect(bondNames(PACK)).toEqual(["Stellaron Hunters", "Heal"]);
+    expect(trackedMatches(PACK, "Kafka", ["Stellaron Hunters"])).toEqual(["Stellaron Hunters"]);
+    expect(trackedMatches(PACK, "Robin", ["Stellaron Hunters"])).toEqual([]);
+    expect(trackedMatches(PACK, "Robin", ["Stellaron Hunters"], ["Stellaron Hunters Emblem"])).toEqual(["Stellaron Hunters"]);
+    expect(trackedMatches(PACK, "Kafka", [])).toEqual([]);
+    expect(membersOf(PACK, "Heal")).toEqual(["Natasha", "Luocha", "Huohuo"]);
+    const variants = { ...PACK, bonds: [{ name: "Moon: A", category: "Faction", members: ["Welt"], summary: "", levels: [] }, { name: "Moon: B", category: "Faction", members: ["Welt", "Pearl"], summary: "", levels: [] }] };
+    expect(bondNames(variants)).toEqual(["Moon"]);
+    expect(membersOf(variants, "Moon: A")).toEqual(["Welt", "Pearl"]);
+  });
+});
+
+describe("turn order", () => {
+  const allies = [{ name: "Kafka", cost: 5, stars: 2 as const, power: 600, place: "on" as const }, { name: "Welt", cost: 1, stars: 1 as const, power: 200, place: "on" as const }];
+  const tl = buildTimeline({ allies, enemies: Array.from({ length: 4 }, (_, i) => ({ name: `Grunt ${i}` })), waves: 2, won: true, cleared: 1, ratio: 1.2, limit: 150, bossPhases: 2, reviveCost: 15 }, createRng("turns"));
+  it("records allies' and enemies' turns in order", () => {
+    expect(tl.turns!.length).toBeGreaterThan(4);
+    expect(tl.turns!.every((x, i) => i === 0 || tl.turns![i - 1].t <= x.t)).toBe(true);
+    expect(new Set(tl.turns!.map((x) => x.id.charAt(0)))).toEqual(new Set(["a", "e"]));
+  });
+  it("lists upcoming turns with Action Value until each, skipping the defeated", () => {
+    const mid = tl.end / 2;
+    const { next } = turnOrder(tl, mid, 6);
+    expect(next.length).toBeGreaterThan(0);
+    expect(next.every((n, i) => n.t > mid && n.av === Math.round(n.t - mid) && (i === 0 || next[i - 1].t <= n.t))).toBe(true);
+    const hp = hpAt(tl, mid);
+    expect(next.every((n) => (hp.get(n.id) ?? 1) > 0)).toBe(true);
+    expect(turnOrder(tl, tl.end).next).toEqual([]);
+  });
+  it("rebuilds turns for fights saved before turns were recorded", () => {
+    const old = { ...tl, turns: undefined };
+    expect(turnsOf(old).length).toBeGreaterThan(0);
+    expect(turnsOf(old).every((x) => tl.events.some((e) => e.kind === "hit" && e.from === x.id && e.t === x.t))).toBe(true);
   });
 });
