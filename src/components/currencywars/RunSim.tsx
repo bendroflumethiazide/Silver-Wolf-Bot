@@ -9,10 +9,11 @@ import {
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
 } from "@/lib/currencywars/run";
-import { isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
+import { isOre, itemKind, madeFrom, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { BattleView } from "./BattleView";
 import { CharacterSheet } from "./CharacterSheet";
+import { recommendedFor, RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
 import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
@@ -194,6 +195,23 @@ export function RunSim({ pack }: { pack: CwPack }) {
   const quit = () => { setRun(null); setSel(null); void kvSet(RUN_KEY, null); };
 
   const tp = useMemo(() => (run ? teamPower(run, pack) : null), [run, pack]);
+  /** Bag items that are (or make) recommended equipment for a deployed character: "Kafka → Firestorm Surge". */
+  const gearFor = useMemo(() => {
+    const m = new Map<string, string[]>();
+    if (!run) return m;
+    for (const zone of ["on", "off"] as const) for (const u of run[zone]) {
+      if (!u) continue;
+      for (const rec of recommendedFor(pack, u.name, zone)) {
+        if (u.items.includes(rec)) continue;
+        for (const part of [rec, ...madeFrom(pack, rec).flat()]) {
+          if (!run.bag.includes(part)) continue;
+          const tag = `${u.name} → ${rec}`;
+          m.set(part, [...new Set([...(m.get(part) ?? []), tag])]);
+        }
+      }
+    }
+    return m;
+  }, [run, pack]);
   if (run === undefined) return null;
   if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><Rules /></div>;
 
@@ -324,9 +342,10 @@ export function RunSim({ pack }: { pack: CwPack }) {
               {run.bag.length ? (
                 <div className="flex flex-wrap gap-1.5">
                   {run.bag.map((it, i) => (
-                    <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={it}
+                    <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={gearFor.get(it) ? `${it} · recommended: ${gearFor.get(it)!.join(", ")}` : it}
                       className={cx("flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px]", sel?.kind === "item" && sel.index === i ? "border-cyan bg-cyan/15" : "border-line hover:border-cyan/50", itemKind(pack, it) === "advanced" && "text-violet-200", itemKind(pack, it) === "emblem" && "text-amber-100", isOre(it) && "border-white/20 bg-white/[0.04]")}>
                       <ItemIcon pack={pack} name={it} size={13} /> {it}
+                      {gearFor.has(it) && <span className="ml-0.5 text-[10px] text-emerald-300" aria-label={`recommended for ${gearFor.get(it)!.map((x) => x.split(" → ")[0]).join(", ")}`}>★</span>}
                     </button>
                   ))}
                 </div>
@@ -358,6 +377,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
                 <button type="button" onClick={() => setSel(null)} aria-label="Cancel" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>
               </div>
             )}
+            {selUnit && sel?.kind === "unit" && <RecommendedGear pack={pack} name={selUnit.name} place={sel.spot.zone} held={selUnit.items} bag={run.bag} compact />}
             {selUnit && sel?.kind === "unit" && bondPeek && <BondMembers pack={pack} bond={bondPeek} have={new Set(units(run).map((u) => u.name))} />}
           </div>
 
@@ -396,7 +416,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
         </div>
       </div>
       <Modal open={!!sheet} onClose={() => setSheet(null)} title={sheet ? `${sheet.name} · details` : "Details"} wide>
-        {sheet && <CharacterSheet key={`${sheet.name}-${sheet.stars}`} pack={pack} name={sheet.name} stars={sheet.stars} items={sheet.items} place={sheet.place} />}
+        {sheet && <CharacterSheet key={`${sheet.name}-${sheet.stars}`} pack={pack} name={sheet.name} stars={sheet.stars} items={sheet.items} bag={run.bag} place={sheet.place} />}
       </Modal>
     </div>
   );

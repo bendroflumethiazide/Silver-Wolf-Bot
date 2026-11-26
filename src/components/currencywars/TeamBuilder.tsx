@@ -11,7 +11,8 @@ import { boardBonds, boardGold, bondVariants, chanceToSee, rollShop, withVariant
 import { createRng } from "@/lib/warp/simulator";
 import { Button, cx, Empty, Modal, Notice, Panel } from "../ui";
 import { CharacterSheet } from "./CharacterSheet";
-import { BondList, bondsOf, CharCard, COST_TEXT, FieldTag, OddsBar, Portrait } from "./shared";
+import { recommendedFor } from "./RecommendedGear";
+import { BondList, bondsOf, CharCard, COST_TEXT, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
 import { BondTracker } from "./tracking";
 
 const BOARD_KEY = "cwBoard";
@@ -62,6 +63,7 @@ export function TeamBuilder({ pack }: { pack: CwPack }) {
                   <Portrait name={u.name} cost={costOf(u.name)} size={34} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm">{u.name}</span>
+                    {recommendedFor(pack, u.name, place).length > 0 && <span className="flex items-center gap-0.5" title={`Recommended: ${recommendedFor(pack, u.name, place).join(", ")}`} aria-label={`Recommended: ${recommendedFor(pack, u.name, place).join(", ")}`}>{recommendedFor(pack, u.name, place).map((it) => <ItemIcon key={it} pack={pack} name={it} size={11} />)}</span>}
                     <span className="flex items-center gap-1 text-[10px] text-faint"><FieldTag field={info(u.name)?.field} />{pack.info ? (s ? `strength ${Math.round(s)}` : <span className="text-rose-300">won&apos;t act here</span>) : null}</span>
                   </span>
                   <button type="button" onClick={() => setBoard(board.map((x) => (x.name === u.name ? { ...x, place: place === "on" ? "off" : "on" } : x)))} className="rounded-md border border-line px-1.5 py-0.5 text-[10px] text-muted hover:text-text">{place === "on" ? "→ Off" : "→ On"}</button>

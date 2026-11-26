@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildTimeline, hpAt, turnOrder, turnsOf } from "../currencywars/timeline";
 import { bondNames, membersOf, trackedMatches } from "../currencywars/bonds";
 import { characterStats, itemBoosts, parseStatLine } from "../currencywars/stats";
+import { gearStatus, recommendedFor } from "../../components/currencywars/RecommendedGear";
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
@@ -704,5 +705,23 @@ describe("character stats", () => {
     expect(geared.onField.total).toBe(176); // 160 × 1.10
     expect(geared.spdAmp.total).toBe(5);
     expect(geared.hpAmp.total).toBe(30);
+  });
+});
+
+describe("recommended equipment", () => {
+  const withRecs: CwPack = { ...PACK, info: { ...PACK.info, Kafka: { ...PACK.info!.Kafka, recommended: [{ group: "On-Field", items: ["Firestorm Surge", "Anti-Grav Boots"] }, { group: "Off-Field", items: ["Fixture Off"] }] } } };
+  it("picks the group for the character's position, or every group when unplaced", () => {
+    expect(recommendedFor(withRecs, "Kafka", "on")).toEqual(["Firestorm Surge", "Anti-Grav Boots"]);
+    expect(recommendedFor(withRecs, "Kafka", "off")).toEqual(["Fixture Off"]);
+    expect(recommendedFor(withRecs, "Kafka")).toEqual(["Firestorm Surge", "Anti-Grav Boots", "Fixture Off"]);
+    expect(recommendedFor(withRecs, "Welt", "on")).toEqual([]);
+  });
+  it("says whether an item is held, can be made now, or one part is owned", () => {
+    expect(gearStatus(PACK, "Firestorm Surge", ["Firestorm Surge"], [])).toBe("held");
+    expect(gearStatus(PACK, "Firestorm Surge", [], ["Folding Knife", "Roller Skates"])).toBe("ready");
+    expect(gearStatus(PACK, "Firestorm Surge", ["Folding Knife"], ["Roller Skates"])).toBe("ready");
+    expect(gearStatus(PACK, "Anti-Grav Boots", [], ["Roller Skates"])).toBe("partial");
+    expect(gearStatus(PACK, "Anti-Grav Boots", [], ["Roller Skates", "Roller Skates"])).toBe("ready");
+    expect(gearStatus(PACK, "Firestorm Surge", [], [])).toBe("none");
   });
 });

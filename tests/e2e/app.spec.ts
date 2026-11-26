@@ -283,9 +283,16 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await expect(page.getByRole("button", { name: "Locked" })).toBeVisible();
   // Character details: stats like the game's Stats Details, and abilities by star.
   await page.getByRole("button", { name: /^(On|Off)-Field slot \d: / }).first().click();
+  // Recommended equipment on the selected character (like the game's card).
+  await expect(page.getByLabel(/recommended equipment$/).first().getByText("Fixture Blade")).toBeVisible();
   await page.getByRole("button", { name: "Details" }).click();
   const sheet = page.getByRole("dialog");
   await expect(sheet.getByText("Stats Details")).toBeVisible();
+  // …and in the sheet, with its recipe; tapping it opens the item's details.
+  await expect(sheet.getByText("Recommended equipment")).toBeVisible();
+  await expect(sheet.getByText("Folding Knife + Roller Skates").first()).toBeVisible();
+  await sheet.getByRole("button", { name: /Fixture Blade/ }).first().click();
+  await expect(sheet.getByRole("region", { name: "Fixture Blade details" }).getByText("Hits harder.")).toBeVisible();
   await expect(sheet.getByText("Base Lucky Strike Rate")).toBeVisible();
   await expect(sheet.getByText("Base Healing Strength")).toBeVisible();
   await expect(sheet.getByRole("tab", { name: "On Field" })).toBeVisible();

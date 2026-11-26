@@ -6,7 +6,8 @@ import { bondsOf } from "@/lib/currencywars/bonds";
 import { characterStats, maxStars, STAR_VALUES, type StatKey } from "@/lib/currencywars/stats";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, cx } from "../ui";
-import { BondMembers, COST_TEXT, FieldTag, ItemIcon, Portrait } from "./shared";
+import { RecommendedGear } from "./RecommendedGear";
+import { BondMembers, COST_TEXT, FieldTag, Portrait } from "./shared";
 
 const ICON: Partial<Record<StatKey, [LucideIcon, string]>> = {
   onField: [Sword, "text-amber-400"], offField: [Crosshair, "text-sky-400"], dmgAmp: [Crown, "text-violet-400"], mitigation: [ShieldHalf, "text-cyan"],
@@ -33,7 +34,7 @@ function StarText({ text, star }: { text: string; star: number }) {
 }
 
 /** Everything about one Currency Wars character: stats like the game's Stats Details, abilities, Eidolons, Light Cone, equipment. */
-export function CharacterSheet({ pack, name, stars: initialStars = 1, items = [], place }: { pack: CwPack; name: string; stars?: number; items?: string[]; place?: "on" | "off" | "bench" }) {
+export function CharacterSheet({ pack, name, stars: initialStars = 1, items = [], bag = [], place }: { pack: CwPack; name: string; stars?: number; items?: string[]; bag?: string[]; place?: "on" | "off" | "bench" }) {
   const info = pack.info?.[name];
   const cost = info?.cost ?? pack.characters.find((c) => c.name === name)?.cost ?? 1;
   const top = maxStars(pack, name);
@@ -78,6 +79,13 @@ export function CharacterSheet({ pack, name, stars: initialStars = 1, items = []
           return <div key={k} title={r.label} className="flex items-center gap-1.5 rounded-md border border-line bg-white/[0.03] px-2 py-1.5"><Icon size={14} className={tone} aria-hidden /><span className="font-mono text-xs">{fmt(r.total, r.percent)}</span><span className="sr-only">{r.label}</span></div>;
         })}
       </div>
+
+      {(info.recommended?.length ?? 0) > 0 && (
+        <div className="rounded-lg border border-line p-2.5">
+          <p className="mb-1.5 text-xs font-medium">Recommended equipment</p>
+          <RecommendedGear pack={pack} name={name} place={place} held={items} bag={bag} />
+        </div>
+      )}
 
       <details className="rounded-lg border border-line" open>
         <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 font-medium">Stats Details <ChevronDown size={14} className="text-faint" /></summary>
@@ -133,20 +141,6 @@ export function CharacterSheet({ pack, name, stars: initialStars = 1, items = []
             {info.lightCone && <p><b className="text-text">Light Cone · {info.lightCone.name}:</b> <span className="text-muted"><StarText text={info.lightCone.desc} star={1} /></span></p>}
           </div>
         </details>
-      )}
-
-      {info.recommended && info.recommended.length > 0 && (
-        <div>
-          <p className="mb-1 text-xs font-medium">Recommended equipment</p>
-          <div className="space-y-1">
-            {info.recommended.map((r) => (
-              <div key={r.group} className="flex flex-wrap items-center gap-1.5 text-xs">
-                {r.group !== "All" && <span className="w-16 shrink-0 text-faint">{r.group}</span>}
-                {r.items.map((it) => <span key={it} className={cx("inline-flex items-center gap-1 rounded border px-1.5 py-0.5", items.includes(it) ? "border-emerald-400/60 text-emerald-100" : "border-line text-muted")}><ItemIcon pack={pack} name={it} size={12} />{it}</span>)}
-              </div>
-            ))}
-          </div>
-        </div>
       )}
 
       {items.length > 0 && <p className="text-xs text-muted">Holding: {items.join(", ")}</p>}

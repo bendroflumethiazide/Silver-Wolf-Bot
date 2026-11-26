@@ -81,6 +81,16 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.6.1 Recommended equipment
+
+- Every character's recommended equipment (from their wiki page, by On-Field / Off-Field, or by form for Dan Heng) now shows on the selected character in the simulator (like the game's card), near the top of the character sheet with each item's recipe, and as icons on team-builder rows.
+- Each item says whether it's equipped, can be made now from your items, or you have one part; tapping it opens the item's details and combinations.
+- Bag items that are (or make) recommended equipment for a deployed character get a ★, with who it's for.
+- Checked: all 58 characters have recommendations and all 249 recommended items match the equipment data.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **172/172** · E2E **13/13** on both builds; real data checked at desktop and phone width.
+
 ## 2026-11-26 · 1.6.0 Character stats and abilities
 
 - **Character sheets** (Details on a selected unit in the simulator; the ⓘ button in the team builder): every stat from the game's Stats Details: On-/Off-Field Strength, DMG Amplification with its eight parts, DMG Mitigation, Lucky Strike Rate (base 5%) and DMG (base 100%), SPD Amplification, Healing and Shield Strength, HP Amplification, each with base by star and the boost from held equipment. Checked against the game's screen for Topaz & Numby.
