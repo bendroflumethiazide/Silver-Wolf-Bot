@@ -153,5 +153,6 @@ export async function activateSnapshot(id: string) {
 
 export function assetUrl(path: string | undefined | null): string | null {
   if (!path) return null;
+  if (/^https:\/\//.test(path)) return path; // already a full URL (e.g. wiki images)
   return `${SOURCE.rawBase}${path}`;
 }

@@ -26,12 +26,17 @@ export default function NpcsPage() {
       {tab !== "codex" && <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" aria-label="Search" className="mb-4 w-full sm:w-72" />}
       {tab === "directory" && (!contacts.length ? <Empty title="No contacts">Download game data to load the in-game Messages contact list.</Empty> : (
         <>
-          <p className="mb-3 text-xs text-muted">Source: the in-game Messages contact list (names and portraits). Background, locations and quests are not in this data. Add them in the codex.</p>
-          <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
-            {contacts.slice(0, 300).map((c) => (
-              <li key={c.id} className="glass flex items-center gap-2 p-2"><GameImage path={c.icon} alt={c.name} className="h-9 w-9 shrink-0" rounded="rounded-full" /><span className="truncate text-xs">{c.name}</span></li>
+          <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 md:grid-cols-6 xl:grid-cols-8">
+            {contacts.slice(0, 400).map((c) => (
+              <li key={c.id}>
+                <a href={`https://honkai-star-rail.fandom.com/wiki/${encodeURIComponent(c.name.replace(/ /g, "_"))}`} target="_blank" rel="noreferrer" className="group flex flex-col items-center gap-1.5 rounded-xl border border-line bg-white/[0.03] p-2.5 text-center transition hover:border-cyan/50">
+                  <GameImage path={c.icon} alt={c.name} className="h-16 w-16 transition group-hover:scale-105" rounded="rounded-full" />
+                  <span className="line-clamp-2 text-xs leading-tight">{c.name}</span>
+                </a>
+              </li>
             ))}
           </ul>
+          <p className="mt-3 text-[11px] text-faint">Names and portraits from the in-game Messages contacts. Tap someone to open their wiki page.</p>
         </>
       ))}
       {tab === "glossary" && (!glossary.length ? <Empty title="No glossary" /> : (
