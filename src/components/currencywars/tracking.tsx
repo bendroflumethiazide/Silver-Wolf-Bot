@@ -9,14 +9,19 @@ import type { CwPack } from "@/lib/currencywars/sim";
 import { cx } from "../ui";
 
 const TRACK_KEY = "cwTracked";
-const Ctx = createContext<{ tracked: string[]; toggle: (bond: string) => void }>({ tracked: [], toggle: () => {} });
+const GEAR_KEY = "cwGearTracked";
+const Ctx = createContext<{ tracked: string[]; toggle: (bond: string) => void; gear: string[]; toggleGear: (name: string) => void }>({ tracked: [], toggle: () => {}, gear: [], toggleGear: () => {} });
 
 /** Bond Tracking, shared by every Currency Wars tab and saved on this device. */
 export function TrackedProvider({ children }: { children: ReactNode }) {
   const saved = useLiveQuery(() => kvGet<string[]>(TRACK_KEY, []), []);
   const tracked = saved ?? [];
   const toggle = (bond: string) => { void kvSet(TRACK_KEY, tracked.includes(bond) ? tracked.filter((b) => b !== bond) : [...tracked, bond]); };
-  return <Ctx.Provider value={{ tracked, toggle }}>{children}</Ctx.Provider>;
+  // Equipment Tracking: characters whose recommended equipment you're collecting.
+  const savedGear = useLiveQuery(() => kvGet<string[]>(GEAR_KEY, []), []);
+  const gear = savedGear ?? [];
+  const toggleGear = (name: string) => { void kvSet(GEAR_KEY, gear.includes(name) ? gear.filter((g) => g !== name) : [...gear, name]); };
+  return <Ctx.Provider value={{ tracked, toggle, gear, toggleGear }}>{children}</Ctx.Provider>;
 }
 export const useTracked = () => useContext(Ctx);
 

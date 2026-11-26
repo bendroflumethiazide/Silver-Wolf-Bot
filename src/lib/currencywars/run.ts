@@ -368,6 +368,7 @@ export function applyEffect(s: RunState, pack: CwPack, text: string, rng: () => 
   const randomAdvanced = () => { const a = eq?.advanced ?? []; return a.length ? pickOne(rng, a).name : null; };
   const emblems = (n: number) => Array.from({ length: n }, () => randomEmblem(pack, rng)).filter((x): x is string => !!x);
   const sourceEmblem = /^(.+? Emblem)(?: Set)?$/.exec(source.trim())?.[1];
+  let unknownUsed = false;
   const sample = <T,>(r: () => number, list: readonly T[], k: number): T[] => { const pool = [...list]; const out: T[] = []; while (out.length < k && pool.length) out.push(pool.splice(Math.floor(r() * pool.length), 1)[0]); return out; };
 
   /** One granted thing, e.g. '1 "Sparxie"', '2 piece(s) of random basic equipment', '8 Gold Coin(s)'. */
@@ -385,11 +386,11 @@ export function applyEffect(s: RunState, pack: CwPack, text: string, rng: () => 
     if (/^(Experience|EXP)$/i.test(desc)) { state = levelUp(state, n); applied.push(`+${n} XP`); return; }
     if (/^free (?:Store )?refresh/i.test(desc)) { state = { ...state, freeRefreshes: state.freeRefreshes + n }; applied.push(`${n} free refreshes`); return; }
     if ((g = /^"([^"]+)"(.*)$/.exec(desc))) {
-      let name = g[1];
+      const name = g[1];
       const rest = g[2];
       if (/^Unknown/i.test(name)) {
-        if (sourceEmblem && eq?.emblems?.some((e) => e.name === sourceEmblem)) { name = sourceEmblem; applied.push(`${name} (the wiki lists this item as “Unknown”)`); for (let i = 0; i < n; i++) addItem(name); return; }
-        skipped.push("an item the wiki lists as “Unknown”"); return;
+        if (sourceEmblem && !unknownUsed && eq?.emblems?.some((e) => e.name === sourceEmblem)) { unknownUsed = true; for (let i = 0; i < n; i++) addItem(sourceEmblem); applied.push(sourceEmblem); return; }
+        skipped.push("an item the wiki hasn't named"); return;
       }
       // '"Beast Garden" character and basic equipment' (Index Funds): a member of that Bond, plus what follows.
       if (/^\s*character/i.test(rest) && membersOf(pack, name).length) {
@@ -401,7 +402,10 @@ export function applyEffect(s: RunState, pack: CwPack, text: string, rng: () => 
       }
       if (name === "Emblem Codex") { for (const e of emblems(n)) { addItem(e); applied.push(`${e} (Emblem Codex: you'd pick one; random here)`); } return; }
       if (name === "Peppy") { for (let i = 0; i < n; i++) addUnit("Peppy", 0, 1, emblems(toNum(/(\d+|three|two|one)\s+(?:permanently attached |random )?Emblems?/i.exec(rest)?.[1] ?? "0") || 0), true); return; }
-      const ch = roster.find((c) => c.name === name) ?? pack.characters.find((c) => c.name === name);
+      // Short names the wiki uses in some texts: "Topaz" → "Topaz & Numby", "SAM" (Firefly's armour) → "Firefly".
+      const alias: Record<string, string> = { SAM: "Firefly" };
+      const ch = roster.find((c) => c.name === name) ?? pack.characters.find((c) => c.name === name)
+        ?? roster.find((c) => c.name === alias[name]) ?? roster.find((c) => c.name.startsWith(`${name} `));
       if (ch) { for (let i = 0; i < n; i++) addUnit(ch.name, ch.cost, stars); return; }
       if (isItem(name)) { for (let i = 0; i < n; i++) addItem(name); applied.push(n > 1 ? `${n} × ${name}` : name); return; }
       if (/^Basic Weapon Box$/i.test(name)) { for (let i = 0; i < n; i++) { const b = randomBasic(pack, rng); if (b) addItem(b); } applied.push(`${n} basic equipment`); return; }

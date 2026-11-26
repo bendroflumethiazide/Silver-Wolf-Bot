@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, Search, Coins, Dices, Flag, Gift, Heart, Lock, LockOpen, Package, Play, RefreshCw, Skull, Swords, Trophy, Undo2, X, type LucideIcon } from "lucide-react";
+import { ArrowDownToLine, Search, ThumbsUp, Coins, Dices, Flag, Gift, Heart, Lock, LockOpen, Package, Play, RefreshCw, Skull, Swords, Trophy, Undo2, X, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WolfComment } from "@/components/SilverWolf";
 import { kvGet, kvSet } from "@/lib/db";
@@ -9,15 +9,16 @@ import {
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
 } from "@/lib/currencywars/run";
-import { isOre, itemKind, madeFrom, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
+import { fillUnknown, gearMark, gearNeeds, type GearTarget } from "@/lib/currencywars/gear";
+import { isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { BattleView } from "./BattleView";
 import { CharacterSheet } from "./CharacterSheet";
-import { recommendedFor, RecommendedGear } from "./RecommendedGear";
+import { RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
 import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
-import { BondTracker, TrackMark } from "./tracking";
+import { BondTracker, TrackMark, useTracked } from "./tracking";
 
 const RUN_KEY = "cwRun";
 const NODE_ICON: Record<NodeKind, LucideIcon> = { Reward: Gift, Strategy: Flag, Combat: Swords, Supply: Package, Encounter: Dices, Boss: Skull };
@@ -195,23 +196,21 @@ export function RunSim({ pack }: { pack: CwPack }) {
   const quit = () => { setRun(null); setSel(null); void kvSet(RUN_KEY, null); };
 
   const tp = useMemo(() => (run ? teamPower(run, pack) : null), [run, pack]);
-  /** Bag items that are (or make) recommended equipment for a deployed character: "Kafka → Firestorm Surge". */
-  const gearFor = useMemo(() => {
-    const m = new Map<string, string[]>();
-    if (!run) return m;
-    for (const zone of ["on", "off"] as const) for (const u of run[zone]) {
-      if (!u) continue;
-      for (const rec of recommendedFor(pack, u.name, zone)) {
-        if (u.items.includes(rec)) continue;
-        for (const part of [rec, ...madeFrom(pack, rec).flat()]) {
-          if (!run.bag.includes(part)) continue;
-          const tag = `${u.name} → ${rec}`;
-          m.set(part, [...new Set([...(m.get(part) ?? []), tag])]);
-        }
-      }
+  const { gear: gearTracked, toggleGear } = useTracked();
+  /** Characters whose recommended equipment is tracked: the ones you picked, else everyone deployed. */
+  const gearTargets = useMemo<GearTarget[]>(() => {
+    if (!run) return [];
+    const placed = (["on", "off", "bench"] as const).flatMap((zone) => run[zone].filter((u): u is Unit => !!u && !u.npc).map((u) => ({ u, zone })));
+    if (gearTracked.length) {
+      return gearTracked.map((name) => {
+        const hit = placed.find((p) => p.u.name === name);
+        return { name, place: hit && hit.zone !== "bench" ? hit.zone : undefined, held: hit?.u.items ?? [] };
+      });
     }
-    return m;
-  }, [run, pack]);
+    return placed.filter((p) => p.zone !== "bench").map((p) => ({ name: p.u.name, place: p.zone, held: p.u.items }));
+  }, [run, gearTracked]);
+  const needs = useMemo(() => gearNeeds(pack, gearTargets), [pack, gearTargets]);
+  const heldByTargets = gearTargets.flatMap((t) => t.held);
   if (run === undefined) return null;
   if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><Rules /></div>;
 
@@ -271,7 +270,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
           <div className="grid gap-3 sm:grid-cols-3">
             {run.offers.environments?.map((e, i) => (
               <button key={e.name} type="button" onClick={() => update((s) => chooseEnvironment(s, pack, i))} className="rounded-xl border border-cyan/30 bg-gradient-to-b from-cyan/10 to-transparent p-4 text-left hover:border-cyan">
-                <b className="block">{e.name}</b><span className="mt-1 block text-xs text-muted">{e.effect}</span>
+                <b className="block">{e.name}</b><span className="mt-1 block text-xs text-muted">{fillUnknown(e.name, e.effect)}</span>
               </button>
             ))}
           </div>
@@ -283,7 +282,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
             {run.offers.strategies?.map((st, i) => (
               <button key={st.name} type="button" onClick={() => update((s) => pickStrategy(s, pack, i))} className={cx("rounded-xl border bg-gradient-to-b to-transparent p-4 text-left hover:brightness-125", RARITY_CARD[st.rarity])}>
                 <span className="text-[10px] uppercase tracking-wider text-muted">{st.rarity}{RULES.strategyDifficulty[st.rarity] ? ` · enemy difficulty +${RULES.strategyDifficulty[st.rarity]}` : ""}</span>
-                <b className="block">{st.name}</b><span className="mt-1 block text-xs text-muted">{st.effect}</span>
+                <b className="block">{st.name}</b><span className="mt-1 block text-xs text-muted">{fillUnknown(st.name, st.effect)}</span>
               </button>
             ))}
           </div>
@@ -295,7 +294,15 @@ export function RunSim({ pack }: { pack: CwPack }) {
             {run.offers.supply?.map((o, i) => (
               <div key={i} className="flex flex-col gap-1">
                 <CharCard pack={pack} name={o.name} cost={o.cost} onClick={() => update((s) => pickSupply(s, pack, i))} footer="free" />
-                {o.item && <span className="flex items-center justify-center gap-1 text-[10px] text-muted"><ItemIcon pack={pack} name={o.item} size={11} /> {o.item}</span>}
+                {o.item && (() => {
+                  const mark = gearMark(needs, o.item, [...run.bag, ...heldByTargets]);
+                  return (
+                    <span title={mark.notes.length ? `For ${mark.notes.join("; ")}` : o.item} className={cx("relative flex items-center justify-center gap-1 rounded-md px-1 py-0.5 text-[10px]", mark.ready ? "text-text ring-2 ring-sky-400" : "text-muted", mark.wanted && !mark.ready && "text-text")}>
+                      <ItemIcon pack={pack} name={o.item} size={11} /> {o.item}
+                      {mark.wanted && <ThumbsUp size={11} className="shrink-0 text-emerald-400" aria-label={`Needed: ${mark.notes.join("; ")}`} />}
+                    </span>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -339,15 +346,27 @@ export function RunSim({ pack }: { pack: CwPack }) {
             {zoneRow("bench", "Bench", "grid-cols-5 max-w-[27.5rem] sm:max-w-[49.5rem] sm:grid-cols-9")}
             <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Items ({run.bag.length})</p>
+              <p className="mb-1.5 flex flex-wrap items-center gap-1 text-[11px] text-muted">
+                <ThumbsUp size={11} className="text-emerald-400" /> Gear tracking:
+                {gearTracked.length ? gearTracked.map((n) => (
+                  <span key={n} className="inline-flex items-center gap-0.5 rounded-full border border-emerald-400/50 bg-emerald-400/10 py-0.5 pl-1.5 pr-0.5 text-emerald-100">{n}
+                    <button type="button" onClick={() => toggleGear(n)} aria-label={`Stop tracking ${n}'s gear`} className="rounded-full p-0.5 hover:bg-white/10"><X size={10} /></button>
+                  </span>
+                )) : <span className="text-faint">everyone deployed (select a character → Track gear to choose)</span>}
+                <span className="text-faint">· <span className="rounded px-1 ring-1 ring-sky-400">blue</span> = the other part is here, craft now</span>
+              </p>
               {run.bag.length ? (
                 <div className="flex flex-wrap gap-1.5">
-                  {run.bag.map((it, i) => (
-                    <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={gearFor.get(it) ? `${it} · recommended: ${gearFor.get(it)!.join(", ")}` : it}
-                      className={cx("flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px]", sel?.kind === "item" && sel.index === i ? "border-cyan bg-cyan/15" : "border-line hover:border-cyan/50", itemKind(pack, it) === "advanced" && "text-violet-200", itemKind(pack, it) === "emblem" && "text-amber-100", isOre(it) && "border-white/20 bg-white/[0.04]")}>
-                      <ItemIcon pack={pack} name={it} size={13} /> {it}
-                      {gearFor.has(it) && <span className="ml-0.5 text-[10px] text-emerald-300" aria-label={`recommended for ${gearFor.get(it)!.map((x) => x.split(" → ")[0]).join(", ")}`}>★</span>}
-                    </button>
-                  ))}
+                  {run.bag.map((it, i) => {
+                    const mark = gearMark(needs, it, [...run.bag.filter((_, k) => k !== i), ...heldByTargets]);
+                    return (
+                      <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={mark.notes.length ? `${it} · for ${mark.notes.join("; ")}` : it}
+                        className={cx("flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px]", sel?.kind === "item" && sel.index === i ? "border-cyan bg-cyan/15" : mark.ready ? "border-sky-400 ring-1 ring-sky-400" : "border-line hover:border-cyan/50", itemKind(pack, it) === "advanced" && "text-violet-200", itemKind(pack, it) === "emblem" && "text-amber-100", isOre(it) && "border-white/20 bg-white/[0.04]")}>
+                        <ItemIcon pack={pack} name={it} size={13} /> {it}
+                        {mark.wanted && <ThumbsUp size={11} className="text-emerald-400" aria-label={`Needed: ${mark.notes.join("; ")}`} />}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : <p className="text-xs text-faint">Reward and Supply nodes give items and Crystal Ores.</p>}
               {run.note?.startsWith("Opened") && <p className="mt-1.5 text-xs text-cyan">{run.note}</p>}
@@ -372,6 +391,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
                 {sel.spot.zone === "bench"
                   ? <Button size="sm" onClick={() => { const to = autoSpot(run, pack, selUnit); if (to) update((s) => moveUnit(s, sel.spot, to)); else update((s) => ({ ...s, note: `Team is full: level ${s.level} deploys ${teamSize(s)}.` })); setSel(null); }}><Swords size={13} /> Deploy</Button>
                   : <Button size="sm" onClick={() => { const free = run.bench.findIndex((x) => !x); if (free >= 0) update((s) => moveUnit(s, sel.spot, { zone: "bench", index: free })); setSel(null); }}><ArrowDownToLine size={13} /> To bench</Button>}
+                {pack.info?.[selUnit.name]?.recommended?.length ? <Button size="sm" variant="ghost" aria-pressed={gearTracked.includes(selUnit.name)} onClick={() => toggleGear(selUnit.name)}><ThumbsUp size={13} className={gearTracked.includes(selUnit.name) ? "text-emerald-400" : ""} /> {gearTracked.includes(selUnit.name) ? "Tracking gear" : "Track gear"}</Button> : null}
                 {pack.info?.[selUnit.name] && <Button size="sm" variant="ghost" onClick={() => setSheet({ name: selUnit.name, stars: selUnit.stars, items: selUnit.items, place: sel.spot.zone })}><Search size={13} /> Details</Button>}
                 <Button size="sm" variant="ghost" onClick={() => { update((s) => sell(s, sel.spot)); setSel(null); }}><Coins size={13} /> Sell +{ASSUMED.sellRefund(selUnit.cost, selUnit.stars)}</Button>
                 <button type="button" onClick={() => setSel(null)} aria-label="Cancel" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>
@@ -407,8 +427,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
           {(run.environment || run.strategies.length > 0) && (
             <Panel title="Your buffs">
               <ul className="space-y-1.5 text-xs">
-                {run.environment && <li><Badge tone="cyan">Environment</Badge> <b>{run.environment.name}</b> <span className="text-muted">{run.environment.effect}</span></li>}
-                {run.strategies.map((s) => <li key={s.name}><Badge tone={s.rarity === "Prismatic" ? "violet" : s.rarity === "Gold" ? "gold" : "default"}>{s.rarity}</Badge> <b>{s.name}</b> <span className="text-muted">{s.effect}</span></li>)}
+                {run.environment && <li><Badge tone="cyan">Environment</Badge> <b>{run.environment.name}</b> <span className="text-muted">{fillUnknown(run.environment.name, run.environment.effect)}</span></li>}
+                {run.strategies.map((s) => <li key={s.name}><Badge tone={s.rarity === "Prismatic" ? "violet" : s.rarity === "Gold" ? "gold" : "default"}>{s.rarity}</Badge> <b>{s.name}</b> <span className="text-muted">{fillUnknown(s.name, s.effect)}</span></li>)}
               </ul>
             </Panel>
           )}

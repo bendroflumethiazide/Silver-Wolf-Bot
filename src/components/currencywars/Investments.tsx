@@ -2,6 +2,7 @@
 
 import { Search } from "lucide-react";
 import { useState } from "react";
+import { fillUnknown } from "@/lib/currencywars/gear";
 import type { StrategyRarity } from "@/lib/currencywars/parse";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, cx, Empty, Panel } from "../ui";
@@ -29,7 +30,7 @@ export function Investments({ pack }: { pack: CwPack }) {
       <Panel title={`Investment Environments (${envs.length})`}>
         <p className="mb-3 text-xs text-muted">Pick 1 of 3 at the start of a run. It lasts the whole run.</p>
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {envs.map((e) => <li key={e.name} className="rounded-lg border border-cyan/25 bg-cyan/[0.03] p-2.5"><b className="block text-sm">{e.name}</b><span className="text-xs text-muted">{e.effect}</span></li>)}
+          {envs.map((e) => <li key={e.name} className="rounded-lg border border-cyan/25 bg-cyan/[0.03] p-2.5"><b className="block text-sm">{e.name}</b><span className="text-xs text-muted">{fillUnknown(e.name, e.effect)}</span></li>)}
         </ul>
       </Panel>
       <Panel title={`Investment Strategies (${strats.length})`}>
@@ -43,7 +44,7 @@ export function Investments({ pack }: { pack: CwPack }) {
             {strats.map((s) => (
               <li key={`${s.rarity}-${s.name}`} className="rounded-lg border border-line p-2.5">
                 <div className="flex items-start justify-between gap-2"><b className="text-sm">{s.name}</b><Badge tone={TONE[s.rarity]}>{s.rarity}</Badge></div>
-                <p className="mt-1 text-xs text-muted">{s.effect}</p>
+                <p className="mt-1 text-xs text-muted">{fillUnknown(s.name, s.effect)}</p>
                 <p className="mt-1 text-[10px] text-faint">Plane {s.planes.join(", ")}</p>
               </li>
             ))}

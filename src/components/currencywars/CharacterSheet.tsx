@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Coins, Crown, Crosshair, Heart, Hexagon, PlusCircle, ShieldHalf, Sparkle, Sword, Wind, Zap, type LucideIcon } from "lucide-react";
+import { ThumbsUp, ChevronDown, Coins, Crown, Crosshair, Heart, Hexagon, PlusCircle, ShieldHalf, Sparkle, Sword, Wind, Zap, type LucideIcon } from "lucide-react";
 import { Fragment, useState } from "react";
 import { bondsOf } from "@/lib/currencywars/bonds";
 import { characterStats, maxStars, STAR_VALUES, type StatKey } from "@/lib/currencywars/stats";
@@ -8,6 +8,7 @@ import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, cx } from "../ui";
 import { RecommendedGear } from "./RecommendedGear";
 import { BondMembers, COST_TEXT, FieldTag, Portrait } from "./shared";
+import { useTracked } from "./tracking";
 
 const ICON: Partial<Record<StatKey, [LucideIcon, string]>> = {
   onField: [Sword, "text-amber-400"], offField: [Crosshair, "text-sky-400"], dmgAmp: [Crown, "text-violet-400"], mitigation: [ShieldHalf, "text-cyan"],
@@ -43,6 +44,7 @@ export function CharacterSheet({ pack, name, stars: initialStars = 1, items = []
   const preferred = place === "off" ? groups.findIndex((g) => /off/i.test(g.group)) : groups.findIndex((g) => /on/i.test(g.group) && !/off/i.test(g.group));
   const [tab, setTab] = useState(Math.max(0, preferred));
   const [bond, setBond] = useState<string | null>(null);
+  const { gear, toggleGear } = useTracked();
   const rows = characterStats(pack, name, stars, items);
   const quick: StatKey[] = ["onField", "offField", "dmgAmp", "mitigation", "luckyRate", "luckyDmg", "spdAmp", "healing"];
 
@@ -82,7 +84,10 @@ export function CharacterSheet({ pack, name, stars: initialStars = 1, items = []
 
       {(info.recommended?.length ?? 0) > 0 && (
         <div className="rounded-lg border border-line p-2.5">
-          <p className="mb-1.5 text-xs font-medium">Recommended equipment</p>
+          <div className="mb-1.5 flex items-center justify-between gap-2">
+            <p className="text-xs font-medium">Recommended equipment</p>
+            <button type="button" onClick={() => toggleGear(name)} aria-pressed={gear.includes(name)} className={cx("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]", gear.includes(name) ? "border-emerald-400/60 bg-emerald-400/15 text-emerald-100" : "border-line text-muted hover:text-text")}><ThumbsUp size={10} /> {gear.includes(name) ? "Tracking gear" : "Track gear"}</button>
+          </div>
           <RecommendedGear pack={pack} name={name} place={place} held={items} bag={bag} />
         </div>
       )}

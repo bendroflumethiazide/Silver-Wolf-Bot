@@ -81,6 +81,15 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.6.3 Equipment Tracking, "Unknown" fixed on plan cards
+
+- **Equipment Tracking** (like the game's): pick characters with "Track gear" (selected character or their sheet), or leave it on everyone deployed. Items in Supply and in your bag get a 👍 when they are, or are a crafting part of, a tracked character's recommended equipment (hover/long-press: who needs it and for what). A part gets a **blue outline** when you already have the other part, so you can craft right away.
+- **"Unknown" on plan cards:** the cards, "Your buffs" and the Investments tab now show the filled-in name ("Obtains 1 "Elation Emblem" and 1 "Sparxie.""); the log no longer mentions "Unknown" either.
+- Found while fixing it: some Emblem Sets have a second "Unknown" (an unnamed item, not a second Emblem); "Topaz" in plan text now means Topaz & Numby and "SAM" means Firefly.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **184/184** · E2E **13/13** on both builds; real-data Supply check on a phone: 4 of 5 Supply items marked with who needs them.
+
 ## 2026-11-26 · 1.6.2 Investment grant audit
 
 Reported: the Gold strategy "Elation Emblem" gave neither the Emblem (shown as "Unknown") nor Sparxie. An audit of all 228 Strategies/Environments that grant something found 201 that gave nothing. Fixed:

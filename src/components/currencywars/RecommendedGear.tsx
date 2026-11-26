@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { recommendedFor } from "@/lib/currencywars/gear";
 import { madeFrom } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, cx } from "../ui";
@@ -28,13 +29,7 @@ export function recommendedGroups(pack: CwPack, name: string, place?: "on" | "of
   return want ? [...groups].sort((x, y) => Number(want.test(y.group)) - Number(want.test(x.group))) : groups;
 }
 
-/** Every item recommended for a character in their current position (or all groups when unplaced). */
-export function recommendedFor(pack: CwPack, name: string, place?: "on" | "off" | "bench"): string[] {
-  const groups = recommendedGroups(pack, name, place);
-  const first = groups[0];
-  const pick = place === "on" || place === "off" ? (first && /^(on|off)/i.test(first.group) ? [first] : groups) : groups;
-  return [...new Set(pick.flatMap((g) => g.items))];
-}
+export { recommendedFor };
 
 const STATUS: Record<Status, { label: string; tone: "ok" | "cyan" | "warn" | "default" } | null> = {
   held: { label: "equipped", tone: "ok" },

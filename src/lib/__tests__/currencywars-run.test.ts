@@ -3,6 +3,7 @@ import { buildTimeline, hpAt, turnOrder, turnsOf } from "../currencywars/timelin
 import { bondNames, membersOf, trackedMatches } from "../currencywars/bonds";
 import { characterStats, itemBoosts, parseStatLine } from "../currencywars/stats";
 import { gearStatus, recommendedFor } from "../../components/currencywars/RecommendedGear";
+import { fillUnknown, gearMark, gearNeeds } from "../currencywars/gear";
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
@@ -734,10 +735,15 @@ describe("Investment grants (items, characters, Peppy, later and repeated grants
     const [s, applied] = run('Obtains 1 "Unknown," 1 "Kafka," and 1 "Firestorm Surge."', "Heal Emblem Set");
     expect(s.bag).toEqual(["Heal Emblem", "Firestorm Surge"]);
     expect(units(s).map((u) => u.name)).toContain("Kafka");
-    expect(applied.join(" ")).toMatch(/Heal Emblem \(the wiki lists this item as “Unknown”\)/);
+    expect(applied).toContain("Heal Emblem");
+    expect(applied.join(" ")).not.toMatch(/Unknown/);
     const [s2, applied2] = run('Obtain 1 "Unknown."', "Intern Development Plan");
     expect(s2.bag).toEqual([]);
-    expect(applied2.join(" ")).toMatch(/not simulated: an item the wiki lists as “Unknown”/);
+    expect(applied2.join(" ")).toMatch(/not simulated: an item the wiki hasn't named/);
+    // Only the first "Unknown" of an Emblem Set is the Emblem; a later one is an unnamed item.
+    const [s3, applied3] = run('Obtains 1 "Unknown," 1 "Kafka," and 1 "Unknown."', "Heal Emblem Set");
+    expect(s3.bag).toEqual(["Heal Emblem"]);
+    expect(applied3.join(" ")).toMatch(/not simulated: an item the wiki hasn't named/);
   });
 
   it("named items, weapon boxes, random equipment, gold and XP, all in one list", () => {
@@ -831,5 +837,32 @@ describe("Hiring Spree", () => {
     expect(units(a).filter((u) => u.cost === 4).length - units(s).filter((u) => u.cost === 4).length).toBe(3);
     expect(applied.join(" ")).toMatch(/−12 gold → 3 random 4-cost characters/);
     expect(applied.join(" ")).toMatch(/not simulated: Perfect Projector/);
+  });
+});
+
+describe("Equipment Tracking", () => {
+  const pack: CwPack = { ...PACK, info: { ...PACK.info, Kafka: { ...PACK.info!.Kafka, recommended: [{ group: "On-Field", items: ["Firestorm Surge"] }, { group: "Off-Field", items: ["Anti-Grav Boots"] }] } } };
+  it("marks recommended items and their components as needed (thumbs-up)", () => {
+    const needs = gearNeeds(pack, [{ name: "Kafka", place: "on", held: [] }]);
+    expect([...needs.keys()].sort()).toEqual(["Firestorm Surge", "Folding Knife", "Roller Skates"]);
+    expect(gearMark(needs, "Folding Knife", []).wanted).toBe(true);
+    expect(gearMark(needs, "Folding Knife", []).ready).toBe(false);
+    expect(gearMark(needs, "Folding Knife", []).notes).toEqual(["Kafka: Firestorm Surge (with Roller Skates)"]);
+    expect(gearMark(needs, "Lucky Star", []).wanted).toBe(false);
+  });
+  it("adds the blue outline when the other component is already in hand", () => {
+    const needs = gearNeeds(pack, [{ name: "Kafka", place: "on", held: [] }]);
+    const mark = gearMark(needs, "Folding Knife", ["Roller Skates"]);
+    expect([mark.wanted, mark.ready]).toEqual([true, true]);
+    expect(mark.notes[0]).toMatch(/which you have/);
+  });
+  it("skips what the character already holds, and uses every group when the character isn't placed", () => {
+    expect(gearNeeds(pack, [{ name: "Kafka", place: "on", held: ["Firestorm Surge"] }]).size).toBe(0);
+    expect([...gearNeeds(pack, [{ name: "Kafka", held: [] }]).keys()]).toContain("Anti-Grav Boots");
+  });
+  it("fills in \"Unknown\" in plan text: the X Emblem first, an unnamed item after", () => {
+    expect(fillUnknown("Elation Emblem", 'Obtains 1 "Unknown" and 1 "Sparxie."')).toBe('Obtains 1 "Elation Emblem" and 1 "Sparxie."');
+    expect(fillUnknown("DoT Emblem Set", 'Obtains 1 "Unknown," 1 "Guinaifen," and 1 "Unknown."')).toBe('Obtains 1 "DoT Emblem," 1 "Guinaifen," and 1 "an item the wiki hasn\'t named."');
+    expect(fillUnknown("Intern Development Plan", 'Obtain 1 "Unknown{{verify}}."')).toBe('Obtain 1 "an item the wiki hasn\'t named."');
   });
 });

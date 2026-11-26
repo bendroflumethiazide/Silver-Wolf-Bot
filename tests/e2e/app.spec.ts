@@ -240,7 +240,7 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   const cards = (title: RegExp) => page.locator("section").filter({ has: page.getByRole("heading", { name: title }) }).locator("div.grid > button");
   // Labor Dispatch-style environment: the emblem must show up in Items (bug fix).
   await cards(/Choose an Investment Environment/).filter({ hasText: "Fixture Dispatch" }).click();
-  await expect(page.getByText(/deployed/)).toBeVisible();
+  await expect(page.getByText(/\d+\/\d+ deployed/)).toBeVisible();
   await expect(page.getByText(/Plane 1/).first()).toBeVisible();
   const emblem = page.getByRole("button", { name: "Grove Guild Emblem" });
   await expect(emblem).toBeVisible();
@@ -302,6 +302,11 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await expect(sheet.locator("span.text-cyan", { hasText: "30%" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(page.getByRole("dialog")).toHaveCount(0);
+  // Equipment Tracking: by default everyone deployed; "Track gear" picks characters.
+  await expect(page.getByText(/everyone deployed/)).toBeVisible();
+  await page.getByRole("button", { name: "Track gear" }).click();
+  await expect(page.getByRole("button", { name: /^Stop tracking .*'s gear$/ })).toBeVisible();
+  await expect(page.getByText(/everyone deployed/)).toHaveCount(0);
   // The unit is still selected after closing the details: send it to the bench.
   await page.getByRole("button", { name: "To bench" }).click();
   await expect(page.getByRole("button", { name: /^Bench slot \d: / }).first()).toBeVisible();
