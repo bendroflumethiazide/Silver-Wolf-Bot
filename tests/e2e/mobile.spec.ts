@@ -26,6 +26,8 @@ test("Currency Wars tabs fit a phone", async ({ page }) => {
   await page.locator("section").filter({ has: page.getByRole("heading", { name: /Choose an Investment Environment/ }) }).locator("div.grid > button").filter({ hasText: "Fixture Armory" }).click();
   // Two basic items in the bag; in this data any two combine, so both are outlined as craftable now.
   await expect(page.getByText(/^Can craft now:/)).toHaveCount(2);
+  // Both are parts of the deployed characters' recommended "Fixture Blade": their portraits show who it's for.
+  await expect(page.locator("button[title]").filter({ has: page.getByRole("img", { name: /^For Fx / }) })).toHaveCount(2);
   for (const tab of ["Run simulator", "Team builder", "Equipment", "Investments"]) {
     await page.getByRole("tab", { name: tab }).click();
     await page.waitForTimeout(200);

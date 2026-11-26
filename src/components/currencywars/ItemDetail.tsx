@@ -1,15 +1,19 @@
 "use client";
 
-import { X } from "lucide-react";
+import { ThumbsUp, X } from "lucide-react";
+import type { GearNeed } from "@/lib/currencywars/gear";
 import { combinations, describe, madeFrom } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, cx } from "../ui";
-import { ItemIcon } from "./shared";
+import { ItemIcon, WhoFaces } from "./shared";
 
 /** One item: what it does, what it's made from, and what it combines into (owned partners marked). */
-export function ItemDetail({ pack, name, owned = [], hint, onClose, actions }: {
+export function ItemDetail({ pack, name, owned = [], hint, onClose, actions, needs }: {
   pack: CwPack; name: string; owned?: string[]; hint?: string; onClose?: () => void; actions?: React.ReactNode;
+  /** Tracked characters' preferences, to show whose recommended equipment an item or combination is. */
+  needs?: Map<string, GearNeed[]>;
 }) {
+  const whoFor = (item: string) => [...new Set((needs?.get(item) ?? []).map((n) => n.who))];
   const d = describe(pack, name);
   const combos = combinations(pack, name);
   const from = madeFrom(pack, name);
@@ -23,6 +27,7 @@ export function ItemDetail({ pack, name, owned = [], hint, onClose, actions }: {
           <p className="text-sm font-semibold text-text">{name}</p>
           <p className="text-[10px] uppercase tracking-wide text-muted">{d.kindLabel}</p>
         </div>
+        {whoFor(name).length > 0 && <span className="flex items-center gap-1 text-[10px] text-emerald-300"><ThumbsUp size={11} aria-hidden /><WhoFaces pack={pack} names={whoFor(name)} size={20} /></span>}
         {actions}
         {onClose && <button type="button" onClick={onClose} aria-label="Close item details" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>}
       </div>
@@ -34,7 +39,7 @@ export function ItemDetail({ pack, name, owned = [], hint, onClose, actions }: {
         <div className="mt-2">
           <p className="mb-1 font-medium text-text">{ready.length ? `You can make ${ready.length} now` : "Combines with"}</p>
           <ul className="space-y-1">
-            {[...ready, ...combos.filter((c) => !have.has(c.partner))].map((c) => {
+            {[...combos].sort((x, y) => (have.has(y.partner) ? 2 : 0) + (whoFor(y.makes).length ? 1 : 0) - (have.has(x.partner) ? 2 : 0) - (whoFor(x.makes).length ? 1 : 0)).map((c) => {
               const r = describe(pack, c.makes);
               return (
                 <li key={c.partner}>
@@ -43,6 +48,7 @@ export function ItemDetail({ pack, name, owned = [], hint, onClose, actions }: {
                       <span className="text-faint">+</span><ItemIcon pack={pack} name={c.partner} size={12} /><span>{c.partner}</span>
                       <span className="text-faint">→</span><ItemIcon pack={pack} name={c.makes} size={12} /><span className="font-medium text-text">{c.makes}</span>
                       {have.has(c.partner) && <Badge tone="ok">you have it</Badge>}
+                      {whoFor(c.makes).length > 0 && <span className="ml-auto flex items-center gap-1 text-emerald-300"><ThumbsUp size={11} aria-hidden /><WhoFaces pack={pack} names={whoFor(c.makes)} size={18} /></span>}
                     </summary>
                     <div className="mt-1 space-y-0.5 text-muted">
                       {r.summary && <p>{r.summary}</p>}

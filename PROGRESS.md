@@ -81,6 +81,11 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.6.5 Who it's for
+
+- Marked items (bag and Supply) show small portraits of the tracked characters they're for, next to the 👍; the blue outline's craft result counts too.
+- Item details show those portraits in the header and on each combination that makes a tracked character's recommended equipment; those combinations (and ones you can make now) are listed first.
+
 ## 2026-11-26 · 1.6.4 Clearer marks
 
 - 👍 = equipment (or a part of it) a tracked character prefers. **Blue outline** = anything you can craft right now: its other part is in your bag or held by one of your characters (equipping combines), for any recipe, recommended or not. Both show in the bag at all times and on Supply picks. Tooltips list who prefers it and what it crafts into.

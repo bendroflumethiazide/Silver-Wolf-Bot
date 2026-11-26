@@ -17,7 +17,7 @@ import { CharacterSheet } from "./CharacterSheet";
 import { RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
-import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait } from "./shared";
+import { BondList, BondMembers, bondsOf, CharCard, FieldTag, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
 import { BondTracker, TrackMark, useTracked } from "./tracking";
 
 const RUN_KEY = "cwRun";
@@ -218,7 +218,9 @@ export function RunSim({ pack }: { pack: CwPack }) {
     const want = gearMark(needs, item, [...others, ...heldByTargets]);
     const craft = craftableNow(pack, item, [...others, ...heldByAll]);
     const notes = [...want.notes.map((n) => `Preferred by ${n}`), ...craft.map((c) => `Craft now: ${item} + ${c.partner} → ${c.makes}`)];
-    return { wanted: want.wanted, ready: craft.length > 0, notes, preferred: want.notes, craft: craft.map((c) => `${c.partner} → ${c.makes}`) };
+    // Who it's for: characters preferring the item itself, or what it crafts into right now.
+    const who = [...new Set([...(needs.get(item) ?? []).map((n) => n.who), ...craft.flatMap((c) => (needs.get(c.makes) ?? []).map((n) => n.who))])];
+    return { wanted: want.wanted, ready: craft.length > 0, notes, preferred: want.notes, craft: craft.map((c) => `${c.partner} → ${c.makes}`), who };
   };
   if (run === undefined) return null;
   if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><Rules /></div>;
@@ -308,7 +310,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
                   return (
                     <span title={mark.notes.length ? mark.notes.join("\n") : o.item} className={cx("relative flex items-center justify-center gap-1 rounded-md px-1 py-0.5 text-[10px]", mark.ready ? "text-text ring-2 ring-sky-400" : "text-muted", mark.wanted && !mark.ready && "text-text")}>
                       <ItemIcon pack={pack} name={o.item} size={11} /> {o.item}
-                      {mark.wanted && <ThumbsUp size={11} className="shrink-0 text-emerald-400" aria-label={`Preferred by ${mark.preferred.join("; ")}`} />}{mark.ready && <span className="sr-only">Can craft now: {mark.craft.join("; ")}</span>}
+                      {mark.wanted && <ThumbsUp size={11} className="shrink-0 text-emerald-400" aria-label={`Preferred by ${mark.preferred.join("; ")}`} />}
+                      <WhoFaces pack={pack} names={mark.who} size={14} />{mark.ready && <span className="sr-only">Can craft now: {mark.craft.join("; ")}</span>}
                     </span>
                   );
                 })()}
@@ -367,12 +370,13 @@ export function RunSim({ pack }: { pack: CwPack }) {
               {run.bag.length ? (
                 <div className="flex flex-wrap gap-1.5">
                   {run.bag.map((it, i) => {
-                    const mark = isOre(it) ? { wanted: false, ready: false, notes: [] as string[], preferred: [] as string[], craft: [] as string[] } : markOf(it, run.bag.filter((_, k) => k !== i));
+                    const mark = isOre(it) ? { wanted: false, ready: false, notes: [] as string[], preferred: [] as string[], craft: [] as string[], who: [] as string[] } : markOf(it, run.bag.filter((_, k) => k !== i));
                     return (
                       <button key={`${it}-${i}`} type="button" onClick={() => clickItem(i)} aria-pressed={sel?.kind === "item" && sel.index === i} title={mark.notes.length ? `${it}\n${mark.notes.join("\n")}` : it}
                         className={cx("flex items-center gap-1 rounded-md border px-1.5 py-1 text-[11px]", sel?.kind === "item" && sel.index === i ? "border-cyan bg-cyan/15" : mark.ready ? "border-sky-400 ring-1 ring-sky-400" : "border-line hover:border-cyan/50", itemKind(pack, it) === "advanced" && "text-violet-200", itemKind(pack, it) === "emblem" && "text-amber-100", isOre(it) && "border-white/20 bg-white/[0.04]")}>
                         <ItemIcon pack={pack} name={it} size={13} /> {it}
-                        {mark.wanted && <ThumbsUp size={11} className="text-emerald-400" aria-label={`Preferred by ${mark.preferred.join("; ")}`} />}{mark.ready && <span className="sr-only">Can craft now: {mark.craft.join("; ")}</span>}
+                        {mark.wanted && <ThumbsUp size={11} className="text-emerald-400" aria-label={`Preferred by ${mark.preferred.join("; ")}`} />}
+                        <WhoFaces pack={pack} names={mark.who} size={16} />{mark.ready && <span className="sr-only">Can craft now: {mark.craft.join("; ")}</span>}
                       </button>
                     );
                   })}
@@ -381,10 +385,10 @@ export function RunSim({ pack }: { pack: CwPack }) {
               {run.note?.startsWith("Opened") && <p className="mt-1.5 text-xs text-cyan">{run.note}</p>}
             </div>
             {sel?.kind === "item" && run.bag[sel.index] && (
-              <ItemDetail pack={pack} name={run.bag[sel.index]} owned={run.bag.filter((_, i) => i !== sel.index)} onClose={() => setSel(null)}
+              <ItemDetail pack={pack} name={run.bag[sel.index]} owned={run.bag.filter((_, i) => i !== sel.index)} needs={needs} onClose={() => setSel(null)}
                 hint={itemKind(pack, run.bag[sel.index]) === "basic" || itemKind(pack, run.bag[sel.index]) === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it."} />
             )}
-            {peek && !sel && <ItemDetail pack={pack} name={peek} owned={run.bag} onClose={() => setPeek(null)} />}
+            {peek && !sel && <ItemDetail pack={pack} name={peek} owned={run.bag} needs={needs} onClose={() => setPeek(null)} />}
             {selUnit && sel?.kind === "unit" && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/[0.06] p-2 text-xs">
                 <Portrait name={selUnit.name} cost={selUnit.cost} size={30} />

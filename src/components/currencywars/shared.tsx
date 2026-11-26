@@ -147,6 +147,19 @@ const BASIC_TONE: Record<string, string> = {
   "Flower of Life": "text-pink-300", "Batch Produced Armor": "text-amber-200", "Aether Drill": "text-orange-300", "Photon Cell": "text-yellow-300",
 };
 
+/** Small overlapping portraits of the characters an item is for (tracked equipment). */
+export function WhoFaces({ pack, names, size = 16, max = 3 }: { pack: CwPack; names: string[]; size?: number; max?: number }) {
+  const list = [...new Set(names)];
+  if (!list.length) return null;
+  const costOf = (n: string) => pack.characters.find((c) => c.name === n)?.cost;
+  return (
+    <span className="inline-flex shrink-0 items-center" title={`For ${list.join(", ")}`} role="img" aria-label={`For ${list.join(", ")}`}>
+      {list.slice(0, max).map((n, i) => <span key={n} className={cx(i > 0 && "-ml-1.5")}><Portrait name={n} cost={costOf(n)} size={size} className="!ring-1 ring-offset-0" /></span>)}
+      {list.length > max && <span className="ml-0.5 text-[9px] text-muted">+{list.length - max}</span>}
+    </span>
+  );
+}
+
 /** Crystal Ore orbs by tier (White, Blue, Gold, Prismatic). */
 const ORE_ORB: Record<string, string> = {
   White: "bg-[radial-gradient(circle_at_35%_30%,#fff,#a1a1aa)] text-zinc-200",
