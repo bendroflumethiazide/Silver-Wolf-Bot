@@ -54,5 +54,5 @@ export function GameImage({ path, alt, className, fallback, rounded = "rounded-l
       </div>
     );
   }
-  return <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={cx("object-cover", rounded, className)} />;
+  return <img src={src} alt={alt} loading="lazy" onError={() => setFailed(true)} className={cx(!className?.includes("object-") && "object-cover", rounded, className)} />;
 }

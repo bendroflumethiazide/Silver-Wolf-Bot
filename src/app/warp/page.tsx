@@ -19,7 +19,7 @@ function Inner() {
   const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "pity") as Tab;
   return (
     <div>
-      <PageHeader title="Warp Observatory" subtitle="Exact pull probabilities, a sandbox simulator and banners. Warp history lives on Star Rail Station." actions={<WarpTrackerButton size="sm" variant="subtle" />} />
+      <PageHeader title="Warp Planner" subtitle="Your pity, your odds, a simulator and banners." actions={<WarpTrackerButton size="sm" variant="subtle" />} />
       <Tabs<Tab> tabs={TABS} value={tab} onChange={(t) => router.replace(`/warp?tab=${t}`, { scroll: false })} />
       {tab === "pity" && <PityPanel />}
       {tab === "planner" && <WarpPlanner />}

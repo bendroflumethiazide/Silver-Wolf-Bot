@@ -134,7 +134,7 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
   if (has(q, "build next", "which character", "upgrade potential", "improve my account", "who should i build", "build")) {
     const ranked = ctx.characters.filter((c) => ctx.game?.characters[c.charId]).map((c) => ({ c, rarity: ctx.game!.characters[c.charId].rarity, inv: investment(c, ctx.game!.characters[c.charId].rarity) }))
       .sort((a, b) => (Number(!!b.c.favorite) - Number(!!a.c.favorite)) || (b.rarity - a.rarity) || (a.inv - b.inv)).filter((x) => x.inv < 95).slice(0, 3);
-    if (!ranked.length) return { intent: "build", line: ctx.characters.length ? "Everyone u own is basically maxed|Go pull something new|Or farm relics. forever" : "U haven't told me who u own|Mark them in the Archive or import a scan", facts: [], sources: ["Your character records"], links: [{ label: "Character Archive", href: "/characters" }] };
+    if (!ranked.length) return { intent: "build", line: ctx.characters.length ? "Everyone u own is basically maxed|Go pull something new|Or farm relics. forever" : "U haven't told me who u own|Mark them in the Archive or import a scan", facts: [], sources: ["Your character records"], links: [{ label: "Characters", href: "/characters" }] };
     return {
       intent: "build",
       line: `Build ${name(ranked[0].c.charId)} next|${ranked[0].rarity}★ w/ the most room to grow|Then ${ranked.slice(1).map((x) => name(x.c.charId)).join(" and ") || "whoever's next"}`,

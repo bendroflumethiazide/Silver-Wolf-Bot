@@ -24,10 +24,12 @@ function NavLinks({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: 
         if (!items.length) return null;
         return (
           <div key={area}>
-            {!collapsed && <div className="mb-1 px-3 font-mono text-[10px] uppercase tracking-[0.2em] text-faint">{area}</div>}
+            {!collapsed && area && <div className="mb-1 px-3 text-[11px] font-semibold uppercase tracking-wider text-faint">{area}</div>}
             <ul className="flex flex-col gap-0.5">
               {items.map((n) => {
-                const active = n.href === "/" ? pathname === "/" : pathname.startsWith(n.href);
+                const path = pathname.replace(/\/$/, "") || "/";
+                const base = n.href.split("?")[0];
+                const active = n.href.includes("?") ? false : base === "/" ? path === "/" : path === base || path.startsWith(`${base}/`);
                 const Icon = n.icon;
                 return (
                   <li key={n.id}>

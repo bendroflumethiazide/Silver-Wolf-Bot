@@ -13,6 +13,6 @@ test("mobile navigation drawer and no horizontal overflow", async ({ page }) => 
     expect(tooWide, `panels wider than the viewport on ${r}`).toBe(0);
   }
   await page.getByRole("button", { name: "Open navigation" }).click();
-  await page.getByRole("dialog", { name: "Navigation" }).getByRole("link", { name: "Warp Observatory" }).click();
+  await page.getByRole("dialog", { name: "Navigation" }).getByRole("link", { name: "Warp Planner" }).click();
   await expect(page).toHaveURL(/\/warp/);
 });

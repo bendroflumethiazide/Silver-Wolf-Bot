@@ -6,7 +6,10 @@ import { ArrowDown, ArrowUp, ChevronRight, Eye, EyeOff, SlidersHorizontal } from
 import { useState, type ReactNode } from "react";
 import { Countdown, useNow } from "@/components/Countdown";
 import { WolfComment } from "@/components/SilverWolf";
-import { Badge, Button, Empty, Loading, NumberInput, PageHeader, Panel, Progress, Stat } from "@/components/ui";
+import { Badge, Button, CardGrid, Empty, ImageCard, Loading, NumberInput, Panel, Progress, SectionTitle, Stat } from "@/components/ui";
+import { GameImage } from "@/components/GameImage";
+import { HubImage } from "@/components/HubImage";
+import { navItem } from "@/lib/nav";
 import { dashboardComment } from "@/lib/companion/comments";
 import { getDb, kvGet, nowIso } from "@/lib/db";
 import type { DailyNote } from "@/lib/connectors/hoyolab";
@@ -21,7 +24,7 @@ import { WarpTrackerButton } from "@/components/warp/Pity";
 
 type WidgetId = "objectives" | "account" | "warp" | "resources" | "resets" | "timeline";
 const WIDGETS: { id: WidgetId; title: string }[] = [
-  { id: "objectives", title: "Your Next Trailblazing Objectives" },
+  { id: "objectives", title: "All objectives" },
   { id: "account", title: "Account statistics" },
   { id: "warp", title: "Warp status" },
   { id: "resources", title: "Resources" },
@@ -147,7 +150,7 @@ function Timeline() {
     ...banners.map((b) => ({ id: b.id, label: `${b.featured5.join(", ") || "Banner"} (${b.pool === "character" ? "Character" : "Light Cone"})`, start: Date.parse(b.start), end: Date.parse(b.end), status: b.status, href: "/warp?tab=banners" })),
     ...events.filter((e) => !e.permanent && e.end).map((e) => ({ id: e.id, label: e.name, start: e.start ? Date.parse(e.start) : 0, end: Date.parse(e.end!), status: e.status, href: "/events" })),
   ].filter((x) => x.end > now).sort((a, b) => a.end - b.end).slice(0, 6);
-  if (!items.length) return <Empty title="Nothing tracked">Add banners and events from official notices in the Warp Observatory and Events pages.</Empty>;
+  if (!items.length) return <Empty title="Nothing tracked">Add banners and events from official notices in the Warp Planner and Events pages.</Empty>;
   return (
     <ul className="space-y-2">
       {items.map((i) => (
@@ -162,6 +165,32 @@ function Timeline() {
     </ul>
   );
 }
+
+function NextSteps({ s }: { s: AccountSummary }) {
+  const top = s.objectives.slice(0, 3);
+  if (!top.length) return null;
+  return (
+    <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+      {top.map((o, i) => (
+        <Link key={o.id} href={o.href} className="group flex items-center gap-3 rounded-lg border border-line bg-black/30 p-3 transition hover:border-cyan/50">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-cyan/15 font-mono text-xs text-cyan">{i + 1}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-medium text-text group-hover:text-cyan">{o.title}</span>
+            <span className="block truncate text-xs text-muted">{o.reason}</span>
+          </span>
+          <ChevronRight size={16} className="shrink-0 text-faint group-hover:text-cyan" />
+        </Link>
+      ))}
+    </div>
+  );
+}
+
+const HUB: { title: string; ids: string[] }[] = [
+  { title: "Database", ids: ["characters", "light-cones", "relics", "bosses", "banners", "codes"] },
+  { title: "Endgame", ids: ["endgame", "universe", "currency-wars"] },
+  { title: "Tools", ids: ["warp", "teams", "materials", "import", "map", "wolf"] },
+  { title: "Guides", ids: ["guides", "modes", "events"] },
+];
 
 export default function Home() {
   const { game, settings, updateSettings } = useApp();
@@ -188,33 +217,56 @@ export default function Home() {
     if (id === "account") return <AccountStats s={summary} />;
     return <WarpStatus s={summary} />;
   };
+  const portrait = game?.characters["1006"]?.portrait;
 
   return (
-    <div>
-      <PageHeader
-        title="Express Terminal"
-        subtitle={<>Welcome back, {profile?.name ?? "Trailblazer"}{game ? <> · game data v{game.version}</> : null}.</>}
-        actions={<Button size="sm" onClick={() => setCustomize((v) => !v)}><SlidersHorizontal size={14} /> {customize ? "Done" : "Customize"}</Button>}
-      />
-      <WolfComment comment={dashboardComment(summary, !!game)} className="mb-5" />
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
-        {order.filter((id) => customize || !settings.dashboardHidden.includes(id)).map((id) => {
-          const w = WIDGETS.find((x) => x.id === id)!;
-          const hidden = settings.dashboardHidden.includes(id);
-          return (
-            <Panel key={id} title={w.title} hud={id === "objectives"} className={`${id === "objectives" ? "lg:col-span-2" : ""} ${hidden ? "opacity-40" : ""}`}
-              actions={customize && (
-                <>
-                  <Button size="sm" variant="ghost" onClick={() => move(id, -1)} aria-label={`Move ${w.title} up`}><ArrowUp size={14} /></Button>
-                  <Button size="sm" variant="ghost" onClick={() => move(id, 1)} aria-label={`Move ${w.title} down`}><ArrowDown size={14} /></Button>
-                  <Button size="sm" variant="ghost" onClick={() => toggle(id)} aria-label={hidden ? `Show ${w.title}` : `Hide ${w.title}`}>{hidden ? <EyeOff size={14} /> : <Eye size={14} />}</Button>
-                </>
-              )}>
-              {render(id)}
-            </Panel>
-          );
-        })}
-      </div>
+    <div className="space-y-8">
+      <section className="glass hud relative overflow-hidden p-5 sm:p-7">
+        {portrait && <div className="pointer-events-none absolute -right-16 -top-10 hidden h-[130%] w-[46%] opacity-40 [mask-image:linear-gradient(to_left,black,transparent)] md:block"><GameImage path={portrait} alt="" className="h-full w-full object-cover object-top" rounded="rounded-none" /></div>}
+        <div className="relative max-w-3xl">
+          <h1 className="text-2xl font-semibold tracking-tight text-gradient sm:text-3xl">Welcome back, {profile?.name ?? "Trailblazer"}</h1>
+          <p className="mt-1 text-sm text-muted">{game ? <>Game data v{game.version} · everything stays on this device</> : "Start by downloading the game data (about 5 MB)."}</p>
+          <WolfComment comment={dashboardComment(summary, !!game)} className="mt-4 !border-0 !bg-transparent !p-0" />
+          <div className="mt-4 flex flex-wrap gap-2">
+            {!game
+              ? <Link href="/settings#game-data" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-sm font-medium text-white">Download game data</Link>
+              : <Link href="/terminal" className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 to-fuchsia-600 px-4 py-2 text-sm font-medium text-white">Ask Silver Wolf what to do</Link>}
+            <Link href="/guides" className="inline-flex items-center gap-2 rounded-lg border border-line px-4 py-2 text-sm text-muted hover:text-text">New here? Guides</Link>
+          </div>
+        </div>
+        {summary && <div className="relative mt-5"><NextSteps s={summary} /></div>}
+      </section>
+
+      {HUB.map((g) => (
+        <section key={g.title}>
+          <SectionTitle>{g.title}</SectionTitle>
+          <CardGrid>
+            {g.ids.map((id) => { const n = navItem(id); return <ImageCard key={id} href={n.href} title={n.label} sub={n.blurb} image={<HubImage id={id} />} />; })}
+          </CardGrid>
+        </section>
+      ))}
+
+      <section>
+        <SectionTitle action={<Button size="sm" variant="ghost" onClick={() => setCustomize((v) => !v)}><SlidersHorizontal size={14} /> {customize ? "Done" : "Customize"}</Button>}>Your account</SectionTitle>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {order.filter((id) => customize || !settings.dashboardHidden.includes(id)).map((id) => {
+            const w = WIDGETS.find((x) => x.id === id)!;
+            const hidden = settings.dashboardHidden.includes(id);
+            return (
+              <Panel key={id} title={w.title} className={`${id === "objectives" ? "lg:col-span-2" : ""} ${hidden ? "opacity-40" : ""}`}
+                actions={customize && (
+                  <>
+                    <Button size="sm" variant="ghost" onClick={() => move(id, -1)} aria-label={`Move ${w.title} up`}><ArrowUp size={14} /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => move(id, 1)} aria-label={`Move ${w.title} down`}><ArrowDown size={14} /></Button>
+                    <Button size="sm" variant="ghost" onClick={() => toggle(id)} aria-label={hidden ? `Show ${w.title}` : `Hide ${w.title}`}>{hidden ? <EyeOff size={14} /> : <Eye size={14} />}</Button>
+                  </>
+                )}>
+                {render(id)}
+              </Panel>
+            );
+          })}
+        </div>
+      </section>
     </div>
   );
 }

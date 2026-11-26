@@ -48,7 +48,7 @@ export default function CharactersPage() {
       });
   }, [all, q, path, element, rarity, own, build, sort, ownedMap, game]);
 
-  if (!game) return (<><PageHeader title="Character Archive" /><WolfComment comment={noGameData()} /></>);
+  if (!game) return (<><PageHeader title="Characters" /><WolfComment comment={noGameData()} /></>);
 
   const toggleOwned = async (id: string) => {
     const o = ownedMap.get(id);
@@ -59,7 +59,7 @@ export default function CharactersPage() {
 
   return (
     <div>
-      <PageHeader title="Character Archive" subtitle={`${all.length} playable characters from game data v${game.version}. Mark owned characters here, or import an HSR Scanner file.`} />
+      <PageHeader title="Characters" subtitle={`${all.length} playable characters from game data v${game.version}. Mark owned characters here, or import an HSR Scanner file.`} />
       <WolfComment comment={characterCollectionComment(owned?.length ?? 0, all.length, belowMax)} className="mb-5" />
       <Panel className="mb-5">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">

@@ -34,3 +34,11 @@ describe("Fribbels build data", () => {
     expect(substatOrder(fribbelsBuild("1006")!).slice(0, 2).sort()).toEqual(["Effect Hit Rate", "SPD"]);
   });
 });
+
+describe("codes", () => {
+  it("normalises codes and builds the official redeem link", async () => {
+    const { cleanCode, redeemUrl } = await import("../codes");
+    expect(cleanCode(" abc-12 def ")).toBe("ABC12DEF");
+    expect(redeemUrl("ABC12DEF")).toBe("https://hsr.hoyoverse.com/gift?code=ABC12DEF");
+  });
+});

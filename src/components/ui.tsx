@@ -1,7 +1,8 @@
 "use client";
 
 import clsx from "clsx";
-import { X } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Info, X } from "lucide-react";
 import { useEffect, useRef, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { SOURCE_LABEL, VERIFIED_SOURCES, type DataSource } from "@/lib/types";
 
@@ -138,7 +139,21 @@ export function ErrorBox({ children }: { children: ReactNode }) {
   return <div role="alert" className="rounded-lg border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad">{children}</div>;
 }
 
-export function Notice({ children, tone = "info" }: { children: ReactNode; tone?: "info" | "warn" | "ok" }) {
+/**
+ * Info notes fold into a small "How this works" toggle so pages stay light; warnings and
+ * confirmations stay visible. `open` forces an info note to show.
+ */
+export function Notice({ children, tone = "info", title, open }: { children: ReactNode; tone?: "info" | "warn" | "ok"; title?: string; open?: boolean }) {
+  if (tone === "info" && !open) {
+    return (
+      <details className="group rounded-lg border border-cyan/20 bg-cyan/[0.04] text-sm text-cyan/90">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-3 py-1.5 text-xs text-cyan/80 hover:text-cyan">
+          <Info size={13} /> {title ?? "How this works"} <span className="ml-auto transition group-open:rotate-90">›</span>
+        </summary>
+        <div className="border-t border-cyan/15 px-3 py-2">{children}</div>
+      </details>
+    );
+  }
   return (
     <div className={cx("rounded-lg border px-3 py-2 text-sm",
       tone === "info" && "border-cyan/30 bg-cyan/5 text-cyan/90",
@@ -232,4 +247,37 @@ export function Stars({ n }: { n: number }) {
 
 export function confirmAction(message: string): boolean {
   return typeof window !== "undefined" && window.confirm(message);
+}
+
+/** Prydwen-style section heading: square marker, caps, full-width rule. */
+export function SectionTitle({ children, action }: { children: ReactNode; action?: ReactNode }) {
+  return (
+    <div className="mb-3 flex items-end justify-between gap-3 border-b border-cyan/50 pb-1.5">
+      <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-text"><span className="h-3 w-3 rounded-[3px] bg-cyan" />{children}</h2>
+      {action}
+    </div>
+  );
+}
+
+/** Image card that links somewhere: picture on the left, title (and optional line), arrow on the right. */
+export function ImageCard({ href, title, sub, image, badge, external }: { href: string; title: string; sub?: ReactNode; image: ReactNode; badge?: ReactNode; external?: boolean }) {
+  const inner = (
+    <>
+      <div className="flex h-[76px] w-[76px] shrink-0 items-center justify-center overflow-hidden bg-black/30 sm:h-[88px] sm:w-[88px]">{image}</div>
+      <div className="min-w-0 flex-1 px-3 py-2">
+        <div className="flex items-center gap-2 font-semibold leading-tight text-text">{title}{badge}</div>
+        {sub && <div className="mt-0.5 line-clamp-2 text-xs text-muted">{sub}</div>}
+      </div>
+      <ArrowRight size={18} className="mr-4 shrink-0 text-faint transition group-hover:translate-x-0.5 group-hover:text-cyan" />
+    </>
+  );
+  const cls = "group flex items-center overflow-hidden rounded-lg border border-line bg-white/[0.03] transition hover:border-cyan/50 hover:bg-white/[0.06]";
+  return external
+    ? <a href={href} target="_blank" rel="noreferrer" className={cls}>{inner}</a>
+    : <Link href={href} className={cls}>{inner}</Link>;
+}
+
+/** Grid for ImageCards: 1 column on phones, 2 on tablets, 3 on desktop. */
+export function CardGrid({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{children}</div>;
 }

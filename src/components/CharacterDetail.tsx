@@ -59,7 +59,7 @@ export function CharacterDetail({ id }: { id: string }) {
 
   return (
     <div>
-      <Link href="/characters" className="mb-3 inline-flex items-center gap-1 text-xs text-muted hover:text-text"><ArrowLeft size={14} /> Character Archive</Link>
+      <Link href="/characters" className="mb-3 inline-flex items-center gap-1 text-xs text-muted hover:text-text"><ArrowLeft size={14} /> Characters</Link>
       <div className="mb-5 grid grid-cols-1 gap-5 lg:grid-cols-[320px_1fr]">
         <div className={`glass hud relative overflow-hidden rarity-border rarity-${c.rarity}`}>
           <GameImage path={c.portrait} alt={`${name} portrait`} className="aspect-[3/4] w-full" rounded="rounded-[13px]" fallback={name} />
