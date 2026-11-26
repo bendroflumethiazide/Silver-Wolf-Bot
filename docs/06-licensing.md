@@ -10,7 +10,9 @@
 | UIGF / SRGF | Open standards | Implemented from the published schema |
 | HSR Scanner format | MIT tool; output format documented in its README | Parser written from the documentation |
 | Enka.Network | Service terms (fair use, custom User-Agent, respect ttl) | Followed in `/api/enka/[uid]` |
-| Prydwen, Star Rail Station, HoYoLAB map | Site content, not licensed for reuse | Not scraped or copied |
+| Prydwen, Star Rail Station, HoYoLAB map | Site content, not licensed for reuse | Not scraped or copied. Prydwen's layout (image-card hubs, grouped menu) inspired the design; all guide text is original |
+| Fribbels HSR Optimizer | MIT | Per-character build metadata extracted at a pinned commit into `src/data/fribbels-builds.json`; MIT notice in `THIRD_PARTY_NOTICES.md` and Settings → Credits |
+| Honkai: Star Rail Wiki (Fandom) | Text CC BY-SA 3.0; images © HoYoverse | Not redistributed: the app downloads enemy and Currency Wars data on request and credits the wiki on each page |
 | E2E fixtures | Synthetic data written for tests | Invented names and numbers only |
 | npm dependencies | MIT / Apache-2.0 / ISC | Standard |
 | WebLLM (`@mlc-ai/web-llm`) | Apache-2.0 | npm dependency; runs the built-in AI |

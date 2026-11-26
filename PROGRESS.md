@@ -63,3 +63,20 @@ See docs/08-roadmap.md → "Next tasks".
 ### Not possible here
 - NSIS installer: needs Windows (Wine crashes in this sandbox), so the release workflow builds it. The portable exe built here has the default Electron icon for the same reason.
 - macOS build: needs a Mac.
+
+## 2026-11-26 · Session 1, part 5 (Prydwen/Fribbels-style overhaul, 1.2.0)
+
+### Completed
+- **Community builds (Fribbels, MIT):** substat weights, main stats, relic/ornament sets, teammates and default Light Cone for 96 characters, extracted by script at a pinned commit and validated against game data. Default scoring profile; picture build box on every character page (owned or not); Silver Wolf answers "how do I build X?".
+- **Prydwen-style UI:** plain-language menu groups, Home hub with image cards and next steps, Guides hub (own text), Endgame hub, compact Silver Wolf comments, icon filters, "How this works" folds.
+- **Enemies with pictures** (HSR Wiki, ~270, type and weakness filters), bigger NPC portraits, **Codes** tracker.
+- **Simulated Universe run simulator** (blessing Path/rarity decoded from ids; stated assumptions for odds) and **Currency Wars simulator** (wiki characters, bonds, shop odds; live bonds, gold, shop practice).
+- **Fribbels save import** in the Import Center.
+- Bugs found and fixed on the way: nested wiki template text lost in cleanup; date-dependent small-talk test; enemy names matched inside other words.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **136/136** · E2E **11/11** on both the server build and the static web edition; phone-width checks for every new page; live downloads checked (enemies 269, Currency Wars 60 characters / 36 bonds).
+
+### Not possible / limits
+- Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
+- SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.

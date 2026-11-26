@@ -8,18 +8,19 @@ Fan-made personal tool. Not affiliated with HoYoverse. Game content © COGNOSPHE
 
 | Area | Highlights |
 | --- | --- |
-| Express Terminal | Customisable dashboard, objectives derived from your data, resources, server-aware daily/weekly reset countdowns |
-| Silver Wolf | Texts you on every page in short Messages-style bursts built from your real numbers (a "data" toggle shows the facts behind each line). A **phone button (bottom right)** opens a chat with her: small talk, "what should I do today?", build ratings, pull advice. Choose whether she's your little sister, big sister or daughter and what she calls you. **Real conversation with no setup**: a small AI model runs on your PC (downloads itself once, about 1 GB, then works offline); add an Anthropic key and she switches to Claude. Account answers always come straight from your data |
-| Build ratings | Total stats, a D→WTF (−/+) grade for every relic and for the whole build, what it lacks, her recommended build, and saved guide builds checked against your gear |
+| Home | Prydwen-style hub: your next three steps, image cards for every section (Database, Endgame, Tools, Guides), then your account widgets (customisable) |
+| Silver Wolf | Texts you on every page in short Messages-style bursts built from your real numbers (a "data" toggle shows the facts behind each line). A **phone button (bottom right)** opens a chat with her: small talk, "what should I do today?", build ratings, pull advice, "how do I build Acheron?". Choose whether she's your little sister, big sister or daughter and what she calls you. **Real conversation with no setup**: a small AI model runs on your PC (downloads itself once, about 1 GB, then works offline); add an Anthropic key and she switches to Claude. Account answers always come straight from your data |
+| Builds | **Community builds from Fribbels' HSR Optimizer** for 96 characters, shown with pictures (Light Cones, relic and ornament sets, main stats per slot, substat order, best teammates), owned or not. Total stats, a D→WTF (−/+) grade for every relic and the whole build, what it lacks, and saved guide builds checked against your gear |
 | Account | Multiple profiles; read-only sync from Enka.Network (public showcase, UID only) and the HoYoLAB Battle Chronicle (stats, Trailblaze Power, daily progress, Memory of Chaos / Pure Fiction / Apocalyptic Shadow); connector capability registry |
-| Archives | 94 characters, 172 Light Cones, 64 relic sets from game data; stats at any level; abilities; traces (original and enhanced kits); Eidolons |
-| Relics | Inventory, per-character scoring profiles with transparent maths, best-in-slot per slot, 2pc/4pc database |
-| Import Center | HSR Scanner JSON (the format Fribbels imports); preview → conflicts → approve → apply → rollback. Warp history goes to [Star Rail Station](https://starrailstation.com/en/warp#import) via a button |
-| Warp Observatory | **Open Warp Tracker** button (Star Rail Station); your current pity and 50/50 guarantee per pool, which feed an exact probability planner with a Monte Carlo cross-check; seeded simulator with animations; banner tracker with confirmed/speculation/leak labels |
+| Database | 94 characters (element and Path icon filters), 172 Light Cones, 64 relic sets (with who they're for); stats at any level; abilities; traces; Eidolons. **Enemies**: ~270 bosses and enemies with pictures, type and weakness filters (from the HSR Wiki). NPC portraits. **Codes** tracker with official redeem links |
+| Endgame | Endgame hub (Memory of Chaos, Pure Fiction, Apocalyptic Shadow, Anomaly Arbitration) with your best runs and teams. **Simulated Universe run simulator** (choose domains, pick blessings, Resonance, curios, occurrences). **Currency Wars simulator**: team builder with live bonds, gold cost and shop practice for the current period |
+| Import Center | HSR Scanner JSON and **Fribbels optimizer save files**; preview → conflicts → approve → apply → rollback. Warp history goes to [Star Rail Station](https://starrailstation.com/en/warp#import) via a button |
+| Warp Planner | **Open Warp Tracker** button (Star Rail Station); your current pity and 50/50 guarantee per pool, which feed an exact probability planner with a Monte Carlo cross-check; seeded simulator with animations; banner tracker with confirmed/speculation/leak labels |
 | Strategy | Team builder, saved teams, comparison, explainable account-wide optimizer, endgame history charts, materials calculator and farming plan |
 | Exploration | Image-based multi-floor map: your screenshots, markers in 25 categories, clustering, filters, completion per zone and planet, map-pack export/import |
 | Log | 1,993 achievements (spoiler-safe), events with expiry alerts, Markdown journal with tags, links, reminders and attachments |
-| Codex | Bosses, enemies, NPCs, lore, missions and game modes, each with sources and confirmed/speculation/fan-theory status; NPC directory and glossary from game data |
+| Guides | Short, visual guides in our own words: start here, Warps, leveling, daily routine, elements, Paths, relics, substats, farming, saving, importing |
+| Codex | Your notes on bosses, NPCs, lore and missions, with sources and confirmed/speculation status; glossary from game data |
 
 The **Dev Status** page (`/status`) lists every feature as tested, implemented, awaiting integration, blocked or planned, with the reason.
 
@@ -87,12 +88,12 @@ pnpm build && pnpm test:e2e
 
 (`test:e2e` runs against the same standalone server the desktop app ships.)
 
-- **Unit tests (Vitest):** 106 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity storage, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping, build grading and total stats, Claude route (mocked SDK), HoYoLAB connector (mocked fetch), Silver Wolf small talk and family settings, same-origin and loopback-only API guards, chat brain routing and safety rules, updater (version compare, URL allow-list, checksum).
-- **End-to-end (Playwright):** 10 scenarios on desktop and mobile, using a synthetic dataset (no HoYoverse content in the repo). The **Built-in AI check** workflow downloads a real model and chats with it using software WebGPU.
+- **Unit tests (Vitest):** 136 tests. Warp rules vs published rates, exact DP vs Monte Carlo, simulator statistics over 300k pulls, pity storage, planner, relic scoring, materials, importers, apply/rollback, backup round-trip, Enka parser, map logic, team analysis, time/resets, Silver Wolf commentary grounding, terminal intents, Markdown escaping, build grading and total stats, Claude route (mocked SDK), HoYoLAB connector (mocked fetch), Silver Wolf small talk and family settings, same-origin and loopback-only API guards, chat brain routing and safety rules, updater (version compare, URL allow-list, checksum), Fribbels data and save import, wiki parsing (enemies, Currency Wars), Currency Wars board maths, SU simulator, code links.
+- **End-to-end (Playwright):** 11 scenarios on desktop and mobile, using a synthetic dataset (no HoYoverse content in the repo). The **Built-in AI check** workflow downloads a real model and chats with it using software WebGPU.
 
 ## Privacy in one paragraph
 
-Everything lives in IndexedDB on your machine (the app window's storage in the desktop app). The app never asks for a HoYoverse password and never automates the game; the only secrets it keeps are the optional API key and HoYoLAB cookies you give it (encrypted by the OS in the desktop app). It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com), **Fetch showcase** (enka.network, UID only), **Sync from HoYoLAB** (cookies kept by the local server, never sent to the page), and Claude chat (api.anthropic.com). **Open Warp Tracker** opens starrailstation.com in your browser. The built-in AI downloads its model once from huggingface.co and then runs entirely on your PC. The desktop app asks api.github.com for the latest release on launch (can be turned off). The syncs are off by default and Claude needs your key. Backup, restore, and "delete all personal data" are in Settings.
+Everything lives in IndexedDB on your machine (the app window's storage in the desktop app). The app never asks for a HoYoverse password and never automates the game; the only secrets it keeps are the optional API key and HoYoLAB cookies you give it (encrypted by the OS in the desktop app). It makes network requests only when you ask it to: **Download game data** (raw.githubusercontent.com), **Fetch showcase** (enka.network, UID only), **Sync from HoYoLAB** (cookies kept by the local server, never sent to the page), and Claude chat (api.anthropic.com). **Open Warp Tracker** opens starrailstation.com in your browser. The built-in AI downloads its model once from huggingface.co and then runs entirely on your PC. The desktop app asks api.github.com for the latest release on launch (can be turned off). **Download enemies** and **Download Currency Wars data** read public pages of the HSR Wiki (honkai-star-rail.fandom.com); pictures load from static.wikia.nocookie.net. The syncs are off by default and Claude needs your key. Backup, restore, and "delete all personal data" are in Settings.
 
 ## Documentation
 
@@ -113,4 +114,4 @@ Everything lives in IndexedDB on your machine (the app window's storage in the d
 
 ## Licence
 
-MIT for the code (see `LICENSE`). Game content belongs to HoYoverse and is not part of this repository.
+MIT for the code (see `LICENSE`). Community build data comes from Fribbels' HSR Optimizer (MIT, see `THIRD_PARTY_NOTICES.md`). Game content belongs to HoYoverse and is not part of this repository. Prydwen's content isn't copied; only the layout style inspired the hubs.

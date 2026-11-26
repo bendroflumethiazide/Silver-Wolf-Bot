@@ -14,6 +14,7 @@ import { POOLS, WARP_TRACKER_URL } from "../warp/rules";
 import { pityKnown } from "../warp/pity";
 import { pick } from "./voice";
 import { charHref } from "@/lib/links";
+import { fribbelsBuild, setIdsByName, substatOrder } from "../builds/fribbels";
 
 export interface TerminalContext {
   game: GameData | null;
@@ -131,6 +132,42 @@ export function answer(raw: string, ctx: TerminalContext): TerminalAnswer {
     };
   }
 
+  // "How do I build Acheron?" / "best relics for Seele" → the community build (Fribbels).
+  if (ctx.game && has(q, "build", "relic", "set", "light cone", "lc", "main stat", "substat", "stats", "teammate", "team for") && !has(q, "build next", "who should i build", "which character")) {
+    const target = mentionedCharacter(q, ctx.game);
+    const fb = target ? fribbelsBuild(target) : null;
+    if (target && fb) {
+      const g = ctx.game;
+      const ids = setIdsByName(g);
+      const setLabel = (pair: string[]) => (pair.length === 1 ? `${pair[0]} 4pc` : `${pair[0]} 2pc + ${pair[1]} 2pc`);
+      const lc = fb.defaultLightCone && g.lightCones[fb.defaultLightCone] ? g.lightCones[fb.defaultLightCone].name : null;
+      const mains = (["BODY", "FOOT", "NECK", "OBJECT"] as const).map((s) => `${{ BODY: "Body", FOOT: "Feet", NECK: "Sphere", OBJECT: "Rope" }[s]} ${(fb.mainStats[s] ?? [])[0] ?? "any"}`).join(" · ");
+      const subs = substatOrder(fb).slice(0, 4).join(" > ");
+      const mates = (fb.teammates ?? []).filter((t) => g.characters[t.id]).map((t) => name(t.id));
+      const lines = [
+        `${name(target)} build, ez`,
+        ...(fb.relicSets?.length ? [`Relics: ${setLabel(fb.relicSets[0])}`] : []),
+        ...(fb.ornamentSets?.length ? [`Planar: ${fb.ornamentSets[0]}`] : []),
+        mains,
+        `Subs: ${subs}`,
+        ...(lc ? [`Best LC: ${lc}`] : []),
+        ...(mates.length ? [`Run w/ ${mates.slice(0, 3).join(", ")}`] : []),
+      ];
+      return {
+        intent: "recommend",
+        line: lines.join("|"),
+        facts: [
+          ...(fb.relicSets ?? []).slice(0, 3).map((p, i) => `Relic option ${i + 1}: ${setLabel(p)}${p.every((n) => ids.has(n)) ? "" : " (not in your game data version)"}`),
+          ...(fb.ornamentSets ?? []).slice(0, 3).map((n, i) => `Planar option ${i + 1}: ${n}`),
+          `Main stats: ${(["BODY", "FOOT", "NECK", "OBJECT"] as const).map((s) => `${s.toLowerCase()} ${(fb.mainStats[s] ?? []).join("/") || "any"}`).join("; ")}`,
+          `Substats in order: ${substatOrder(fb).join(" > ")}`,
+        ],
+        sources: ["Fribbels' HSR Optimizer (community data, MIT)"],
+        links: [{ label: `${name(target)}'s page`, href: charHref(target) }],
+      };
+    }
+  }
+
   if (has(q, "build next", "which character", "upgrade potential", "improve my account", "who should i build", "build")) {
     const ranked = ctx.characters.filter((c) => ctx.game?.characters[c.charId]).map((c) => ({ c, rarity: ctx.game!.characters[c.charId].rarity, inv: investment(c, ctx.game!.characters[c.charId].rarity) }))
       .sort((a, b) => (Number(!!b.c.favorite) - Number(!!a.c.favorite)) || (b.rarity - a.rarity) || (a.inv - b.inv)).filter((x) => x.inv < 95).slice(0, 3);
@@ -245,3 +282,14 @@ export function buildAiContext(raw: string, ctx: TerminalContext, opts: { compac
   if (local.intent !== "unknown" && local.intent !== "help") lines.push(`Local lookup (${local.intent}): ${local.facts.join(" | ")}`);
   return lines.join("\n").slice(0, lim.max);
 }
+
+/** The character a message is about: the longest display name it contains ("silver wolf" alone isn't enough when another name is there too). */
+export function mentionedCharacter(q: string, game: NonNullable<TerminalContext["game"]>): string | null {
+  const hits = Object.values(game.characters)
+    .map((c) => ({ id: c.id, n: characterDisplayName(c).toLowerCase() }))
+    .filter((c) => c.n.length >= 3 && !c.n.startsWith("trailblazer") && new RegExp(`(^|[^a-z0-9])${c.n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}($|[^a-z0-9])`).test(q))
+    .sort((a, b) => b.n.length - a.n.length);
+  const notHer = hits.find((h) => h.n !== "silver wolf");
+  return (notHer ?? hits[0])?.id ?? null;
+}
+

@@ -13,6 +13,7 @@ import { getDb, kvGet } from "@/lib/db";
 import { activateSnapshot, downloadSnapshot, fetchSourceInfo, LANGUAGES, listSnapshots, SOURCE, type DownloadProgress } from "@/lib/gamedata/source";
 import { NAV } from "@/lib/nav";
 import { useApp, type Server } from "@/lib/store";
+import { Credits } from "@/components/Credits";
 
 function GameDataPanel() {
   const { game, reloadGame, settings, updateSettings } = useApp();
@@ -211,12 +212,13 @@ function PrivacyPanel() {
 export default function SettingsPage() {
   return (
     <div className="space-y-5">
-      <PageHeader title="Settings & Data" subtitle="Game data, privacy, backups and preferences. Everything is stored locally in this browser." />
+      <PageHeader title="Settings & Data" subtitle="Game data, privacy, backups and credits. Everything stays on this device." />
       <DesktopSettings />
       <GameDataPanel />
       <PreferencesPanel />
       <PrivacyPanel />
       <DataPanel />
+      <Credits />
     </div>
   );
 }
