@@ -22,9 +22,10 @@ export function nameFor(p: Persona): string {
 
 type Lines = Record<Relationship, string[]>;
 /** Pick a line; `salt` (e.g. how many messages so far) keeps repeated questions from getting identical replies. */
-const by = (p: Persona, lines: Lines, key: string, salt = 0) => {
+const by = (p: Persona, lines: Lines, key: string, salt = 0, now = new Date()) => {
   const opts = lines[p.relationship];
-  const base = opts.indexOf(pick(opts, key, new Date().toISOString().slice(0, 10)));
+  const day = `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+  const base = opts.indexOf(pick(opts, key, day));
   return opts[(base + salt) % opts.length];
 };
 
@@ -161,13 +162,13 @@ export function casualReply(raw: string, p: Persona, now = new Date(), salt = 0)
     if (!re.test(q)) continue;
     const late = now.getHours() < 5 && (intent === "greet" || intent === "howAreYou" || intent === "wyd" || intent === "bored");
     const key = late ? "lateNight" : intent;
-    return { intent: key, line: fill(by(p, L[key], key, salt), p, now) };
+    return { intent: key, line: fill(by(p, L[key], key, salt, now), p, now) };
   }
   return null;
 }
 
 export function casualFallback(p: Persona, now = new Date(), salt = 0): string {
-  return fill(by(p, L.fallback, "fallback", salt), p, now);
+  return fill(by(p, L.fallback, "fallback", salt, now), p, now);
 }
 
 /** Asking for "Claude", "real chat", "talk like a human"... */
@@ -183,7 +184,7 @@ export function aiSetupLine(p: Persona, configured: boolean, onLocalAi = false):
 export function openingLine(p: Persona, urgent: string | null, now = new Date()): string {
   const h = now.getHours();
   const key = h < 5 ? "lateNight" : h < 11 ? "morning" : "greet";
-  const base = fill(by(p, L[key], `open-${key}`), p, now);
+  const base = fill(by(p, L[key], `open-${key}`, 0, now), p, now);
   return urgent ? `${base}|Btw|${urgent}` : base;
 }
 

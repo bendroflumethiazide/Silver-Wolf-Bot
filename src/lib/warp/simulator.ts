@@ -32,6 +32,9 @@ export function hashString(s: string): number {
 export interface SimItem {
   id?: string;
   name: string;
+  /** Game-data image paths: card art for result tiles, full art for the 5★ reveal. */
+  image?: string;
+  art?: string;
 }
 
 export interface SimBanner {
@@ -40,6 +43,8 @@ export interface SimBanner {
   offBanner5: SimItem[];
   featured4: SimItem[];
   offBanner4: SimItem[];
+  /** 3★ Light Cones. Chosen by pull number (no RNG draw), so results for a seed don't change. */
+  three?: SimItem[];
 }
 
 export interface SimState {
@@ -94,7 +99,8 @@ export function simulatePull(
     return { pull, state: { ...s, pity4: 0, guaranteed4: fc !== null && !featured } };
   }
 
-  return { pull: { index, rarity: 3, featured: false, item: { name: "3★ Light Cone" }, pityAt: 0 }, state: s };
+  const three = banner.three?.length ? banner.three[(index * 7919) % banner.three.length] : { name: "3★ Light Cone" };
+  return { pull: { index, rarity: 3, featured: false, item: three, pityAt: 0 }, state: s };
 }
 
 export function simulatePulls(banner: SimBanner, state: SimState, rng: () => number, count: number, startIndex = 0) {

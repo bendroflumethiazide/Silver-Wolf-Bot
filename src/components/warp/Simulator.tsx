@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Dices, RotateCcw, Save } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { GameImage } from "@/components/GameImage";
 import { WolfComment } from "@/components/SilverWolf";
 import { Badge, Button, cx, Field, Notice, NumberInput, Panel, Stat } from "@/components/ui";
 import { fill, pick, SW } from "@/lib/companion/voice";
@@ -32,17 +33,21 @@ export function WarpSimulator() {
   const [mcBudget, setMcBudget] = useState(180);
   const [mcResult, setMcResult] = useState<ReturnType<typeof monteCarlo> | null>(null);
   const [saved, setSaved] = useState(false);
+  const [reveal, setReveal] = useState<SimPull | null>(null);
 
   const pools = useMemo(() => {
     const chars = playableCharacters(game);
     const lcs = game ? Object.values(game.lightCones) : [];
-    const it = (id: string, name: string): SimItem => ({ id, name });
-    const std5c = chars.filter((c) => STANDARD_5STAR_IDS.has(c.id)).map((c) => it(c.id, characterDisplayName(c)));
-    const std5l = lcs.filter((l) => STANDARD_5STAR_IDS.has(l.id)).map((l) => it(l.id, l.name));
-    const four = [...chars.filter((c) => c.rarity === 4 && Number(c.id) < 8000).map((c) => it(c.id, characterDisplayName(c))), ...lcs.filter((l) => l.rarity === 4).map((l) => it(l.id, l.name))];
+    const ch = (c: (typeof chars)[number]): SimItem => ({ id: c.id, name: characterDisplayName(c), image: c.preview, art: c.portrait });
+    const lc = (l: (typeof lcs)[number]): SimItem => ({ id: l.id, name: l.name, image: l.preview, art: l.portrait });
+    const std5c = chars.filter((c) => STANDARD_5STAR_IDS.has(c.id)).map(ch);
+    const std5l = lcs.filter((l) => STANDARD_5STAR_IDS.has(l.id)).map(lc);
+    const four = [...chars.filter((c) => c.rarity === 4 && Number(c.id) < 8000).map(ch), ...lcs.filter((l) => l.rarity === 4).map(lc)];
+    const three = lcs.filter((l) => l.rarity === 3).map(lc);
     const limited5c = chars.filter((c) => c.rarity === 5 && !STANDARD_5STAR_IDS.has(c.id) && Number(c.id) < 8000);
     const limited5l = lcs.filter((l) => l.rarity === 5 && !STANDARD_5STAR_IDS.has(l.id));
-    return { std5c, std5l, four, limited5c, limited5l };
+    const byId = new Map<string, SimItem>([...chars.map(ch), ...lcs.map(lc)].map((x) => [x.id!, x]));
+    return { std5c, std5l, four, three, limited5c, limited5l, byId };
   }, [game]);
 
   const options = useMemo(
@@ -54,10 +59,11 @@ export function WarpSimulator() {
     const f = options.find((x) => x.id === featuredId) ?? options[0];
     return {
       kind,
-      featured5: kind === "standard" || !f ? [] : [f],
+      featured5: kind === "standard" || !f ? [] : [pools.byId.get(f.id) ?? f],
       offBanner5: kind === "lightcone" ? pools.std5l : kind === "standard" ? [...pools.std5c, ...pools.std5l] : pools.std5c,
       featured4: pools.four.filter((x) => featured4.includes(x.id!)),
       offBanner4: pools.four.filter((x) => !featured4.includes(x.id!)),
+      three: pools.three,
     };
   }, [kind, featuredId, pools, options, featured4]);
 
@@ -69,6 +75,9 @@ export function WarpSimulator() {
     setState(out.state);
     setHistory((h) => [...h, ...out.pulls]);
     setLast(out.pulls);
+    // Big reveal for the best 5★ in the batch (featured first), unless animations are skipped.
+    const best = out.pulls.filter((p) => p.rarity === 5).sort((x, y) => Number(y.featured) - Number(x.featured))[0];
+    setReveal(!skip && best ? best : null);
     setSaved(false);
   };
 
@@ -143,12 +152,13 @@ export function WarpSimulator() {
                     initial={skip ? false : { rotateY: 90, opacity: 0 }}
                     animate={{ rotateY: 0, opacity: 1 }}
                     transition={{ delay: skip ? 0 : i * 0.08, duration: 0.3 }}
-                    className={cx("flex aspect-[3/4] flex-col items-center justify-end rounded-lg border p-1 text-center",
+                    className={cx("relative flex aspect-[3/4] flex-col items-center justify-end overflow-hidden rounded-lg border p-1 text-center",
                       p.rarity === 5 ? "border-gold bg-gradient-to-b from-amber-500/30 to-transparent shadow-[0_0_18px_rgba(233,196,106,.45)]" : p.rarity === 4 ? "border-[var(--purple4)] bg-gradient-to-b from-violet-500/25 to-transparent" : "border-line bg-white/5")}
                     title={`${p.item.name} · pull #${p.index + 1}`}
                   >
-                    <span className="line-clamp-2 text-[9px] leading-tight">{p.item.name}</span>
-                    <span className={cx("text-[9px]", p.rarity === 5 ? "text-gold" : p.rarity === 4 ? "text-[var(--purple4)]" : "text-faint")}>{"★".repeat(p.rarity)}</span>
+                    {p.item.image && <GameImage path={p.item.image} alt={p.item.name} fallback={p.item.name} className="absolute inset-0 h-full w-full object-cover" rounded="rounded-[7px]" />}
+                    <span className="relative z-[1] line-clamp-2 w-full rounded bg-black/55 px-0.5 text-[9px] leading-tight">{p.item.name}</span>
+                    <span className={cx("relative z-[1] text-[9px] drop-shadow", p.rarity === 5 ? "text-gold" : p.rarity === 4 ? "text-[var(--purple4)]" : "text-faint")}>{"★".repeat(p.rarity)}</span>
                   </motion.div>
                 ))}
               </AnimatePresence>
@@ -162,6 +172,32 @@ export function WarpSimulator() {
           )}
         </div>
       </div>
+      <AnimatePresence>
+        {reveal && (
+          <motion.button
+            type="button"
+            aria-label={`5★ ${reveal.item.name}. Close`}
+            onClick={() => setReveal(null)}
+            className="fixed inset-0 z-[60] flex items-center justify-center bg-black/85 p-4 backdrop-blur-sm"
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          >
+            <motion.div
+              initial={{ scale: 0.6, rotateY: 90 }} animate={{ scale: 1, rotateY: 0 }} transition={{ type: "spring", stiffness: 140, damping: 16 }}
+              className="relative w-[min(88vw,380px)] overflow-hidden rounded-2xl border-2 border-gold shadow-[0_0_60px_rgba(233,196,106,.6)]"
+            >
+              <GameImage path={reveal.item.art ?? reveal.item.image} alt={reveal.item.name} fallback={reveal.item.name} className="aspect-[3/4] w-full object-cover" rounded="rounded-none" />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/70 to-transparent p-4 text-left">
+                <div className="text-lg text-gold">★★★★★</div>
+                <div className="text-xl font-semibold text-white">{reveal.item.name}</div>
+                <div className="mt-1 text-xs text-white/75">
+                  {kind === "standard" ? "Stellar Warp" : reveal.featured ? "Featured" : "Lost the 50/50"} · pity {reveal.pityAt}
+                </div>
+              </div>
+            </motion.div>
+            <span className="absolute bottom-6 text-xs text-white/60">Tap to continue</span>
+          </motion.button>
+        )}
+      </AnimatePresence>
       <Panel title="Monte Carlo analysis">
         <div className="flex flex-wrap items-end gap-3">
           <Field label="Featured copies"><NumberInput min={1} max={7} value={mcCopies} onChange={setMcCopies} /></Field>
