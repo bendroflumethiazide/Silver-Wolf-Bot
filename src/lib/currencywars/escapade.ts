@@ -399,18 +399,6 @@ export function supplyOffers(s: RunState, pack: CwPack, offers: { name: string; 
   }
 }
 
-/** Strategy quality after Cottontail / Bubble Wolf. */
-export function strategyQuality(s: RunState, rarity: "Silver" | "Gold" | "Prismatic"): ["Silver" | "Gold" | "Prismatic", RunState] {
-  const e = s.escapade;
-  if (!e) return [rarity, s];
-  if (e.nextPrismatic) return ["Prismatic", record(patch(s, { nextPrismatic: false }), "modified this Investment Strategy offer to Prismatic.")];
-  if (e.variant === "ct-strategy" && !(e.boosted ?? []).includes(s.plane) && rarity !== "Prismatic") {
-    const up = rarity === "Silver" ? "Gold" : "Prismatic";
-    return [up, record(patch(s, { boosted: [...(e.boosted ?? []), s.plane] }), `raised this plane's first Investment Strategy offer to ${up}.`)];
-  }
-  return [rarity, s];
-}
-
 /** Enemy strength multiplier for a fight, and whether it's a Trotter fight. */
 export function enemyMods(s: RunState, kind: NodeKind, eliteFight: boolean, rng: () => number): { mult: number; trotter: boolean } {
   const e = s.escapade;

@@ -13,12 +13,13 @@ import { combineResult, emblemBond, goldOreName, isOre, itemKind, ORE_DROP_ODDS,
 import { membersOf } from "./bonds";
 import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPack } from "./sim";
 import { buildTimeline, type Timeline } from "./timeline";
+import { GRADES, offerGrades, shiftGrade, startingRefreshes, type Grade, type GradeRules, type OfferMeta, type PendingSelection } from "./strategyGrades";
 import { addStats, bondEffect, itemEffect, powerMult, zeroStats, type BondCtx, type Stats, type Summon } from "./combat";
 import { specialItem } from "./specialItems";
 import { afterCombat, expressPower, nodeTp, storeStats, syncTsrLevel, TSR_BOND, tsrOf, type TsrState } from "./trailblazeStore";
 import {
   addBasics, afterFight, checkAssignments, chooseTea, enemyMods, enterSpecial, ESCAPADE_ASSUMED, onEnterNode, robotFor, specialNode, startEscapade,
-  strategyQuality, supplyOffers, synthesisRefund, talentRefill, spendWoofSave, woofSave, xpBonus, type EscapadeState, type TeaOption,
+  supplyOffers, synthesisRefund, talentRefill, spendWoofSave, woofSave, xpBonus, type EscapadeState, type TeaOption,
 } from "./escapade";
 import {
   beginSelection, choosePlot, frenzyContract, PLOT_ARMOR_RULES, plotInvestment, plotOf, plotUnitBonus, remapHolders, rollCallGrant,
@@ -194,7 +195,7 @@ export interface RunState {
   /** The rule each variant bond (e.g. Phantasmoon Games) uses this run. */
   variants?: Record<string, string>;
   nodeOpponent: string;
-  offers: { environments?: CwNamed[]; strategies?: CwStrategy[]; supply?: SupplyOffer[]; teaBreak?: { kind: "teaBreak" | "treasury"; options: TeaOption[] } };
+  offers: { environments?: CwNamed[]; strategies?: CwStrategy[]; strategyMeta?: OfferMeta; supply?: SupplyOffer[]; teaBreak?: { kind: "teaBreak" | "treasury"; options: TeaOption[] } };
   encounter: "easy" | "hard" | null;
   last: BattleReport | null;
   note: string | null;
@@ -226,6 +227,16 @@ export interface RunState {
   /** Node order when a companion moved nodes (else RULES.planes). */
   layout?: NodeKind[][];
   interlude?: Interlude;
+  /** Investment Strategy grade rules from Environments/Strategies (one place, see strategyGrades.ts). */
+  grades?: GradeRules;
+  /** Extra Strategy selections waiting for a node (Futures, Gold Investment, Joint Decision…). */
+  pendingSelections?: PendingSelection[];
+  /** Strategy refreshes banked for the next selection ("After 3 Nodes, gains another refresh"). */
+  bankedStrategyRefreshes?: { at: number; n: number }[];
+  /** Fixed Strategy Node selections offered so far (Jackpot = 1st, Last Chance = 3rd). */
+  nodeSelections?: number;
+  /** Gold per owned Strategy when obtaining one (Strategy Master). */
+  goldPerStrategy?: number;
 }
 
 // --------------------------------------------------------------------------------------------- helpers
@@ -380,11 +391,12 @@ const UNMODELLED = /Chimera|Smelting Furnace|Disassembly Wrench|Good Fortune Tok
  * "Unknown" grants the X Emblem). Parts it can't model are listed as "not simulated: …".
  */
 export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () => number, source = ""): [RunState, string[]] {
-  // Plot Armor investments first; their sentences are then left out of the general parser.
+  // Plot Armor and Strategy-grade investments first; their sentences are then left out of the general parser.
   const [plotState, plotApplied, handled] = plotInvestment(s, text0, source);
-  const text = handled.reduce((t, h) => t.replace(h, ""), text0).trim();
-  let state = plotState;
-  const applied: string[] = [...plotApplied];
+  const [gradeState, gradeApplied, gradeHandled] = strategyInvestment(plotState, pack, text0, source, rng);
+  const text = [...handled, ...gradeHandled].reduce((t, h) => t.replace(h, ""), text0).trim();
+  let state = gradeState;
+  const applied: string[] = [...plotApplied, ...gradeApplied];
   const skipped: string[] = [];
   let lastEmblem: string | null = null;
   const roster = shopRoster(pack);
@@ -519,8 +531,6 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
   if (/When opening a crystal ore, there is a 50% chance to obtain a crystal ore of one tier lower/i.test(text)) { state = { ...state, oreEcho: true }; applied.push("opening ores may give another"); }
   const xpNode = /Gain (\d+) Experience whenever you enter a new Node/i.exec(text);
   if (xpNode) { state = { ...state, xpPerNode: state.xpPerNode + Number(xpNode[1]) }; applied.push(`+${xpNode[1]} XP each node`); }
-  const forced = /All Investment Strategies in this round are of (Silver|Gold|Prismatic) quality/i.exec(text);
-  if (forced) { state = { ...state, forcedRarity: forced[1] as StrategyRarity }; applied.push(`${forced[1]} strategies only`); }
   const express = /the Express deals (\d+)% of the original DMG/i.exec(text);
   if (express) { const t = tsrOf(state); state = { ...state, tsr: { ...t, expressMult: Math.max(t.expressMult ?? 1, Number(express[1]) / 100) } }; applied.push(`the Express deals ${express[1]}% DMG`); }
   if (/2-star characters may appear in the Store/i.test(text)) { state = { ...state, twoStarShop: true }; applied.push("2-star characters in the shop"); }
@@ -749,9 +759,11 @@ function nodePhase(s: RunState, pack: CwPack, kind: NodeKind, rng: () => number)
   const special = kind === "Reward" ? specialNode(s) : null;
   if (special) return enterSpecial(s, pack, special, rng);
   if (kind === "Strategy") {
-    const offer = strategyOffer(s, pack, rng);
-    if (offer[0].length) return { ...offer[1], phase: "strategy", offers: { strategies: offer[0] } };
-    s = offer[1];
+    // Visionary: the node grants 1 random Prismatic Strategy (no choice, no refresh, no difficulty).
+    if (gradeRulesOf(s).visionary) return { ...grantRandomStrategy(s, pack, "Prismatic", rng, gradeRulesOf(s).sources?.visionary ?? "Visionary", true), phase: "prep", offers: {} };
+    const [opts, meta, s2] = strategyOffer(s, pack, rng, { kind: "node" });
+    if (opts.length) return { ...s2, phase: "strategy", offers: { strategies: opts, strategyMeta: meta } };
+    s = s2;
   }
   if (kind === "Supply") {
     const roster = shopRoster(pack);
@@ -763,12 +775,136 @@ function nodePhase(s: RunState, pack: CwPack, kind: NodeKind, rng: () => number)
   return { ...s, phase: "prep", offers: {} };
 }
 
-/** Three Investment Strategies of one (rolled) quality. */
-function strategyOffer(s0: RunState, pack: CwPack, rng: () => number, any = false): [CwStrategy[], RunState] {
-  const rolled: StrategyRarity = s0.forcedRarity ?? (["Silver", "Gold", "Prismatic"] as const)[weighted(rng, [ASSUMED.strategyRarity.Silver, ASSUMED.strategyRarity.Gold, ASSUMED.strategyRarity.Prismatic])];
-  const [rarity, s] = any ? [rolled, s0] as const : strategyQuality(s0, rolled);
-  const pool = (pack.strategies ?? []).filter((x) => x.rarity === rarity && x.planes.includes(s.plane + 1) && !s.strategies.some((o) => o.name === x.name));
-  return [sample(rng, pool, RULES.strategyOffers), s];
+/** Grade rules in effect (older saves kept a single forced grade). */
+export function gradeRulesOf(s: Pick<RunState, "grades" | "forcedRarity">): GradeRules {
+  const r = s.grades ?? {};
+  return !r.fixed && s.forcedRarity ? { ...r, fixed: s.forcedRarity, sources: { ...r.sources, fixed: r.sources?.fixed ?? "Investment Environment" } } : r;
+}
+
+const rollGrade = (rng: () => number): Grade => GRADES[weighted(rng, [ASSUMED.strategyRarity.Silver, ASSUMED.strategyRarity.Gold, ASSUMED.strategyRarity.Prismatic])];
+
+/** Draw one Strategy of a grade not owned and not already offered. */
+function drawStrategy(s: RunState, pack: CwPack, grade: Grade, rng: () => number, exclude: string[]): CwStrategy | null {
+  const pool = (pack.strategies ?? []).filter((x) => x.rarity === grade && x.planes.includes(s.plane + 1) && !s.strategies.some((o) => o.name === x.name) && !exclude.includes(x.name));
+  const any = pool.length ? pool : (pack.strategies ?? []).filter((x) => x.rarity === grade && !s.strategies.some((o) => o.name === x.name) && !exclude.includes(x.name));
+  return any.length ? pickOne(rng, any) : null;
+}
+
+/** One Strategy selection: the grades come from offerGrades (the one place that decides them). */
+function strategyOffer(s0: RunState, pack: CwPack, rng: () => number, opts: { kind: "node" | "extra"; pending?: PendingSelection }): [CwStrategy[], OfferMeta, RunState] {
+  let s = s0;
+  const rules = gradeRulesOf(s);
+  const selection = opts.kind === "node" ? (s.nodeSelections ?? 0) + 1 : 0;
+  // Bubble Wolf's hack: this offer becomes Prismatic.
+  let forced = opts.pending?.grade;
+  if (!forced && s.escapade?.nextPrismatic) { forced = "Prismatic"; s = { ...s, escapade: { ...s.escapade, nextPrismatic: false, history: [...s.escapade.history, { tick: s.tick, text: "modified this Investment Strategy offer to Prismatic." }] } }; }
+  const { grades, why, usedShift } = offerGrades(rules, { rolled: rollGrade(rng), kind: opts.kind, selection, count: RULES.strategyOffers, forced });
+  const picked: CwStrategy[] = [];
+  for (const g of grades) { const x = drawStrategy(s, pack, g, rng, picked.map((p) => p.name)); if (x) picked.push(x); }
+  const now = globalIndex(s.plane, s.node);
+  const banked = (s.bankedStrategyRefreshes ?? []).filter((b) => b.at <= now).reduce((n, b) => n + b.n, 0);
+  const refreshable = opts.pending ? opts.pending.refreshable : true;
+  const meta: OfferMeta = {
+    grades: picked.map((p) => p.rarity), why: why.slice(0, picked.length),
+    refreshes: refreshable ? startingRefreshes(rules, opts.pending) + banked : 0,
+    perOption: refreshable && rules.perOptionRefresh ? picked.map(() => false) : undefined,
+    refreshable, kind: opts.kind, source: opts.pending?.source, free: opts.pending?.free,
+  };
+  s = {
+    ...s,
+    nodeSelections: opts.kind === "node" ? selection : s.nodeSelections,
+    grades: usedShift ? { ...rules, nextShift: undefined } : s.grades,
+    bankedStrategyRefreshes: banked ? (s.bankedStrategyRefreshes ?? []).filter((b) => b.at > now) : s.bankedStrategyRefreshes,
+  };
+  return [picked, meta, s];
+}
+
+/** Refresh one offered Strategy: same grade (Environment rules can't be bypassed); Cottontail upgrades the first one each plane. */
+export function refreshStrategy(s0: RunState, pack: CwPack, index: number): RunState {
+  const meta = s0.offers.strategyMeta;
+  const cur = s0.offers.strategies?.[index];
+  if (s0.phase !== "strategy" || !meta || !cur) return s0;
+  if (!meta.refreshable) return note(s0, "These Investment Strategies can't be refreshed.");
+  const usePerOption = !!meta.perOption && !meta.perOption[index];
+  if (!usePerOption && meta.refreshes <= 0) return note(s0, "No Investment Strategy refreshes left.");
+  const [s1, rng] = step(s0);
+  let s = s1;
+  let grade = meta.grades[index];
+  let why = meta.why[index];
+  const e = s.escapade;
+  if (e?.variant === "ct-strategy" && !(e.boosted ?? []).includes(s.plane) && grade !== "Prismatic") {
+    grade = shiftGrade(grade, 1); why = "refresh-up";
+    s = { ...s, escapade: { ...e, boosted: [...(e.boosted ?? []), s.plane], history: [...e.history, { tick: s.tick, text: `first Strategy refresh this plane became ${grade}.` }] } };
+    s = log(s, `Cottontail: the first Strategy refresh this plane is upgraded to ${grade}.`);
+  }
+  const offered = s.offers.strategies ?? [];
+  const x = drawStrategy(s, pack, grade, rng, offered.map((o) => o.name));
+  if (!x) return note(s0, `No other ${grade} Investment Strategy to refresh into.`);
+  const strategies = offered.map((o, i) => (i === index ? x : o));
+  const next: OfferMeta = {
+    ...meta, grades: meta.grades.map((g, i) => (i === index ? grade : g)), why: meta.why.map((w, i) => (i === index ? why : w)),
+    refreshes: usePerOption ? meta.refreshes : meta.refreshes - 1, perOption: meta.perOption?.map((u, i) => u || (usePerOption && i === index)),
+  };
+  return log({ ...s, offers: { ...s.offers, strategies, strategyMeta: next } }, `Refreshed Strategy: ${cur.name} → ${x.name} (${grade}).`);
+}
+
+/** Apply a Strategy directly (Visionary's grants). */
+function grantRandomStrategy(s0: RunState, pack: CwPack, grade: Grade, rng: () => number, source: string, free: boolean): RunState {
+  const st = drawStrategy(s0, pack, grade, rng, []);
+  if (!st) return s0;
+  const [s2, applied] = applyEffect({ ...s0, strategies: [...s0.strategies, st], extraDifficulty: s0.extraDifficulty + (free ? 0 : RULES.strategyDifficulty[st.rarity]) }, pack, st.effect, rng, st.name);
+  return log(s2, `${source}: ${grade} strategy ${st.name}${applied.length ? ` (${applied.join(", ")})` : ""}.`);
+}
+
+/** Global node index of "Node P-N" (1-based plane and node). */
+const nodeAt = (plane: number, node: number) => globalIndex(plane - 1, node - 1);
+
+/**
+ * Strategy-grade Investments (Environment or Strategy text). Returns the state, what it applied and
+ * the sentences it handled.
+ */
+export function strategyInvestment(s: RunState, pack: CwPack, text: string, source: string, rng: () => number): [RunState, string[], string[]] {
+  let out = s;
+  let rules: GradeRules = { ...gradeRulesOf(s), sources: { ...gradeRulesOf(s).sources } };
+  const pend: PendingSelection[] = [...(s.pendingSelections ?? [])];
+  const applied: string[] = [];
+  const handled: string[] = [];
+  const now = globalIndex(s.plane, s.node);
+  const ORD: Record<string, number> = { first: 1, second: 2, third: 3 };
+  for (const sen of text.split(/(?<=[.!])\s+/).map((x) => x.trim())) {
+    let m: RegExpExecArray | null;
+    if ((m = /All Investment Strategies in this round are of (Silver|Gold|Prismatic) quality/i.exec(sen))) {
+      rules = { ...rules, fixed: m[1] as Grade, sources: { ...rules.sources, fixed: source } }; applied.push(`every Strategy ${m[1]}`); handled.push(sen);
+    } else if ((m = /^The (first|second|third) investment strategy is of (Silver|Gold|Prismatic) quality/i.exec(sen))) {
+      rules = { ...rules, guarantees: { ...rules.guarantees, [ORD[m[1].toLowerCase()]]: m[2] as Grade }, sources: { ...rules.sources, guarantee: source } }; applied.push(`${m[1]} Strategy selection ${m[2]}`); handled.push(sen);
+    } else if ((m = /left, middle, and right options will be (Silver|Gold|Prismatic), (Silver|Gold|Prismatic), and (Silver|Gold|Prismatic) quality respectively/i.exec(sen))) {
+      rules = { ...rules, positions: [m[1], m[2], m[3]] as Grade[], sources: { ...rules.sources, positions: source } }; applied.push(`left/middle/right ${m[1]}/${m[2]}/${m[3]}`);
+      const more = /Investment Strategy refresh count increases by (\d+)/i.exec(sen);
+      if (more) { rules = { ...rules, refreshBonus: (rules.refreshBonus ?? 0) + Number(more[1]), sources: { ...rules.sources, refresh: source } }; applied.push(`+${more[1]} Strategy refreshes`); }
+      handled.push(sen);
+    } else if ((m = /The quality of your next Investment Strategy increases by (\d+)/i.exec(sen))) {
+      rules = { ...rules, nextShift: (rules.nextShift ?? 0) + Number(m[1]), sources: { ...rules.sources, shift: source } }; applied.push(`next Strategy +${m[1]} grade`); handled.push(sen);
+    } else if ((m = /Immediately choose one of three (Silver|Gold|Prismatic) Investment Strategies, with (\d+) refresh/i.exec(sen))) {
+      pend.push({ grade: m[1] as Grade, refreshes: Number(m[2]), refreshable: true, source }); applied.push(`choose a ${m[1]} Strategy now (${m[2]} refreshes)`); handled.push(sen);
+    } else if ((m = /^After (\d+) Nodes?, gains another refresh/i.exec(sen))) {
+      out = { ...out, bankedStrategyRefreshes: [...(out.bankedStrategyRefreshes ?? []), { at: now + Number(m[1]), n: 1 }] }; applied.push(`+1 Strategy refresh after ${m[1]} nodes`); handled.push(sen);
+    } else if ((m = /After (?:entering )?(\d+) (?:new )?Node\(?s?\)?, (?:choose one of three|select (?:a|1)) non-refreshable (Silver|Gold|Prismatic) Investment Strateg/i.exec(sen)) || (m = /After (?:entering )?(\d+) (?:new )?Nodes?, select 1 (Silver|Gold|Prismatic) Investment Strategy that cannot be refreshed/i.exec(sen))) {
+      pend.push({ at: now + Number(m[1]), grade: m[2] as Grade, refreshes: 0, refreshable: false, source }); applied.push(`a non-refreshable ${m[2]} Strategy after ${m[1]} nodes`); handled.push(sen);
+    } else if ((m = /^At Node (\d)-(\d), gain an additional (?:choice and choose one of three Investment Strategies|Investment Strategy)/i.exec(sen))) {
+      pend.push({ at: nodeAt(Number(m[1]), Number(m[2])), refreshes: 0, refreshable: true, source }); applied.push(`an extra Strategy choice at Node ${m[1]}-${m[2]}`); handled.push(sen);
+    } else if ((m = /When obtaining an Investment Strategy, gain \((\d+) × current number of Investment Strategies owned\) Gold Coins/i.exec(sen))) {
+      out = { ...out, goldPerStrategy: Number(m[1]) }; applied.push(`${m[1]} gold per Strategy owned on each new one`); handled.push(sen);
+    } else if (/Subsequent Investment Strategy Nodes will be changed to grant 1 random Prismatic Investment Strateg/i.test(sen)) {
+      rules = { ...rules, visionary: true, sources: { ...rules.sources, visionary: source } }; applied.push("later Strategy Nodes grant a random Prismatic Strategy (no difficulty)"); handled.push(sen);
+    } else if ((m = /^Gains a random (Silver|Gold|Prismatic) Investment Strategy(?: and (\d+) Gold Coins?)?/i.exec(sen))) {
+      out = grantRandomStrategy({ ...out, grades: rules }, pack, m[1] as Grade, rng, source, false);
+      rules = gradeRulesOf(out);
+      if (m[2]) out = { ...out, gold: out.gold + Number(m[2]) };
+      applied.push(`a random ${m[1]} Strategy${m[2] ? ` and ${m[2]} gold` : ""}`); handled.push(sen);
+    }
+  }
+  if (!applied.length) return [s, [], []];
+  return [{ ...out, grades: rules, pendingSelections: pend }, applied, handled];
 }
 
 /** Queue what interrupts this node: Bubble Wolf's bonus Strategy, then the Plot Armor selection. */
@@ -776,7 +912,11 @@ function withInterludes(s: RunState, pack: CwPack): RunState {
   if (s.phase === "teaBreak") return s;
   const queue: Interlude["queue"] = [];
   let out = s;
-  if (out.escapade?.extraStrategy) { queue.push("bonusStrategy"); out = { ...out, escapade: { ...out.escapade, extraStrategy: false } }; }
+  if (out.escapade?.extraStrategy) {
+    out = { ...out, escapade: { ...out.escapade, extraStrategy: false }, pendingSelections: [...(out.pendingSelections ?? []), { refreshes: 0, refreshable: true, source: "Bubble Wolf" }] };
+  }
+  const now = globalIndex(out.plane, out.node);
+  for (const p of out.pendingSelections ?? []) if (p.at === undefined || p.at <= now) queue.push("bonusStrategy");
   if (selectionDue(out)) {
     if (deployed(out).some((u) => !u.npc)) queue.push("plotArmor");
     else out = log({ ...out, plotArmor: { ...plotOf(out), done: [...plotOf(out).done, out.plane] } }, "Plot Armor: no one deployed to become the protagonist.");
@@ -793,9 +933,14 @@ export function nextInterlude(s: RunState, pack: CwPack): RunState {
   if (!head) return { ...s, phase: il.resume.phase, offers: il.resume.offers, interlude: undefined };
   const next: RunState = { ...s, interlude: { ...il, queue: rest, active: head } };
   if (head === "bonusStrategy") {
-    const [offer, s2] = strategyOffer(next, pack, createRng(`${s.seed}:bonus-strategy:${s.tick}`), true);
-    if (!offer.length) return nextInterlude(s2, pack);
-    return log({ ...s2, phase: "strategy", offers: { strategies: offer } }, "Bubble Wolf: a bonus Investment Strategy selection!");
+    const now = globalIndex(next.plane, next.node);
+    const i = (next.pendingSelections ?? []).findIndex((p) => p.at === undefined || p.at <= now);
+    if (i < 0) return nextInterlude(next, pack);
+    const pending = next.pendingSelections![i];
+    const rest2 = next.pendingSelections!.filter((_, k) => k !== i);
+    const [opts, meta, s2] = strategyOffer({ ...next, pendingSelections: rest2 }, pack, createRng(`${s.seed}:bonus-strategy:${s.tick}:${i}`), { kind: "extra", pending });
+    if (!opts.length) return nextInterlude(s2, pack);
+    return log({ ...s2, phase: "strategy", offers: { strategies: opts, strategyMeta: meta } }, `${pending.source}: an extra Investment Strategy selection${pending.grade ? ` (${pending.grade})` : ""}!`);
   }
   if (head === "plotArmor") return log(beginSelection(next, pack, "protagonist"), `Plot Armor: choose Protagonist ${plotOf(next).done.length + 1} from your deployed characters.`);
   if (head === "swap") return beginSelection(next, pack, "swap");
@@ -855,8 +1000,19 @@ export function pickStrategy(s0: RunState, pack: CwPack, index: number): RunStat
   const st = s0.offers.strategies?.[index];
   if (s0.phase !== "strategy" || !st) return s0;
   const [s1, rng] = step(s0);
-  const [s2, applied] = applyEffect({ ...s1, strategies: [...s1.strategies, st], extraDifficulty: s1.extraDifficulty + RULES.strategyDifficulty[st.rarity] }, pack, st.effect, rng, st.name);
-  const out = log({ ...s2, phase: "prep" as Phase, offers: {} }, `${st.rarity} strategy: ${st.name}${applied.length ? ` (${applied.join(", ")})` : " (effect not simulated)"}.`);
+  const meta = s0.offers.strategyMeta;
+  // The grade the card showed is the grade that counts (Silver Age / Visionary picks add no difficulty).
+  const difficulty = meta?.free || gradeRulesOf(s1).fixed === "Silver" ? 0 : RULES.strategyDifficulty[st.rarity];
+  const owned = [...s1.strategies, st];
+  const bonusGold = (s1.goldPerStrategy ?? 0) * owned.length;
+  const [s2, applied] = applyEffect({ ...s1, strategies: owned, gold: s1.gold + bonusGold, extraDifficulty: s1.extraDifficulty + difficulty }, pack, st.effect, rng, st.name);
+  let out = log({ ...s2, phase: "prep" as Phase, offers: {} }, `${st.rarity} strategy: ${st.name}${applied.length ? ` (${applied.join(", ")})` : " (effect not simulated)"}${bonusGold ? ` · +${bonusGold} gold` : ""}.`);
+  // Selections that start right away (Gold/Silver Investment).
+  const immediate = (out.pendingSelections ?? []).some((p) => p.at === undefined);
+  if (immediate) {
+    if (out.interlude?.active === "bonusStrategy") out = { ...out, interlude: { ...out.interlude, queue: ["bonusStrategy", ...out.interlude.queue] } };
+    else return settle(nextInterlude({ ...out, interlude: { queue: ["bonusStrategy"], resume: { phase: "prep", offers: {} } } }, pack), pack);
+  }
   return settle(out.interlude?.active === "bonusStrategy" ? nextInterlude(out, pack) : out, pack);
 }
 

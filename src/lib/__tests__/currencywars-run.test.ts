@@ -7,14 +7,15 @@ import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
-  ASSUMED, advance, applyEffect, enterNode, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
-  nodeKind, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
+  ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
+  nodeKind, nodeKinds, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
 import { chooseProtagonist, eligible, refreshPlot, refreshPrice, changeProtagonist, plotOf, plotOptions, PLOT_ARMOR_CONFIG } from "../currencywars/plotArmor";
 import { buyTsr, expressPower, refreshTsr, tsrIncome, tsrOf, priceOf, tsrGood, TSR_GOODS } from "../currencywars/trailblazeStore";
 import { COMPANIONS } from "../currencywars/voyageCompanions";
 import { openBox, shiftEarlier } from "../currencywars/escapade";
 import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
+import { offerGrades, shiftGrade } from "../currencywars/strategyGrades";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
 import { createRng } from "../warp/simulator";
 
@@ -1316,5 +1317,143 @@ describe("equipment passives and Bond effects work in battle", () => {
     const next = enterNode(held, P48);
     expect(next.on[0]!.dice).toHaveLength(2);
     expect(teamPower(next, P48).power).toBeGreaterThan(teamPower(held, P48).power);
+  });
+});
+
+// --------------------------------------------------------------------------------------------- Investment Strategy grades
+
+const mkStrat = (rarity: "Silver" | "Gold" | "Prismatic", i: number) => ({ name: `${rarity} Plan ${i}`, rarity, effect: "Gain 1 Gold Coin(s).", planes: [1, 2, 3] });
+const PG: CwPack = { ...P47, strategies: (["Silver", "Gold", "Prismatic"] as const).flatMap((r) => [1, 2, 3, 4, 5].map((i) => mkStrat(r, i))) };
+const ENVS: Record<string, string> = {
+  rainbow: "All Investment Strategies in this round are of Prismatic quality.",
+  golden: "All Investment Strategies in this round are of Gold quality.",
+  silver: "All Investment Strategies in this round are of Silver quality, so enemy difficulty will not increase with selecting higher quality Investment Strategies.",
+  jackpot: "The first investment strategy is of Prismatic quality.",
+  last: "The third investment strategy is of Prismatic quality.",
+  sgi: "In this round, when selecting Investment Strategies at fixed Nodes, the left, middle, and right options will be Silver, Gold, and Prismatic quality respectively, and Investment Strategy refresh count increases by 2.",
+};
+/** A run with an environment text applied, standing on a Strategy node of `plane`. */
+function stratNode(env: string | null, plane = 0, opts: { companion?: string; variant?: string } = { companion: "Sundove", variant: "sd-gift" }): RunState {
+  let s = chooseEnvironment(newRun(PG, "grade", "A0-1", opts), PG, 0);
+  if (env) s = applyEffect(s, PG, env, createRng("env"), "Test Environment")[0];
+  return enterNode({ ...s, plane, node: nodeKinds(plane).indexOf("Strategy"), phase: "prep" }, PG);
+}
+const gradesOf = (s: RunState) => s.offers.strategies!.map((x) => x.rarity);
+
+describe("Investment Strategy grades (Silver < Gold < Prismatic)", () => {
+  it("moves grades with clamping at both ends", () => {
+    expect([shiftGrade("Silver", 1), shiftGrade("Gold", 1), shiftGrade("Prismatic", 1), shiftGrade("Prismatic", -1), shiftGrade("Gold", -1), shiftGrade("Silver", -1)])
+      .toEqual(["Gold", "Prismatic", "Prismatic", "Gold", "Silver", "Silver"]);
+  });
+
+  it("resolves rules in one place: forced > position > fixed > guarantee, then the one-shot shift (fixed rules win)", () => {
+    const o = (rules: Parameters<typeof offerGrades>[0], kind: "node" | "extra" = "node", selection = 1, forced?: "Silver" | "Gold" | "Prismatic") => offerGrades(rules, { rolled: "Silver", kind, selection, count: 3, forced }).grades;
+    expect(o({ fixed: "Silver" })).toEqual(["Silver", "Silver", "Silver"]);
+    expect(o({ fixed: "Gold" })).toEqual(["Gold", "Gold", "Gold"]);
+    expect(o({ fixed: "Prismatic" })).toEqual(["Prismatic", "Prismatic", "Prismatic"]);
+    expect(o({ positions: ["Silver", "Gold", "Prismatic"] })).toEqual(["Silver", "Gold", "Prismatic"]);
+    expect(o({ positions: ["Silver", "Gold", "Prismatic"] }, "extra")).toEqual(["Silver", "Silver", "Silver"]);
+    expect(o({ guarantees: { 1: "Prismatic" } }, "node", 1)).toEqual(["Prismatic", "Prismatic", "Prismatic"]);
+    expect(o({ guarantees: { 1: "Prismatic" } }, "node", 2)).toEqual(["Silver", "Silver", "Silver"]);
+    expect(o({ nextShift: 1 })).toEqual(["Gold", "Gold", "Gold"]);
+    expect(o({ fixed: "Silver", nextShift: 1 })).toEqual(["Silver", "Silver", "Silver"]);
+    expect(o({ fixed: "Silver" }, "extra", 0, "Gold")).toEqual(["Gold", "Gold", "Gold"]);
+  });
+
+  it("the Ages fix every offer, and refreshing keeps the grade", () => {
+    for (const [env, g] of [["rainbow", "Prismatic"], ["golden", "Gold"], ["silver", "Silver"]] as const) {
+      const s = stratNode(ENVS[env]);
+      expect(gradesOf(s)).toEqual([g, g, g]);
+      expect(s.offers.strategyMeta!.why).toEqual(["fixed", "fixed", "fixed"]);
+      const r = refreshStrategy({ ...s, offers: { ...s.offers, strategyMeta: { ...s.offers.strategyMeta!, refreshes: 2 } } }, PG, 1);
+      expect(gradesOf(r)).toEqual([g, g, g]);
+      expect(r.offers.strategies![1].name).not.toBe(s.offers.strategies![1].name);
+    }
+    // The Silver Age: no difficulty from picking.
+    const silver = stratNode(ENVS.silver);
+    expect(pickStrategy(silver, PG, 0).extraDifficulty).toBe(silver.extraDifficulty);
+  });
+
+  it("Jackpot makes the first Strategy selection Prismatic and Last Chance the third, and only those", () => {
+    const j1 = stratNode(ENVS.jackpot, 0);
+    expect(gradesOf(j1)).toEqual(["Prismatic", "Prismatic", "Prismatic"]);
+    expect(j1.offers.strategyMeta!.why[0]).toBe("guarantee");
+    const j2 = enterNode({ ...pickStrategy(j1, PG, 0), plane: 1, node: nodeKinds(1).indexOf("Strategy"), phase: "prep" }, PG);
+    expect(j2.nodeSelections).toBe(2);
+    expect(j2.offers.strategyMeta!.why[0]).not.toBe("guarantee");
+    let l = stratNode(ENVS.last, 0);
+    expect(l.offers.strategyMeta!.why[0]).not.toBe("guarantee");
+    l = enterNode({ ...pickStrategy(l, PG, 0), plane: 1, node: nodeKinds(1).indexOf("Strategy"), phase: "prep" }, PG);
+    l = enterNode({ ...pickStrategy(l, PG, 0), plane: 2, node: nodeKinds(2).indexOf("Strategy"), phase: "prep" }, PG);
+    expect(gradesOf(l)).toEqual(["Prismatic", "Prismatic", "Prismatic"]);
+  });
+
+  it("Silver • Gold • Iridescence sets left/middle/right at fixed nodes, +2 refreshes, and refresh keeps each position", () => {
+    const s = stratNode(ENVS.sgi);
+    expect(gradesOf(s)).toEqual(["Silver", "Gold", "Prismatic"]);
+    expect(s.offers.strategyMeta!.refreshes).toBe(2);
+    let r = refreshStrategy(s, PG, 2);
+    r = refreshStrategy(r, PG, 0);
+    expect(gradesOf(r)).toEqual(["Silver", "Gold", "Prismatic"]);
+    expect(r.offers.strategyMeta!.refreshes).toBe(0);
+    expect(refreshStrategy(r, PG, 1).note).toMatch(/No Investment Strategy refreshes left/);
+    // What you pick is what the card said, and difficulty follows it.
+    const picked = pickStrategy(r, PG, 2);
+    expect(picked.strategies.at(-1)!.rarity).toBe("Prismatic");
+    expect(picked.extraDifficulty - r.extraDifficulty).toBe(RULES.strategyDifficulty.Prismatic);
+  });
+
+  it("Investment Level Up raises only the next selection by one", () => {
+    let s = chooseEnvironment(newRun(PG, "grade", "A0-1", { companion: "Sundove", variant: "sd-gift" }), PG, 0);
+    s = applyEffect(s, PG, "The quality of your next Investment Strategy increases by 1.", createRng("x"), "Investment Level Up")[0];
+    expect(gradeRulesOf(s).nextShift).toBe(1);
+    const first = enterNode({ ...s, node: nodeKinds(0).indexOf("Strategy"), phase: "prep" }, PG);
+    expect(first.offers.strategyMeta!.grades[0]).not.toBe("Silver");
+    expect(gradeRulesOf(first).nextShift).toBeUndefined();
+  });
+
+  it("Gold Investment opens an immediate Gold choice with 3 refreshes; Futures come later and can't be refreshed", () => {
+    const base = chooseEnvironment(newRun(PG, "grade", "A0-1", { companion: "Sundove", variant: "sd-gift" }), PG, 0);
+    const withGI = { ...base, phase: "strategy" as const, offers: { strategies: [{ name: "Gold Investment", rarity: "Prismatic" as const, planes: [1], effect: "Immediately choose one of three Gold Investment Strategies, with 3 refresh(es). After 3 Nodes, gains another refresh." }], strategyMeta: { grades: ["Prismatic" as const], why: ["rolled" as const], refreshes: 0, refreshable: true, kind: "node" as const } } };
+    const now = pickStrategy(withGI, PG, 0);
+    expect(now.phase).toBe("strategy");
+    expect(gradesOf(now)).toEqual(["Gold", "Gold", "Gold"]);
+    expect(now.offers.strategyMeta).toMatchObject({ kind: "extra", refreshes: 3, refreshable: true, source: "Gold Investment" });
+    const after = pickStrategy(now, PG, 0);
+    expect(after.phase).toBe("prep");
+    expect(after.strategies.map((x) => x.rarity)).toEqual(["Prismatic", "Gold"]);
+    expect(after.bankedStrategyRefreshes).toHaveLength(1);
+    const futures = applyEffect(base, PG, "After 5 Node(s), choose one of three non-refreshable Prismatic Investment Strategies.", createRng("f"), "Prismatic Futures")[0];
+    expect(futures.pendingSelections).toEqual([expect.objectContaining({ grade: "Prismatic", refreshable: false, at: 5 })]);
+    const due = enterNode({ ...futures, node: 5, phase: "prep" }, PG);
+    expect(due.phase).toBe("strategy");
+    expect(gradesOf(due)).toEqual(["Prismatic", "Prismatic", "Prismatic"]);
+    expect(refreshStrategy(due, PG, 0).note).toMatch(/can't be refreshed/);
+  });
+
+  it("Visionary turns Strategy Nodes into a free random Prismatic; Strategy Master pays per Strategy owned", () => {
+    let s = chooseEnvironment(newRun(PG, "grade", "A0-1", { companion: "Sundove", variant: "sd-gift" }), PG, 0);
+    s = applyEffect(s, PG, "Gains a random Gold Investment Strategy and 15 Gold Coins. Subsequent Investment Strategy Nodes will be changed to grant 1 random Prismatic Investment Strategies (cannot be refreshed) and will no longer increase enemy difficulty.", createRng("v"), "Visionary")[0];
+    expect(s.strategies.map((x) => x.rarity)).toEqual(["Gold"]);
+    const node = enterNode({ ...s, node: nodeKinds(0).indexOf("Strategy"), phase: "prep" }, PG);
+    expect(node.phase).toBe("prep");
+    expect(node.strategies.map((x) => x.rarity)).toEqual(["Gold", "Prismatic"]);
+    expect(node.extraDifficulty).toBe(s.extraDifficulty);
+    const m = applyEffect(stratNode(null), PG, "When obtaining an Investment Strategy, gain (2 × current number of Investment Strategies owned) Gold Coins. At Node 3-5, gain an additional Investment Strategy.", createRng("m"), "Strategy Master")[0];
+    expect(pickStrategy(m, PG, 0).gold - m.gold).toBeGreaterThanOrEqual(2);
+    expect(m.pendingSelections).toEqual([expect.objectContaining({ at: 9 + 7 + 4, source: "Strategy Master" })]);
+  });
+
+  it("Cottontail's first refresh each plane upgrades that option; save/load keeps grades and refreshes", () => {
+    const s = stratNode(ENVS.golden, 0, { companion: "Cottontail", variant: "ct-strategy" });
+    const meta = { ...s.offers.strategyMeta!, refreshes: 2 };
+    const up = refreshStrategy({ ...s, offers: { ...s.offers, strategyMeta: meta } }, PG, 0);
+    expect(up.offers.strategyMeta!.grades).toEqual(["Prismatic", "Gold", "Gold"]);
+    expect(up.offers.strategyMeta!.why[0]).toBe("refresh-up");
+    const again = refreshStrategy(up, PG, 1);
+    expect(again.offers.strategyMeta!.grades[1]).toBe("Gold");
+    const loaded = JSON.parse(JSON.stringify(again)) as RunState;
+    expect(gradesOf(loaded)).toEqual(gradesOf(again));
+    expect(pickStrategy(loaded, PG, 0).strategies.at(-1)!.rarity).toBe("Prismatic");
   });
 });

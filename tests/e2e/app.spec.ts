@@ -391,7 +391,7 @@ test("Currency Wars 4.7: Voyage Companion, Trailblaze Store and Plot Armor in a 
   let fights = 0;
   for (let i = 0; i < 40 && !(await plot.isVisible()); i++) {
     if (await page.getByRole("heading", { name: /Backstage Tea Break|Pearliefin's Treasury/ }).isVisible()) { await cards(/Backstage Tea Break|Pearliefin's Treasury/).first().click(); continue; }
-    if (await page.getByRole("heading", { name: /Choose an Investment Strategy/ }).isVisible()) { await cards(/Choose an Investment Strategy/).first().click(); continue; }
+    if (await page.getByRole("heading", { name: /Choose an Investment Strategy|Extra Investment Strategy/ }).isVisible()) { await page.getByRole("button", { name: /^(Silver|Gold|Prismatic) strategy / }).first().click(); continue; }
     if (await page.getByRole("heading", { name: /^Supply/ }).isVisible()) { await page.getByRole("button", { name: "Skip" }).click(); continue; }
     if (await page.getByRole("heading", { name: /Encounter: pick a fight/ }).isVisible()) { await cards(/Encounter: pick a fight/).first().click(); continue; }
     if (await page.getByRole("button", { name: /Next node/ }).isVisible()) { await page.getByRole("button", { name: /Next node/ }).click(); continue; }

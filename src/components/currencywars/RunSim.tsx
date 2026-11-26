@@ -8,9 +8,10 @@ import {
   advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
-  choosePlotArmor, pickTea, placedBondStates, settle, useSwap as swapProtagonist,
+  choosePlotArmor, gradeRulesOf, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
 import { openBox, specialNode } from "@/lib/currencywars/escapade";
+import { GRADE_LABEL } from "@/lib/currencywars/strategyGrades";
 import { changeProtagonist, chooseProtagonist, PLOT_ARMOR_CONFIG, PLOT_ARMOR_RULES, plotOf, refreshPlot, selectionNode } from "@/lib/currencywars/plotArmor";
 import { specialItem } from "@/lib/currencywars/specialItems";
 import { buyTsr, refreshTsr, TSR_ASSUMED, TSR_BOND, TSR_RULES } from "@/lib/currencywars/trailblazeStore";
@@ -327,18 +328,40 @@ export function RunSim({ pack }: { pack: CwPack }) {
           </div>
         </Panel>
       )}
-      {run.phase === "strategy" && (
-        <Panel title="Choose an Investment Strategy">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {run.offers.strategies?.map((st, i) => (
-              <button key={st.name} type="button" onClick={() => update((s) => pickStrategy(s, pack, i))} className={cx("rounded-xl border bg-gradient-to-b to-transparent p-4 text-left hover:brightness-125", RARITY_CARD[st.rarity])}>
-                <span className="text-[10px] uppercase tracking-wider text-muted">{st.rarity}{RULES.strategyDifficulty[st.rarity] ? ` · enemy difficulty +${RULES.strategyDifficulty[st.rarity]}` : ""}</span>
-                <b className="block">{st.name}</b><span className="mt-1 block text-xs text-muted">{fillUnknown(st.name, st.effect)}</span>
-              </button>
-            ))}
-          </div>
-        </Panel>
-      )}
+      {run.phase === "strategy" && (() => {
+        const meta = run.offers.strategyMeta;
+        const rules = gradeRulesOf(run);
+        const whyText = (w?: string) => {
+          if (!w || w === "rolled") return null;
+          const src = w === "fixed" ? rules.sources?.fixed : w === "position" ? rules.sources?.positions : w === "guarantee" ? rules.sources?.guarantee : w === "shift" ? rules.sources?.shift : w === "selection" ? meta?.source : w === "refresh-up" ? "Cottontail" : undefined;
+          return `${GRADE_LABEL[w as keyof typeof GRADE_LABEL]}${src ? `: ${src}` : ""}`;
+        };
+        return (
+          <Panel title={meta?.kind === "extra" ? `Extra Investment Strategy${meta.source ? ` · ${meta.source}` : ""}` : "Choose an Investment Strategy"}
+            actions={meta && <span className="text-xs text-muted">{!meta.refreshable ? "Can't be refreshed" : `${meta.refreshes} refresh${meta.refreshes === 1 ? "" : "es"} left${meta.perOption ? " · 1 free per option" : ""}`}</span>}>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {run.offers.strategies?.map((st, i) => {
+                const why = whyText(meta?.why[i]);
+                const canRefresh = !!meta?.refreshable && (meta.refreshes > 0 || (!!meta.perOption && !meta.perOption[i]));
+                const diff = meta?.free || rules.fixed === "Silver" ? 0 : RULES.strategyDifficulty[st.rarity];
+                return (
+                  <div key={st.name} className={cx("cw-grade flex flex-col rounded-xl border bg-gradient-to-b to-transparent", RARITY_CARD[st.rarity])} data-grade={st.rarity}>
+                    <button type="button" onClick={() => update((s) => pickStrategy(s, pack, i))} aria-label={`${st.rarity} strategy ${st.name}`} className="flex-1 p-4 text-left hover:brightness-125">
+                      <span className="flex flex-wrap items-center gap-1.5 text-[10px] uppercase tracking-wider">
+                        <span className={cx("rounded px-1.5 py-0.5 font-bold", st.rarity === "Prismatic" ? "bg-fuchsia-400/30 text-fuchsia-100" : st.rarity === "Gold" ? "bg-amber-400/30 text-amber-100" : "bg-slate-300/25 text-slate-100")}>{st.rarity === "Prismatic" ? "Prism" : st.rarity}</span>
+                        {diff ? <span className="text-muted">enemy difficulty +{diff}</span> : null}
+                        {why && <span className="normal-case tracking-normal text-cyan">{why}</span>}
+                      </span>
+                      <b className="mt-1 block">{st.name}</b><span className="mt-1 block text-xs text-muted">{fillUnknown(st.name, st.effect)}</span>
+                    </button>
+                    {meta?.refreshable && <button type="button" onClick={() => update((s) => refreshStrategy(s, pack, i))} disabled={!canRefresh} aria-label={`Refresh option ${i + 1}`} className="flex items-center justify-center gap-1 border-t border-white/10 py-1.5 text-[11px] text-muted hover:text-text disabled:opacity-40"><RefreshCw size={11} /> Refresh</button>}
+                  </div>
+                );
+              })}
+            </div>
+          </Panel>
+        );
+      })()}
       {run.phase === "supply" && (
         <Panel title="Supply: take one character and the item they carry" actions={<Button size="sm" variant="ghost" onClick={() => update((s) => skipSupply(s, pack))}>Skip</Button>}>
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
