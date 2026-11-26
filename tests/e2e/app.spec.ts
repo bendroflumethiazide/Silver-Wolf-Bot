@@ -223,9 +223,8 @@ test("new hubs: guides, endgame, codes, Currency Wars and the SU run simulator",
   await page.goto("/universe");
   await page.getByRole("button", { name: /Erudition/ }).click();
   await expect(page.getByText("Where next?")).toBeVisible();
-  await page.getByRole("button", { name: /^(Combat|Elite)/ }).first().click().catch(async () => {
-    await page.getByRole("button", { name: /^(Occurrence|Respite)/ }).first().click();
-  });
+  // Domain choices are random: take whichever is offered first.
+  await page.getByRole("button", { name: /^(Combat|Elite|Occurrence|Respite)/ }).first().click();
   await expect(page.getByText(/Domain [12] of 13|Choose a blessing|Enhance a blessing|Where next/).first()).toBeVisible();
   expect(errors).toEqual([]);
 });
