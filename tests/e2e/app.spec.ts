@@ -236,7 +236,10 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await installCwWiki(page);
   await page.goto("/currency-wars");
   await page.getByRole("button", { name: "Download Currency Wars data" }).click();
+  // A fixed seed: its Voyage Companion (Mummicat, synthesis refund) doesn't change the first nodes.
+  await page.getByRole("textbox", { name: "Seed" }).fill("e2e-base");
   await page.getByRole("button", { name: "Start run" }).click();
+  await page.getByRole("button", { name: "Let's go" }).click();
   const cards = (title: RegExp) => page.locator("section").filter({ has: page.getByRole("heading", { name: title }) }).locator("div.grid > button");
   // Labor Dispatch-style environment: the emblem must show up in Items (bug fix).
   await cards(/Choose an Investment Environment/).filter({ hasText: "Fixture Dispatch" }).click();
@@ -311,7 +314,7 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await page.getByRole("button", { name: "To bench" }).click();
   await expect(page.getByRole("button", { name: /^Bench slot \d: / }).first()).toBeVisible();
   // The run survives a reload (give IndexedDB a moment to commit the last write).
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(1000);
   await page.reload();
   await expect(page.getByRole("button", { name: /^Bench slot \d: / }).first()).toBeVisible();
 
@@ -341,5 +344,85 @@ test("Currency Wars: download, play a run, browse items", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /Every mechanic/ })).toBeVisible();
   await page.goto("/guides/view?g=crystal-ores");
   await expect(page.getByRole("heading", { name: /Every Crystal Ore/ })).toBeVisible();
+  expect(errors).toEqual([]);
+});
+
+test("Currency Wars 4.7: Voyage Companion, Trailblaze Store and Plot Armor in a real run", async ({ page }) => {
+  test.setTimeout(120_000);
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(String(e)));
+  await installGameData(page);
+  await installCwWiki(page);
+  await page.goto("/currency-wars");
+  await page.getByRole("button", { name: "Download Currency Wars data" }).click();
+  // The collection is empty before any run.
+  await expect(page.getByText(/Companions met 0\/11/)).toBeVisible();
+  await page.getByRole("textbox", { name: "Seed" }).fill("e2e47");
+  await page.getByRole("button", { name: "Start run" }).click();
+  // Escapade: the companion is revealed with an animation, once.
+  const reveal = page.getByRole("dialog", { name: "Your Voyage Companion" });
+  await expect(reveal.getByText("Escapade · Voyage Companion")).toBeVisible();
+  const companion = (await reveal.getByRole("heading").innerText()).trim();
+  await reveal.getByRole("button", { name: "Let's go" }).click();
+  await expect(reveal).toHaveCount(0);
+  const card = page.locator("section").filter({ has: page.getByRole("heading", { name: "Voyage Companion" }) });
+  await expect(card.getByText(companion, { exact: true })).toBeVisible();
+  const cards = (title: RegExp) => page.locator("section").filter({ has: page.getByRole("heading", { name: title }) }).locator("div.grid > button");
+  await cards(/Choose an Investment Environment/).first().click();
+
+  // Trailblaze Store: the starters are Trailblaze Silver Rail members, so it's open; the Express costs 0 TP.
+  const store = page.locator("section").filter({ has: page.getByRole("heading", { name: "Trailblaze Store" }) });
+  await expect(store.getByText(/\+20 TP after each combat|\+45 TP after each combat/)).toBeVisible();
+  await store.getByRole("button", { name: /^Buy Astral Express, warp! for 0/ }).click();
+  await expect(store.getByText("Express:")).toContainText("Astral Express, warp!");
+
+  // Play nodes until the Plot Armor selection (before the First Plane boss).
+  const plot = page.getByRole("heading", { name: /Plot Armor · Protagonist 1 of 2/ });
+  let fights = 0;
+  for (let i = 0; i < 40 && !(await plot.isVisible()); i++) {
+    if (await page.getByRole("heading", { name: /Backstage Tea Break|Pearliefin's Treasury/ }).isVisible()) { await cards(/Backstage Tea Break|Pearliefin's Treasury/).first().click(); continue; }
+    if (await page.getByRole("heading", { name: /Choose an Investment Strategy/ }).isVisible()) { await cards(/Choose an Investment Strategy/).first().click(); continue; }
+    if (await page.getByRole("heading", { name: /^Supply/ }).isVisible()) { await page.getByRole("button", { name: "Skip" }).click(); continue; }
+    if (await page.getByRole("heading", { name: /Encounter: pick a fight/ }).isVisible()) { await cards(/Encounter: pick a fight/).first().click(); continue; }
+    if (await page.getByRole("button", { name: /Next node/ }).isVisible()) { await page.getByRole("button", { name: /Next node/ }).click(); continue; }
+    await page.getByRole("button", { name: "Battle", exact: true }).click();
+    fights++;
+    await page.getByRole("button", { name: "Skip" }).click();
+    await page.getByRole("button", { name: /See results/ }).click();
+  }
+  expect(fights).toBeGreaterThan(2);
+  await expect(plot).toBeVisible();
+  // TP came in after the fights (HUD counter).
+  await expect(page.getByTitle("Trailblaze Power", { exact: true })).not.toHaveText(/^\s*0 TP/);
+  // Pick a deployed character, see two options, refresh for 1 gold, choose.
+  await page.getByRole("button", { name: /^Make .* the protagonist$/ }).first().click();
+  const panel = page.locator("section").filter({ has: plot });
+  const options = panel.locator("div.grid > button");
+  await expect(options).toHaveCount(2);
+  const gold = async () => Number((await page.getByText(/\d+ gold$/).first().innerText()).match(/\d+/)![0]);
+  const before = await gold();
+  await panel.getByRole("button", { name: /Refresh/ }).click();
+  expect(await gold()).toBe(before - 1);
+  await expect(panel.getByText(/Refreshed 1×/)).toBeVisible();
+  await options.first().click();
+  await expect(plot).toHaveCount(0);
+  const status = page.locator("section").filter({ has: page.getByRole("heading", { name: "Plot Armor", exact: true }) });
+  await expect(status.getByText(/Protagonist, Plane 1/)).toBeVisible();
+  await expect(page.getByLabel("Plot Armor").first()).toBeVisible();
+  await expect(status.getByText(/Plot Armor refresh for 1 gold/)).toBeHidden();
+  await status.getByText(/History/).click();
+  await expect(status.getByText(/Plot Armor refresh for 1 gold/)).toBeVisible();
+
+  // Everything survives a reload; the reveal doesn't replay.
+  await page.waitForTimeout(1000);
+  await page.reload();
+  await expect(page.getByText(/Protagonist, Plane 1/)).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Your Voyage Companion" })).toHaveCount(0);
+  await expect(page.locator("section").filter({ has: page.getByRole("heading", { name: "Trailblaze Store" }) }).getByText("Express:")).toContainText("Astral Express, warp!");
+
+  // The collection remembers the companion after the run ends.
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("button", { name: "Abandon" }).click();
+  await expect(page.getByText(/Companions met 1\/11/)).toBeVisible();
   expect(errors).toEqual([]);
 });

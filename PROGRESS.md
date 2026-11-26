@@ -81,6 +81,23 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-26 · 1.7.0 Version 4.7 mechanics: Trailblaze Store, Escapade, Plot Armor
+
+Added to the existing run simulator (nothing rebuilt or removed). Verified rules come from the HSR Wiki's 4.7 Currency Wars pages; everything else is a labelled, configurable assumption (`TSR_ASSUMED`, `ESCAPADE_ASSUMED`, `PLOT_ARMOR_CONFIG`).
+
+- **Trailblaze Silver Rail** (`trailblazeStore.ts`): Trailblaze Power after each combat (20/45/75/125/225 at Bond 2/4/6/8/10, read from the Bond text). The **Trailblaze Store** sells Bond characters, stat bonuses I–IV, DMG Amplification/Mitigation IV, Projectors, Bond-exclusive Components (from level 6) and TP packs, plus the **Astral Express** (warp → Forward II → III; Fuel, Light Rail, SPD Boost). Prices rise by 40 (Enhancements) and 60 (Components) per purchase; level 10 gives 500 TP and Forward IV once; spending 500 TP unlocks King Pom-Pom. Purchases change real systems: stats and the Express raise fight strength (the Express fights in the battle viewer), Fuel makes TP from crashes, Overload Energy Module makes TP each node, Projectors copy characters.
+- **Escapade** (`voyageCompanions.ts`, `escapade.ts`): one of the 11 Voyage Companions per run, with one of its wiki effects (equipment, resource or node), revealed with an animation once. All 40 effects work in play: Backstage Tea Break replaces the Reward Node before the boss (Photo Op copies, auto-buying, It Takes Three, Woof Woof Dan's affix/difficulty/star cuts, Himekat's coffees, Sundove moving nodes, Cottontail's transformation, Ashwolf's assignments, Bubble Wolf's bonus Strategy / powerful Plot Armor / Trotters, Pearliefin's Projectors and copies), Pearliefin's Treasury, Woof Woof Dan's Perfect Clears, Mr. Yang's Imploding Singularity, Turbulence slot, Talent slot and Belobog Robot, Evanefox's Supply changes, Mummicat's refunds and Basic Weapon Boxes. A collection remembers companions, effects and Plot Armor across runs.
+- **Plot Armor** (`plotArmor.ts`): two protagonists chosen from deployed characters, before the Plane 1 and Plane 2 bosses; two options (character, Bond, resource) with target, duration and difficulty; refreshes use free ones first (by source), then gold (1 for the first paid ones, then rising); history. Investments: Plot Armor Procurement, Early Entrance (nodes 1-6 / 2-4), Refresh Chain/Refresh Chain+, New Cast Performance (change protagonist), It's A Wrap (disable + swaps). Roll-Call 5 gives an Imagenae: Plot Armor item (a separate holder, not a third protagonist); Roll-Call 7 gives holders +100% strength and +50% SPD. The five Plot Armor Bonds join the protagonist to that Bond with their effects. Bubble Wolf makes powerful options likelier and free of difficulty.
+- Save/load: all of it lives in the saved run; one-time grants are flagged, so reloading never repeats a reward (tested by replaying a full run with a save/load round-trip at every step).
+
+### Corrections to the request (from the wiki)
+- 20/45/75/125/225 are the Trailblaze Power you **receive after each combat** at Bond levels 2/4/6/8/10, not purchase thresholds.
+- Moving the Plot Armor selection to nodes 1-6 / 2-4 is the **Early Entrance** environment; **Plot Armor Procurement** fixes the refresh price at 1 gold and gives 6 free refreshes.
+- The wiki has no complete list of Plot Armor effects, so apart from the five Plot Armor Bonds the options are labelled stand-ins. No verified "replacement" mechanic exists beyond New Cast Performance, It's A Wrap and the Advantage Layout's Reselect Protagonist (not part of the simulator), so no others were added.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **205/205** (69 Currency Wars run tests, 18 new) · E2E **14/14** on the server build and the static web edition (new: a real run through the companion reveal, Trailblaze Store, Plot Armor selection with a paid refresh, reload and collection) · real wiki data checked in a browser, no page errors, no phone overflow · calibration bot unchanged (A0 ≈ 84%, A4 ≈ 53%).
+
 ## 2026-11-26 · 1.6.6 Store refresh every node
 
 - The store gets new stock at the start of every node: after a fight, a Supply pick or skip, a Strategy or Encounter. The shop header says so ("new stock for P1-4").

@@ -8,8 +8,12 @@ import { combinations, combineResult, describe as describeItem, goldOreName, isO
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
   ASSUMED, advance, applyEffect, enterNode, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
-  nodeKind, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState,
+  nodeKind, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
+import { chooseProtagonist, eligible, refreshPlot, refreshPrice, changeProtagonist, plotOf, plotOptions, PLOT_ARMOR_CONFIG } from "../currencywars/plotArmor";
+import { buyTsr, expressPower, refreshTsr, tsrIncome, tsrOf, priceOf, tsrGood, TSR_GOODS } from "../currencywars/trailblazeStore";
+import { COMPANIONS } from "../currencywars/voyageCompanions";
+import { openBox, shiftEarlier } from "../currencywars/escapade";
 import { bondVariants, withVariants, type CwPack } from "../currencywars/sim";
 import { createRng } from "../warp/simulator";
 
@@ -234,8 +238,13 @@ const PACK: CwPack = {
 /** Plays a run with a simple, sensible policy; returns the final state. */
 function autoplay(seed: string, rank = "A0-1", smart = true): RunState {
   let s = newRun(PACK, seed, rank);
-  for (let guard = 0; guard < 400 && s.phase !== "over"; guard++) {
+  for (let guard = 0; guard < 600 && s.phase !== "over"; guard++) {
     if (s.phase === "environment") s = chooseEnvironment(s, PACK, 0);
+    else if (s.phase === "teaBreak") s = pickTea(s, PACK, 0);
+    else if (s.phase === "plotArmor") {
+      const cur = s.plotArmor!.current!;
+      s = cur.uid === undefined ? chooseProtagonist(s, PACK, eligible(s)[0].uid) : choosePlotArmor(s, PACK, 0);
+    }
     else if (s.phase === "strategy") s = pickStrategy(s, PACK, 0);
     else if (s.phase === "supply") { const n = pickSupply(s, PACK, 0); s = n.phase === "supply" ? skipSupply(n, PACK) : n; }
     else if (s.phase === "encounter") s = { ...s, phase: "prep", encounter: "easy" };
@@ -246,7 +255,7 @@ function autoplay(seed: string, rank = "A0-1", smart = true): RunState {
         s.shop.forEach((slot, i) => { if (slot && s.gold - slot.cost >= 4) s = buy(s, PACK, i); });
         for (let i = 0; i < s.bench.length; i++) {
           const u = s.bench[i];
-          if (!u) continue;
+          if (!u || !PACK.info![u.name]) continue;
           const zone = PACK.info![u.name].field === "off" ? "off" : "on";
           const free = s[zone].findIndex((x) => !x);
           if (free >= 0) s = moveUnit(s, { zone: "bench", index: i }, { zone, index: free });
@@ -755,7 +764,7 @@ describe("Investment grants (items, characters, Peppy, later and repeated grants
     expect(run("Obtain 1 random basic equipment, 1 random 4-cost character(s), and 6 Gold Coin(s).")[0].gold).toBe(fresh().gold + 6);
     expect(run("Obtain 2 of each type of basic equipment.")[0].bag).toHaveLength(4);
     const [s3, a3] = run('Obtains 1 "Staff Projector."');
-    expect([s3.bag, a3]).toEqual([[], ["not simulated: Staff Projector"]]);
+    expect([s3.bag, a3]).toEqual([["Staff Projector"], ["Staff Projector"]]);
   });
 
   it("Bond characters (Index Funds), random Bond members, and every N-cost character", () => {
@@ -836,7 +845,8 @@ describe("Hiring Spree", () => {
     expect(a.gold).toBe(13 - 12 + 10);
     expect(units(a).filter((u) => u.cost === 4).length - units(s).filter((u) => u.cost === 4).length).toBe(3);
     expect(applied.join(" ")).toMatch(/−12 gold → 3 random 4-cost characters/);
-    expect(applied.join(" ")).toMatch(/not simulated: Perfect Projector/);
+    expect(applied.join(" ")).toMatch(/Perfect Projector/);
+    expect(applied.join(" ")).not.toMatch(/not simulated/);
   });
 });
 
@@ -901,5 +911,323 @@ describe("store refresh", () => {
     expect(s.log.at(-1)).toMatch(/kept by Lock/);
     s = advance({ ...s, phase: "result" }, PACK);
     expect(s.shopNote).toBe("refreshed");
+  });
+});
+
+// --------------------------------------------------------------------------------------------- 4.7: Trailblaze Store, Escapade, Plot Armor
+
+const TSR_MEMBERS: [string, number][] = [["March 7th (The Hunt)", 1], ["Sunday", 2], ["Trailblazer (Elation)", 3], ["Himeko • Nova", 4], ["Dan Heng • Imbibitor Lunae", 5], ["King Pom-Pom", 5]];
+const PHANTASMOON: [string, number][] = [["Sparxie", 2], ["Evanescia", 3], ["Silver Wolf LV.999", 4], ["Ashveil", 4], ["Mortenax Blade", 5]];
+const P47: CwPack = {
+  ...PACK,
+  characters: [...PACK.characters, ...[...TSR_MEMBERS, ...PHANTASMOON].map(([name, cost]) => ({ name, cost }))],
+  bonds: [
+    ...PACK.bonds,
+    { name: "Trailblaze Silver Rail", category: "Faction", members: ["Welt", ...TSR_MEMBERS.map(([n]) => n)], summary: "", levels: [
+      { count: 2, effect: '20 "Trailblaze Power." Astral Express, all aboard!', tier: "bronze" }, { count: 4, effect: '45 "Trailblaze Power." Goods become better.', tier: "silver" },
+      { count: 6, effect: '75 "Trailblaze Power." Goods become better, and Bond-exclusive Components appear.', tier: "gold" }, { count: 8, effect: '125 "Trailblaze Power."', tier: "gold" }, { count: 10, effect: '225 "Trailblaze Power"! Express evolution!', tier: "plat" }] },
+    { name: "Phantasmoon Games: Roll-Call", category: "Faction", members: ["Pearl", "Sunday", ...PHANTASMOON.map(([n]) => n)], summary: "", levels: [
+      { count: 3, effect: "The strongest character performs Roll-Call.", tier: "bronze" }, { count: 5, effect: 'Immediately gains 1 "Imagenae: Plot Armor."', tier: "silver" }, { count: 7, effect: "All characters with Plot Armor perform Roll-Call.", tier: "gold" }] },
+    { name: "Follow-Up ATK", category: "School", members: ["Feixiao", "March 7th (The Hunt)"], summary: "", levels: [{ count: 3, effect: "x", tier: "bronze" }] },
+    { name: "Joint Follow-Up ATK", category: "Plot Armor", members: [], summary: 'Only takes effect on "Follow-Up ATK" characters:', levels: [{ count: 1, effect: "After taking action, there is a 15% chance of advancing action by 100%.", tier: "bronze" }, { count: 2, effect: "KO x2", tier: "gold" }] },
+    { name: "Deliverer", category: "Plot Armor", members: [], summary: 'Become "Deliverer."', levels: [{ count: 1, effect: "Gains all non-independent Bond effects activated by on-field characters.", tier: "gold" }] },
+  ],
+  info: { ...PACK.info, ...Object.fromEntries([...TSR_MEMBERS, ...PHANTASMOON].map(([name, cost]) => [name, { cost, field: "both" as const, roles: [], bonds: [], onField: STR[cost], offField: STR[cost], hp: [0, 30, 60] }])) },
+};
+const u47 = (uid: number, name: string, stars: 1 | 2 | 3 = 1, items: string[] = []) => ({ uid, name, cost: P47.characters.find((c) => c.name === name)!.cost, stars, items });
+/** A run in preparation at a node, with `on` deployed (On-Field first, then Off-Field). */
+function at47(names: string[], extra: Partial<RunState> = {}, opts: { companion?: string; variant?: string } = { companion: "Sundove", variant: "sd-gift" }): RunState {
+  const s = chooseEnvironment(newRun(P47, "t47", "A0-1", opts), P47, 0);
+  const all = names.map((n, i) => u47(500 + i, n));
+  return { ...s, phase: "prep", level: 10, gold: 50, on: [...all.slice(0, 4), ...Array(4).fill(null)].slice(0, 4), off: [...all.slice(4, 10), ...Array(6).fill(null)].slice(0, 6), bench: Array(9).fill(null), bag: [], ...extra };
+}
+
+describe("4.7 Trailblaze Silver Rail: Trailblaze Power and the Trailblaze Store", () => {
+  it("TP per combat phase by Bond level comes from the Bond text (20/45/75/125/225)", () => {
+    expect([1, 2, 3, 4, 6, 8, 10].map((l) => tsrIncome(P47, l))).toEqual([0, 20, 20, 45, 75, 125, 225]);
+  });
+
+  it("opens at level 2, pays TP after each fight, and goods unlock as the Bond grows", () => {
+    const s0 = at47(["Welt", "March 7th (The Hunt)"]);
+    const s = settle(s0, P47);
+    expect(s.tsr!.best).toBe(2);
+    expect(s.tsr!.stock).toHaveLength(6);
+    expect(s.note).toMatch(/Trailblaze Store open/);
+    expect(settle(s, P47)).toBe(s); // nothing new: same object, no duplicate notices
+    expect(refreshTsr({ ...s, gold: 0 }, P47, 2).note).toMatch(/Refresh All costs 1 gold/);
+    const rolled = refreshTsr(s, P47, 2);
+    expect(rolled.gold).toBe(s.gold - 1);
+    expect(new Set(rolled.tsr!.stock).size).toBe(rolled.tsr!.stock.length); // no repeats while goods last
+    const fought = battle({ ...s, plane: 0, node: 3 }, P47);
+    expect(fought.tsr!.tp).toBe(20);
+    expect(fought.tsr!.stock.every((id) => tsrGood(id)!.minLevel <= 2)).toBe(true);
+    const four = battle(settle(at47(["Welt", "March 7th (The Hunt)", "Sunday", "Trailblazer (Elation)"], { plane: 0, node: 3 }), P47), P47);
+    expect(four.tsr!.tp).toBe(45);
+    expect(four.log.join(" ")).toMatch(/goods became better/);
+  });
+
+  it("buys characters, stats and Express parts with TP; prices rise by 40 / 60; King Pom-Pom after 500 TP spent", () => {
+    let s = settle(at47(["Welt", "March 7th (The Hunt)", "Sunday", "Trailblazer (Elation)", "Himeko • Nova", "Dan Heng • Imbibitor Lunae"]), P47);
+    s = { ...s, tsr: { ...tsrOf(s), tp: 1000 } };
+    const lvl = 6;
+    const bought = buyTsr(s, P47, "char-Sunday", lvl);
+    expect(bought.tsr!.tp).toBe(965);
+    expect(units(bought).filter((u) => u.name === "Sunday")).toHaveLength(2);
+    expect(buyTsr(s, P47, "on-4", lvl).note).toMatch(/Bond level 8/);
+    const on1 = buyTsr(s, P47, "on-1", lvl);
+    expect(teamPower(on1, P47).power).toBeGreaterThan(teamPower(s, P47).power);
+    let e = buyTsr(s, P47, "fuel", lvl);
+    expect(e.tsr!.consumed).toBe(40);
+    expect(priceOf(e.tsr!, tsrGood("rail")!)).toBe(80);
+    e = buyTsr(e, P47, "rail", lvl);
+    expect(e.tsr!.consumed).toBe(120);
+    const c = buyTsr(s, P47, "comp-Nameless Proof", lvl);
+    expect(c.bag).toContain("Nameless Proof");
+    expect(priceOf(c.tsr!, tsrGood("comp-Navigator's Banner")!)).toBe(160);
+    expect(buyTsr(s, P47, "char-King Pom-Pom", lvl).note).toMatch(/Consume 500 TP/);
+    const spent = { ...s, tsr: { ...tsrOf(s), consumed: 470 } };
+    const unlocked = buyTsr(spent, P47, "staff", lvl);
+    expect(unlocked.log.join(" ")).toMatch(/King Pom-Pom unlocked/);
+    expect(buyTsr(unlocked, P47, "char-King Pom-Pom", lvl).note ?? "").not.toMatch(/Consume/);
+    expect(buyTsr({ ...s, tsr: { ...tsrOf(s), tp: 5 } }, P47, "char-Sunday", lvl).note).toMatch(/costs 35/);
+  });
+
+  it("the Express fights with you: warp → Forward II → III, Fuel makes TP from crashes", () => {
+    let s = settle(at47(["Welt", "March 7th (The Hunt)", "Sunday", "Trailblazer (Elation)", "Himeko • Nova", "Dan Heng • Imbibitor Lunae"], { plane: 0, node: 3 }), P47);
+    s = { ...s, tsr: { ...tsrOf(s), tp: 500 } };
+    expect(buyTsr(s, P47, "forward2", 6).note).toMatch(/Needs the Express/);
+    const base = teamPower(s, P47).power;
+    s = buyTsr(s, P47, "warp", 6);
+    expect(expressPower(s, 150).collisions).toBe(1);
+    expect(teamPower(s, P47).power).toBeGreaterThan(base);
+    s = buyTsr(buyTsr(buyTsr(s, P47, "forward2", 6), P47, "forward3", 6), P47, "fuel", 6);
+    const ex = expressPower(s, 150);
+    expect(ex.collisions).toBe(4);
+    const fought = battle(s, P47);
+    expect(fought.last!.express!.collisions).toBe(4);
+    expect(fought.last!.timeline!.units.some((x) => x.name === "Astral Express")).toBe(true);
+    expect(fought.tsr!.tp - s.tsr!.tp).toBe(75 + 5 * 4);
+  });
+
+  it("Bond level 10 grants 500 TP and Forward IV exactly once", () => {
+    const s = at47(["Welt"], { tsr: { ...tsrOf(at47([])), best: 8, stock: ["on-1"] } });
+    const tsrSync = (x: RunState) => settle({ ...x, on: x.on, off: x.off }, P47);
+    // Ten "members" via Emblems isn't in the fixture, so drive syncTsrLevel through settle's count with extra copies of the Bond.
+    const ten: CwPack = { ...P47, bonds: P47.bonds.map((b) => (b.name === "Trailblaze Silver Rail" ? { ...b, members: [...b.members, "Pearl", "Natasha", "Robin"] } : b)) };
+    const board = { ...s, on: [u47(1, "Welt"), u47(2, "March 7th (The Hunt)"), u47(3, "Sunday"), u47(4, "Trailblazer (Elation)")], off: [u47(5, "Himeko • Nova"), u47(6, "Dan Heng • Imbibitor Lunae"), u47(7, "King Pom-Pom"), u47(8, "Pearl"), u47(9, "Natasha"), u47(10, "Robin")] };
+    const once = settle(board, ten);
+    expect(once.tsr!.tp).toBe(500);
+    expect(once.tsr!.express).toBe(4);
+    const twice = settle(JSON.parse(JSON.stringify(once)), ten);
+    expect(twice.tsr!.tp).toBe(500);
+    expect(tsrSync).toBeTruthy();
+  });
+
+  it("Projectors copy characters within their limits; Overload Energy Module makes TP each node", () => {
+    const s = at47(["Sunday", "Feixiao"], { bag: ["Trailblaze: Staff Projector", "Trailblaze: Staff Projector"] });
+    const copied = equip(s, P47, 0, { zone: "on", index: 0 });
+    expect(units(copied).filter((u) => u.name === "Sunday")).toHaveLength(2);
+    expect(copied.bag).toEqual(["Trailblaze: Staff Projector"]);
+    expect(equip(s, P47, 0, { zone: "on", index: 1 }).note).toMatch(/Trailblaze Silver Rail/);
+    const kpp = at47(["King Pom-Pom"], { bag: ["Overload Energy Module", "Navigator's Banner"] });
+    expect(equip(kpp, P47, 0, { zone: "on", index: 0 }).on[0]!.items).toEqual(["Overload Energy Module"]);
+    expect(equip(at47(["Kafka"], { bag: ["Overload Energy Module"] }), P47, 0, { zone: "on", index: 0 }).note).toMatch(/only be equipped by King Pom-Pom/);
+    const worn = { ...kpp, on: [{ ...kpp.on[0]!, stars: 2 as const, items: ["Overload Energy Module"] }, null, null, null], plane: 0, node: 3 };
+    expect(tsrOf(enterNode(worn, P47)).tp).toBe(20);
+  });
+});
+
+describe("4.7 Escapade: Voyage Companions and Backstage Tea Break", () => {
+  it("every run has one of the 11 companions with one of its effects, replayable from the seed", () => {
+    expect(COMPANIONS).toHaveLength(11);
+    const seen = new Set<string>();
+    for (let i = 0; i < 60; i++) {
+      const s = newRun(P47, `c${i}`, "A0-1");
+      const c = COMPANIONS.find((x) => x.name === s.escapade!.companion)!;
+      expect(c.variants.some((v) => v.id === s.escapade!.variant)).toBe(true);
+      expect(s.escapade!.revealed).toBe(false);
+      seen.add(c.name);
+    }
+    expect(seen.size).toBeGreaterThan(8);
+    expect(newRun(P47, "c1", "A0-1").escapade).toEqual(newRun(P47, "c1", "A0-1").escapade);
+  });
+
+  it("Pearliefin: the Reward Node before the First Plane boss becomes a Tea Break with real rewards, once", () => {
+    const s = at47(["Kafka"], { plane: 0, node: 7 }, { companion: "Pearliefin", variant: "pf-gifts" });
+    const tea = enterNode(s, P47);
+    expect(tea.phase).toBe("teaBreak");
+    expect(tea.offers.teaBreak!.options[0].name).toBe("Draw a Few More Sketches.");
+    const after = pickTea(tea, P47, 0);
+    expect(after.bag.filter((x) => x === "Intern Projector")).toHaveLength(3);
+    expect(after.node).toBe(8);
+    expect(after.escapade!.done).toEqual([0]);
+    expect(after.escapade!.history.map((h) => h.text).join(" ")).toMatch(/Backstage Tea Break/);
+    expect(pickTea(after, P47, 0)).toBe(after);
+    // Reloaded mid-run: the same node never offers it again.
+    expect(enterNode(JSON.parse(JSON.stringify({ ...after, node: 7 })), P47).phase).not.toBe("teaBreak");
+  });
+
+  it("Woof Woof Dan turns the first loss of each plane into a Perfect Clear", () => {
+    const s = at47(["Welt"], { plane: 1, node: 0, gold: 0 }, { companion: "Woof Woof Dan", variant: "wd-each" });
+    const first = battle(s, P47);
+    expect(first.last!.won).toBe(true);
+    expect(first.last!.saved).toBe(true);
+    expect(first.hp).toBe(100);
+    const second = battle({ ...first, phase: "prep" }, P47);
+    expect(second.last!.saved).toBeFalsy();
+  });
+
+  it("Evanefox, Mummicat and Sundove change Supplies, equipment and the node order", () => {
+    const sup = enterNode(at47(["Kafka"], { plane: 0, node: 4 }, { companion: "Evanefox", variant: "ef-2star" }), P47);
+    expect(sup.offers.supply!.every((o) => o.stars === 2)).toBe(true);
+    expect(pickSupply(sup, P47, 0).bench.find(Boolean)!.stars).toBe(2);
+    const box = enterNode(at47(["Kafka"], { plane: 0, node: 4 }, { companion: "Mummicat", variant: "mc-box" }), P47);
+    const took = pickSupply(box, P47, 0);
+    expect(took.bag).toContain("Basic Weapon Box");
+    const opened = openBox(took, P47, took.bag.indexOf("Basic Weapon Box"), "Folding Knife");
+    expect(opened.bag).toContain("Folding Knife");
+    const early = newRun(P47, "sd", "A0-1", { companion: "Sundove", variant: "sd-strategy" });
+    expect(nodeKind({ ...early, plane: 0, node: 1 })).toBe("Strategy");
+    expect(shiftEarlier(["Combat", "Strategy", "Supply"], "Supply")).toEqual(["Combat", "Supply", "Strategy"]);
+  });
+
+  it("March Bunny adds XP in Planes 2–3; Ashwolf's assignment pays once; Bubble Wolf adds a Strategy pick", () => {
+    const mb = at47(["Kafka"], { plane: 1, xp: 0, level: 5 }, { companion: "March Bunny", variant: "mb-xp" });
+    expect(buyXp(mb).xp).toBe(ASSUMED.xpPerBuy + 1);
+    const aw = enterNode(at47(["Kafka"], { plane: 1, node: 0, gold: 10 }, { companion: "Ashwolf", variant: "aw-plane" }), P47);
+    expect(aw.escapade!.assignments).toHaveLength(1);
+    const rich = settle({ ...aw, phase: "prep", gold: 120, streak: 4, level: 10, hp: 100, stats: { ...aw.stats, refreshes: 99, losses: 9 }, on: [u47(9, "Kafka", 3), u47(10, "Jade", 3), null, null] }, P47);
+    const done = rich.escapade!.completed ?? [];
+    if (aw.escapade!.assignments![0].id.match(/healthy|extreme|encounter/)) expect(done).toHaveLength(0);
+    else { expect(done).toHaveLength(1); expect(rich.bag).toContain("Gold Crystal Ore"); expect(settle(rich, P47)).toBe(rich); }
+    const bw = { ...at47(["Kafka"], { plane: 1, node: 0 }, { companion: "Bubble Wolf", variant: "bw-strategy" }) };
+    const flagged = { ...bw, escapade: { ...bw.escapade!, extraStrategy: true } };
+    const entered = enterNode(flagged, P47);
+    expect(entered.phase).toBe("strategy");
+    const picked = pickStrategy(entered, P47, 0);
+    expect(picked.phase).toBe(nodeKind(picked) === "Combat" ? "prep" : picked.phase);
+    expect(picked.escapade!.extraStrategy).toBe(false);
+  });
+});
+
+describe("4.7 Plot Armor", () => {
+  const toBoss = (s: RunState, plane = 0) => enterNode({ ...s, plane, node: RULES.planes[plane].length - 1 }, P47);
+  it("two protagonists, chosen from deployed characters before the Plane 1 and Plane 2 bosses", () => {
+    const s = toBoss(at47(["Kafka", "Welt", "Feixiao"]));
+    expect(s.phase).toBe("plotArmor");
+    expect(eligible(s).map((u) => u.name)).toEqual(["Kafka", "Welt", "Feixiao"]);
+    const picked = chooseProtagonist(s, P47, eligible(s)[0].uid);
+    expect(picked.plotArmor!.current!.options).toHaveLength(PLOT_ARMOR_CONFIG.options);
+    const lead = plotOptions(P47).findIndex((o) => o.id === "lead");
+    const chosen = choosePlotArmor({ ...picked, plotArmor: { ...picked.plotArmor!, current: { ...picked.plotArmor!.current!, options: ["lead", "pay"] } } }, P47, 0);
+    expect(lead).toBeGreaterThanOrEqual(0);
+    expect(chosen.phase).toBe("prep");
+    expect(chosen.plotArmor!.holders).toEqual([expect.objectContaining({ name: "Kafka", option: "lead", source: "protagonist", plane: 0 })]);
+    expect(teamPower(chosen, P47).power).toBeGreaterThan(teamPower(s, P47).power);
+    // Reloading or re-entering the node doesn't ask again; the Second Plane boss asks for Protagonist 2; the Third doesn't.
+    expect(toBoss(JSON.parse(JSON.stringify(chosen))).phase).toBe("prep");
+    const second = toBoss(chosen, 1);
+    expect(second.phase).toBe("plotArmor");
+    expect(eligible(second).map((u) => u.name)).toEqual(["Welt", "Feixiao"]);
+    const p2 = choosePlotArmor(chooseProtagonist(second, P47, eligible(second)[0].uid), P47, 0);
+    expect(p2.plotArmor!.holders).toHaveLength(2);
+    expect(toBoss(p2, 2).phase).toBe("prep");
+  });
+
+  it("refreshes: 1 gold for the first paid ones, then rising; free ones (by source) first; history kept", () => {
+    let s = chooseProtagonist(toBoss(at47(["Kafka", "Welt"], { gold: 20 })), P47, 500);
+    const costs: number[] = [];
+    for (let i = 0; i < 4; i++) { costs.push(refreshPrice(plotOf(s))); s = refreshPlot(s, P47); }
+    expect(costs).toEqual([1, 1, 2, 3]);
+    expect(s.gold).toBe(20 - 7);
+    expect(plotOf(s).history.filter((h) => h.kind === "refresh")).toHaveLength(4);
+    expect(refreshPlot({ ...s, gold: 0 }, P47).note).toMatch(/costs 4 gold/);
+    const [chain] = applyEffect(s, P47, 'When refreshing the "Plot Armor" effect, gains 1 free Store refresh(es). Gains 3 free Plot Armor refresh(es).', createRng("x"), "Refresh Chain");
+    const r = refreshPlot(chain, P47);
+    expect(r.gold).toBe(chain.gold);
+    expect(r.freeRefreshes).toBe(chain.freeRefreshes + 1);
+    expect(plotOf(r).free).toEqual([{ source: "Refresh Chain", left: 2 }]);
+  });
+
+  it("Plot Armor Procurement fixes the price at 1 and gives 6 free; Early Entrance moves selection to 1-6 and 2-4", () => {
+    const [p, applied] = applyEffect(at47(["Kafka"]), P47, "The Plot Armor refresh cost for this run is fixed at 1 Gold Coin(s), and you'll receive 6 free Plot Armor refreshes.", createRng("y"), "Plot Armor Procurement");
+    expect(applied.join(" ")).not.toMatch(/not simulated/);
+    expect(plotOf(p)).toMatchObject({ fixedCost: 1, free: [{ source: "Plot Armor Procurement", left: 6 }] });
+    expect(refreshPrice({ ...plotOf(p), paid: 9 })).toBe(1);
+    const [e] = applyEffect(at47(["Kafka"]), P47, "The Plot Armor selection stage has been moved up to Nodes 1-6 and 2-4.", createRng("z"), "Early Entrance");
+    expect(enterNode({ ...e, plane: 0, node: 5 }, P47).phase).toBe("plotArmor");
+    expect(enterNode({ ...e, plane: 1, node: 3 }, P47).phase).toBe("plotArmor");
+    expect(enterNode({ ...e, plane: 0, node: 8 }, P47).phase).not.toBe("plotArmor");
+  });
+
+  it("Plot Armor Bonds join the protagonist to the Bond; New Cast changes, It's A Wrap swaps", () => {
+    const s = chooseProtagonist(toBoss(at47(["Feixiao", "March 7th (The Hunt)", "Kafka"])), P47, 500);
+    const withBond = choosePlotArmor({ ...s, plotArmor: { ...s.plotArmor!, current: { ...s.plotArmor!.current!, options: ["bond:Joint Follow-Up ATK", "pay"] } } }, P47, 0);
+    expect(teamPower(withBond, P47).bonds.find((b) => b.bond.name === "Joint Follow-Up ATK")?.tier).toBe("bronze");
+    expect(teamPower(withBond, P47).power).toBeGreaterThan(teamPower({ ...withBond, plotArmor: { ...withBond.plotArmor!, holders: [] } }, P47).power);
+    const [nc] = applyEffect(withBond, P47, "Obtains 1 chance(s) to change the Protagonist, and get 10 free Plot Armor refresh(es).", createRng("n"), "New Cast Performance");
+    expect(plotOf(nc)).toMatchObject({ changes: 1, free: [{ source: "New Cast Performance", left: 10 }] });
+    const moved = changeProtagonist(nc, 500, 502);
+    expect(plotOf(moved).holders[0].name).toBe("Kafka");
+    expect(plotOf(moved).changes).toBe(0);
+    const [wrap] = applyEffect(withBond, P47, "All protagonists' Plot Armor is disabled. Gain an equal number of chances to swap them out.", createRng("w"), "It's A Wrap");
+    expect(plotOf(wrap).holders[0].disabled).toBe(true);
+    expect(plotOf(wrap).swaps).toBe(1);
+    const swapping = useSwap(wrap, P47);
+    expect(swapping.phase).toBe("plotArmor");
+    const swapped = choosePlotArmor(chooseProtagonist(swapping, P47, 501), P47, 1);
+    expect(swapped.phase).toBe("prep");
+    expect(plotOf(swapped).holders.filter((h) => !h.disabled)).toEqual([expect.objectContaining({ source: "swap", name: "March 7th (The Hunt)" })]);
+  });
+
+  it("Roll-Call: 5 members give one Imagenae: Plot Armor (not a protagonist); 7 boost Plot Armor holders", () => {
+    const five = at47(["Pearl", "Sparxie", "Evanescia", "Silver Wolf LV.999", "Ashveil"], { variants: { "Phantasmoon Games": "Phantasmoon Games: Roll-Call" } });
+    const got = settle(five, P47);
+    expect(got.bag).toEqual(["Phantasmoon: Plot Armor"]);
+    expect(settle(JSON.parse(JSON.stringify({ ...got, bag: [] })), P47).bag).toEqual([]); // never twice
+    const using = equip(got, P47, 0, { zone: "on", index: 0 });
+    expect(using.phase).toBe("plotArmor");
+    expect(using.plotArmor!.current).toMatchObject({ stage: "imagenae", uid: 500 });
+    const done = choosePlotArmor(using, P47, 0);
+    expect(done.phase).toBe("prep");
+    expect(plotOf(done).holders[0]).toMatchObject({ source: "imagenae", name: "Pearl" });
+    expect(plotOf(done).done).toEqual([]); // protagonist selections untouched
+    const seven = { ...done, off: [...done.off.slice(0, 1), u47(600, "Mortenax Blade"), u47(601, "Sunday"), ...done.off.slice(3)] };
+    const pb = (x: RunState) => teamPower(x, P47).per.find((p) => p.uid === 500)!.plot;
+    expect(teamPower(seven, P47).rollCall7).toBe(true);
+    expect(pb(seven) - pb(done)).toBeCloseTo(1, 5);
+  });
+
+  it("Bubble Wolf's System, Activate! stops Plot Armor adding enemy difficulty", () => {
+    const s = chooseProtagonist(toBoss(at47(["Kafka"])), P47, 500);
+    const pick = (x: RunState) => choosePlotArmor({ ...x, plotArmor: { ...x.plotArmor!, current: { ...x.plotArmor!.current!, options: ["star", "pay"] } } }, P47, 0);
+    expect(pick(s).extraDifficulty - s.extraDifficulty).toBe(4);
+    const boosted = { ...s, escapade: { ...s.escapade!, powerfulPlot: true } };
+    expect(pick(boosted).extraDifficulty).toBe(s.extraDifficulty);
+  });
+
+  it("a whole run with all three systems survives save/load at every step and replays the same", () => {
+    const play = (roundTrip: boolean) => {
+      let s = newRun(P47, "full47", "A0-1", { companion: "Pearliefin", variant: "pf-gifts" });
+      for (let g = 0; g < 600 && s.phase !== "over"; g++) {
+        if (roundTrip) s = JSON.parse(JSON.stringify(s));
+        if (s.phase === "environment") s = chooseEnvironment(s, P47, 0);
+        else if (s.phase === "teaBreak") s = pickTea(s, P47, 0);
+        else if (s.phase === "plotArmor") s = s.plotArmor!.current!.uid === undefined ? chooseProtagonist(s, P47, eligible(s)[0].uid) : choosePlotArmor(s, P47, 0);
+        else if (s.phase === "strategy") s = pickStrategy(s, P47, 0);
+        else if (s.phase === "supply") s = skipSupply(s, P47);
+        else if (s.phase === "encounter") s = { ...s, phase: "prep", encounter: "easy" };
+        else if (s.phase === "result") s = advance(s, P47);
+        else s = battle(settle(s, P47), P47);
+      }
+      return s;
+    };
+    const a = play(false), b = play(true);
+    expect(a.phase).toBe("over");
+    expect(b).toEqual(a);
+    if (a.plane >= 1 || a.result === "cleared") expect(a.escapade!.done.length).toBeGreaterThan(0);
+    expect(new Set(a.plotArmor!.done).size).toBe(a.plotArmor!.done.length);
+    expect(TSR_GOODS.length).toBeGreaterThan(40);
+    expect(nextInterlude(a, P47)).toBe(a);
   });
 });

@@ -1,8 +1,9 @@
 "use client";
 
-import { Award, ThumbsUp, Clover, Coins, Crosshair, Flower2, Footprints, Gem, Pickaxe, Shield, Sparkles, Sword, Zap, type LucideIcon } from "lucide-react";
+import { Award, ThumbsUp, Clover, Coins, Cpu, Crosshair, Crown, Flower2, Footprints, Gem, Orbit, Package, Pickaxe, Projector, Shield, Sparkles, Sword, Zap, type LucideIcon } from "lucide-react";
 import { bondFamily, bondsOf, membersOf } from "@/lib/currencywars/bonds";
 import { emblemBond, oreGold, oreTier } from "@/lib/currencywars/items";
+import { specialItem } from "@/lib/currencywars/specialItems";
 import { useState } from "react";
 import { cwCharacterId } from "@/lib/currencywars/names";
 import type { BondTier, CwField } from "@/lib/currencywars/parse";
@@ -176,6 +177,11 @@ export function ItemIcon({ pack, name, size = 16 }: { pack: CwPack; name: string
   if (tier) return <span aria-hidden className={cx("inline-block shrink-0 rounded-full shadow-[0_0_8px_currentColor] ring-1 ring-white/50", ORE_ORB[tier])} style={{ width: size, height: size }} />;
   if (name === "Red Gem" || name === "Blue Gem" || name === "Wealth Gem") return <Gem size={size} className={name === "Red Gem" ? "text-rose-400" : name === "Blue Gem" ? "text-sky-400" : "text-amber-300"} aria-hidden />;
   if (emblemBond(pack, name)) return <Award size={size} className="text-amber-200" aria-hidden />;
+  const sp = specialItem(name);
+  if (sp) {
+    const Icon = sp.use === "projector" ? Projector : sp.use === "plotArmor" ? Crown : sp.use === "box" ? Package : name === "Imploding Singularity" ? Orbit : Cpu;
+    return <Icon size={size} className={sp.use === "plotArmor" ? "text-fuchsia-300" : sp.use === "projector" ? "text-sky-300" : sp.use === "box" ? "text-amber-200" : "text-amber-300"} aria-hidden />;
+  }
   const adv = pack.equipment?.advanced.find((a) => a.name === name);
   if (!adv) return <Sparkles size={size} className="text-violet-300" aria-hidden />;
   const [A, B] = adv.recipe.map((r) => BASIC_ICON[r] ?? Sparkles);

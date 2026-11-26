@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowDownToLine, Search, ThumbsUp, Coins, Dices, Flag, Gift, Heart, Lock, LockOpen, Package, Play, RefreshCw, Skull, Swords, Trophy, Undo2, X, type LucideIcon } from "lucide-react";
+import { ArrowDownToLine, Search, ThumbsUp, Coffee, Coins, Crown, Dices, Flag, Gift, Heart, Library, Lock, LockOpen, Package, Play, RefreshCw, Skull, Swords, Trophy, Undo2, X, Zap, type LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { WolfComment } from "@/components/SilverWolf";
 import { kvGet, kvSet } from "@/lib/db";
@@ -8,7 +8,16 @@ import {
   advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
   toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
+  choosePlotArmor, pickTea, placedBondStates, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
+import { openBox, specialNode } from "@/lib/currencywars/escapade";
+import { changeProtagonist, chooseProtagonist, PLOT_ARMOR_CONFIG, PLOT_ARMOR_RULES, plotOf, refreshPlot, selectionNode } from "@/lib/currencywars/plotArmor";
+import { specialItem } from "@/lib/currencywars/specialItems";
+import { buyTsr, refreshTsr, TSR_ASSUMED, TSR_BOND, TSR_RULES } from "@/lib/currencywars/trailblazeStore";
+import { companionOf } from "@/lib/currencywars/voyageCompanions";
+import { CompanionCard, CompanionCollection, CompanionReveal, TeaBreakPanel, useCollection } from "./Escapade";
+import { PlotArmorPanel, PlotArmorStatus } from "./PlotArmor";
+import { TrailblazeStorePanel } from "./TrailblazeStore";
 import { craftableNow, fillUnknown, gearMark, gearNeeds, type GearTarget } from "@/lib/currencywars/gear";
 import { isOre, itemKind, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS } from "@/lib/currencywars/items";
 import type { CwPack } from "@/lib/currencywars/sim";
@@ -60,7 +69,9 @@ function Setup({ pack, onStart }: { pack: CwPack; onStart: (rank: string, seed: 
 }
 
 function Hud({ run }: { run: RunState }) {
-  const kinds = nodeKinds(run.plane);
+  const kinds = nodeKinds(run.plane, run);
+  const plotAt = (PLOT_ARMOR_RULES.planes as readonly number[]).includes(run.plane) && !plotOf(run).done.includes(run.plane) ? selectionNode(run, run.plane) : -1;
+  const comp = run.escapade ? companionOf(run.escapade.companion) : undefined;
   const need = xpToNext(run.level);
   return (
     <div className="glass space-y-3 p-3">
@@ -69,15 +80,19 @@ function Hud({ run }: { run: RunState }) {
         <ol className="flex flex-wrap gap-1" aria-label="Nodes on this plane">
           {kinds.map((k, i) => {
             const real = i === run.node ? nodeKind(run) : nodeKind({ ...run, node: i });
-            const Icon = NODE_ICON[real];
+            const special = real === "Reward" && i >= run.node ? specialNode({ ...run, node: i }) : null;
+            const Icon = special === "teaBreak" ? Coffee : special === "treasury" ? Library : NODE_ICON[real];
+            const label = special === "teaBreak" ? "Backstage Tea Break" : special === "treasury" ? "Pearliefin's Treasury" : NODE_LABEL[real];
             return (
-              <li key={i} title={`${i + 1}. ${NODE_LABEL[real]}`} className={cx("relative flex h-7 w-7 items-center justify-center rounded-md border", i < run.node ? "border-line text-faint opacity-50" : i === run.node ? "border-cyan bg-cyan/15 text-cyan" : "border-line text-muted", real === "Boss" && i >= run.node && "border-rose-400/60 text-rose-300")}>
-                <Icon size={14} aria-hidden /><span className="sr-only">{NODE_LABEL[real]}{i === run.node ? " (now)" : ""}</span>
+              <li key={i} title={`${i + 1}. ${label}${i === plotAt ? " · Plot Armor selection" : ""}`} className={cx("relative flex h-7 w-7 items-center justify-center rounded-md border", i < run.node ? "border-line text-faint opacity-50" : i === run.node ? "border-cyan bg-cyan/15 text-cyan" : "border-line text-muted", real === "Boss" && i >= run.node && "border-rose-400/60 text-rose-300", special && "border-amber-300/60 text-amber-300")}>
+                <Icon size={14} aria-hidden /><span className="sr-only">{label}{i === run.node ? " (now)" : ""}{i === plotAt ? ", Plot Armor selection" : ""}</span>
+                {i === plotAt && i >= run.node && <Crown size={10} className="absolute -right-1 -top-1 text-fuchsia-300" aria-hidden />}
               </li>
             );
           })}
         </ol>
         <Badge tone="violet">{run.rank}</Badge>
+        {comp && <span className="flex items-center gap-1 text-xs text-muted" title="Voyage Companion"><span aria-hidden>{comp.emoji}</span>{comp.name}</span>}
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-5">
         <span className="flex items-center gap-1.5"><Heart size={15} className="text-rose-400" /> <b>{run.hp}</b><span className="text-faint">/100</span></span>
@@ -85,18 +100,23 @@ function Hud({ run }: { run: RunState }) {
         <span className="flex items-center gap-1.5">Lv.<b>{run.level}</b>{need > 0 && <span className="text-xs text-faint">{run.xp}/{need} XP</span>}</span>
         <span className="flex items-center gap-1.5"><Swords size={14} className="text-cyan" /> {deployed(run).length}/{teamSize(run)} deployed</span>
         <span className="flex items-center gap-1.5">Streak <b>{run.streak}</b></span>
+        {run.tsr && <span className="flex items-center gap-1.5" title="Trailblaze Power"><Zap size={14} className="text-amber-300" /> <b>{run.tsr.tp}</b> TP</span>}
+        {plotOf(run).holders.some((h) => !h.disabled) && <span className="flex items-center gap-1.5" title="Plot Armor holders"><Crown size={14} className="text-fuchsia-300" /> {plotOf(run).holders.filter((h) => !h.disabled).map((h) => h.name).join(", ")}</span>}
       </div>
     </div>
   );
 }
 
-function UnitTile({ u, place, pack, selected, onClick, label }: { u: Unit | null; place: Zone; pack: CwPack; selected: boolean; onClick: () => void; label: string }) {
+function UnitTile({ u, place, pack, selected, onClick, label, crowned, turbulence }: { u: Unit | null; place: Zone; pack: CwPack; selected: boolean; onClick: () => void; label: string; crowned?: boolean; turbulence?: boolean }) {
+  if (turbulence && !u) return <button type="button" onClick={onClick} aria-label={`${label} (Black Hole Turbulence Slot)`} title="Black Hole Turbulence Slot: whoever stands here changes into another character of the same cost at the next node." className={cx("aspect-square min-w-0 rounded-lg border border-dashed border-violet-400/80 bg-violet-500/10", selected && "ring-2 ring-cyan")} />;
   if (!u) return <button type="button" onClick={onClick} aria-label={label} className={cx("aspect-square min-w-0 rounded-lg border border-dashed transition", selected ? "border-cyan bg-cyan/10" : "border-line/70 hover:border-cyan/50")} />;
   const idle = place !== "bench" && unitPower(u, place, pack) === 0;
   return (
     <button type="button" onClick={onClick} aria-label={`${label}: ${u.stars}-star ${u.name}`} aria-pressed={selected}
       className={cx("relative flex aspect-square min-w-0 flex-col items-center justify-center rounded-lg border bg-white/[0.03] p-0.5 transition", selected ? "border-cyan ring-2 ring-cyan" : idle ? "border-rose-400/70" : "border-line hover:border-cyan/50")}>
       <span className="absolute left-1 top-0.5 text-[9px] leading-none text-amber-300">{"★".repeat(u.stars)}</span>
+      {crowned && <Crown size={11} className="absolute left-0.5 bottom-0.5 text-fuchsia-300" aria-label="Plot Armor" />}
+      {turbulence && <span className="absolute inset-0 rounded-lg ring-2 ring-violet-400/70" title="Black Hole Turbulence Slot" aria-hidden />}
       <Portrait name={u.name} cost={u.cost} size={34} className="!ring-1" />
       <span className="mt-0.5 w-full truncate text-[9px] leading-tight">{u.name}</span>
       {u.items.length > 0 && <span className="absolute bottom-0.5 right-0.5 flex gap-px">{u.items.map((it, i) => <ItemIcon key={i} pack={pack} name={it} size={9} />)}</span>}
@@ -115,7 +135,11 @@ function Report({ run, pack, onNext }: { run: RunState; pack: CwPack; onNext: ()
           {r.kind !== "Reward" && <p className="mt-1 text-xs text-muted">Your strength {Math.round(r.power)} vs {Math.round(r.enemy)} · estimated win chance {Math.round(r.chance * 100)}%</p>}</div>
         <div><p className="text-xs text-muted">Gold +{total}</p><p className="text-xs">Base {r.gold.base} · streak {r.gold.streak} · interest {r.gold.interest}{r.gold.drops ? ` · drops ${r.gold.drops}` : ""}</p>{r.item && <p className="mt-1 flex items-center gap-1 text-xs">Dropped <ItemIcon pack={pack} name={r.item} size={12} /> {r.item}</p>}
           {r.ores && r.ores.length > 0 && <p className="mt-1 flex flex-wrap items-center gap-1 text-xs">Ores: {r.ores.map((o, i) => <span key={i} className="inline-flex items-center gap-1"><ItemIcon pack={pack} name={o} size={11} />{o.replace(" Crystal Ore", "")}</span>)} <span className="text-faint">(in Items: tap to open)</span></p>}</div>
-        <div><p className="text-xs text-muted">Squad</p><p className="text-xs">{r.won ? "No HP lost." : `Cleared about ${Math.round(r.cleared * 100)}% → −${r.hpLost} squad HP.`} +{r.xp} XP.</p></div>
+        <div><p className="text-xs text-muted">Squad</p><p className="text-xs">{r.won ? "No HP lost." : `Cleared about ${Math.round(r.cleared * 100)}% → −${r.hpLost} squad HP.`} +{r.xp} XP.</p>
+          {r.saved && <p className="mt-1 text-xs text-ok">Woof Woof Dan turned this failed fight into a Perfect Clear!</p>}
+          {r.trotter && <p className="mt-1 text-xs text-amber-200">Trotters! (Bubble Wolf) Easier fight, extra ore.</p>}
+          {r.express && <p className="mt-1 text-xs text-amber-200">Astral Express: {r.express.collisions} collision{r.express.collisions === 1 ? "" : "s"} (+{Math.round(r.express.bonus * 100)}% strength).</p>}
+          {run.tsr && <p className="mt-1 text-xs text-muted">Trailblaze Power now {run.tsr.tp}.</p>}</div>
       </div>
     </Panel>
   );
@@ -157,11 +181,18 @@ function Rules() {
         <li>Characters placed in the wrong position don&apos;t act (shown as IDLE); each character&apos;s On-/Off-Field Strength by star comes from their wiki page.</li>
         <li>Emblems put their wearer in that Bond and count toward it; Red/Blue Gem + a basic item makes an Emblem; owning a Wealth Gem raises the team size by 1. Ore strategies (Prismatic Ore, Bursting Ore, Cracked Quartz, Gold Miner) work as written.</li>
       </ul>
+      <p className="font-medium text-text">Version 4.7 mechanics (wiki-verified):</p>
+      <ul className="mb-2 list-disc pl-4">
+        <li>Trailblaze Silver Rail: after each combat, {TSR_RULES.income.map(([c, v]) => `${v} TP at ${c}`).join(", ")}. Store names, texts and prices as listed; Express Enhancements +{TSR_RULES.enhancementStep} and Components +{TSR_RULES.componentStep} per purchase; level 6 adds Components; level 10 gives 500 TP and Forward IV; spending 500 TP unlocks King Pom-Pom.</li>
+        <li>Escapade: one of 11 random Voyage Companions per run, each with the wiki&apos;s effects; Backstage Tea Break replaces the Reward Node before the boss for companions that have one.</li>
+        <li>Plot Armor: two protagonists from deployed characters (Plane 1 and Plane 2 bosses), first paid refreshes 1 gold; Plot Armor Procurement, Early Entrance (nodes 1-6 / 2-4), Refresh Chain(+), New Cast Performance, It&apos;s A Wrap; Roll-Call 5 gives Imagenae: Plot Armor and 7 boosts holders by 100% strength and 50% SPD; the five Plot Armor Bonds.</li>
+      </ul>
       <p className="font-medium text-text">Not published, so guessed here:</p>
       <ul className="list-disc pl-4">
         <li>Base gold {ASSUMED.baseIncome} per fight, streak bonus {ASSUMED.streakBonus.join("/")}, Reward drops {ASSUMED.rewardGold.join("–")} gold, sell price = what you paid.</li>
         <li>{ASSUMED.xpPerBuy} XP per purchase, {ASSUMED.xpPerBattle} XP per fight, start at level {ASSUMED.startLevel}, deploy = level, XP to level up {lv} (the 84 matches the game).</li>
         <li>Crystal Ores: tiers White, Blue, Gold and Prismatic are real, and ores hold gold, characters or equipment, but what&apos;s inside isn&apos;t published. Here: {ORE_TIERS.map((t) => `${t}: ${ORE_REWARDS[t].map((r) => r.label).join(" / ")}`).join("; ")}. Reward nodes drop {ASSUMED.rewardOres} ores (plane 1 odds {ORE_DROP_ODDS[0].map((x) => `${Math.round(x * 100)}%`).join("/")}).</li>
+        <li>4.7: Trailblaze Store unlock levels (other than 2/4/6/10), {TSR_ASSUMED.stockSlots} goods in stock refreshed after each combat, &quot;Others&quot; priced in gold; Plot Armor chosen at the boss node by default, {PLOT_ARMOR_CONFIG.cheapRefreshes} paid refreshes at 1 gold then +{PLOT_ARMOR_CONFIG.escalation} each, and the non-Bond Plot Armor options (the wiki has no list); missing companion numbers (each says so on its card).</li>
         <li>Up to {ASSUMED.onFieldSlots} On-Field slots. Fights are a strength comparison (stats, stars, items, bonds) with a win chance, not a real battle. Environment/Strategy effects the simulator can&apos;t model are listed as “not simulated”.</li>
       </ul>
     </Notice>
@@ -186,7 +217,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
   const update = (fn: (s: RunState) => RunState) => {
     const cur = runRef.current;
     if (!cur) return;
-    const next = fn(cur);
+    // settle(): unlocks and grants that happen as soon as the board allows (once each).
+    const next = settle(fn(cur), pack);
     if (next === cur) return;
     runRef.current = next;
     setRun(next);
@@ -196,6 +228,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
   const quit = () => { setRun(null); setSel(null); void kvSet(RUN_KEY, null); };
 
   const tp = useMemo(() => (run ? teamPower(run, pack) : null), [run, pack]);
+  const tsrLevel = useMemo(() => (run ? placedBondStates(run, pack).find((b) => b.bond.name === TSR_BOND)?.count ?? 0 : 0), [run, pack]);
+  const collection = useCollection(run);
   const { gear: gearTracked, toggleGear } = useTracked();
   /** Characters whose recommended equipment is tracked: the ones you picked, else everyone deployed. */
   const gearTargets = useMemo<GearTarget[]>(() => {
@@ -223,7 +257,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
     return { wanted: want.wanted, ready: craft.length > 0, notes, preferred: want.notes, craft: craft.map((c) => `${c.partner} → ${c.makes}`), who };
   };
   if (run === undefined) return null;
-  if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><Rules /></div>;
+  if (!run) return <div className="space-y-4"><Setup pack={pack} onStart={start} /><CompanionCollection collection={collection} /><Rules /></div>;
 
   const prep = run.phase === "prep";
   const odds = pack.odds.find((o) => o.level === run.level)?.odds ?? [1, 0, 0, 0, 0];
@@ -262,7 +296,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
     <div>
       <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">{title}</p>
       <div className={cx("grid gap-1.5", cols)}>
-        {run[zone].map((u, index) => <UnitTile key={index} u={u} place={zone} pack={pack} selected={sel?.kind === "unit" ? sel.spot.zone === zone && sel.spot.index === index : false} onClick={() => clickSlot({ zone, index })} label={`${title} slot ${index + 1}`} />)}
+        {run[zone].map((u, index) => <UnitTile key={index} u={u} place={zone} pack={pack} selected={sel?.kind === "unit" ? sel.spot.zone === zone && sel.spot.index === index : false} onClick={() => clickSlot({ zone, index })} label={`${title} slot ${index + 1}`}
+          crowned={!!u && plotOf(run).holders.some((h) => h.uid === u.uid && !h.disabled)} turbulence={zone === "bench" && run.escapade?.variant === "my-turbulence" && run.escapade.turbulence === index} />)}
       </div>
     </div>
   );
@@ -276,6 +311,9 @@ export function RunSim({ pack }: { pack: CwPack }) {
       <Hud run={run} />
       {run.note && <p role="status" className={cx("rounded-lg border px-3 py-2 text-sm", run.note.startsWith("Opened") ? "border-cyan/40 bg-cyan/10 text-cyan" : "border-amber-300/40 bg-amber-300/10 text-amber-100")}>{run.note}</p>}
 
+      {run.escapade && !run.escapade.revealed && run.phase !== "over" && <CompanionReveal run={run} onDone={() => update((s) => (s.escapade ? { ...s, escapade: { ...s.escapade, revealed: true } } : s))} />}
+      {run.phase === "teaBreak" && <TeaBreakPanel run={run} onPick={(i) => { setSel(null); update((s) => pickTea(s, pack, i)); }} />}
+      {run.phase === "plotArmor" && <PlotArmorPanel run={run} pack={pack} onProtagonist={(uid) => update((s) => chooseProtagonist(s, pack, uid))} onRefresh={() => update((s) => refreshPlot(s, pack))} onChoose={(i) => update((s) => choosePlotArmor(s, pack, i))} />}
       {run.phase === "environment" && (
         <Panel title="Choose an Investment Environment">
           <div className="grid gap-3 sm:grid-cols-3">
@@ -304,7 +342,10 @@ export function RunSim({ pack }: { pack: CwPack }) {
           <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
             {run.offers.supply?.map((o, i) => (
               <div key={i} className="flex flex-col gap-1">
-                <CharCard pack={pack} name={o.name} cost={o.cost} onClick={() => update((s) => pickSupply(s, pack, i))} footer="free" />
+                {o.name === "Basic Weapon Box"
+                  ? <button type="button" onClick={() => update((s) => pickSupply(s, pack, i))} className="flex aspect-[3/4] flex-col items-center justify-center gap-1 rounded-xl border border-amber-300/50 bg-amber-300/[0.06] p-2 text-[11px]"><Package size={28} className="text-amber-200" />{(o.items ?? []).length} × Basic Weapon Box<span className="text-faint">Mummicat</span></button>
+                  : <CharCard pack={pack} name={o.name} cost={o.cost} stars={o.stars} onClick={() => update((s) => pickSupply(s, pack, i))} footer={o.stars && o.stars > 1 ? `free ${"★".repeat(o.stars)}` : "free"} />}
+                {o.items && o.items.length > 1 && o.name !== "Basic Weapon Box" && <span className="text-center text-[10px] text-amber-100">+ {o.items.slice(1).join(", ")}</span>}
                 {o.item && (() => {
                   const mark = markOf(o.item, run.bag);
                   return (
@@ -384,10 +425,16 @@ export function RunSim({ pack }: { pack: CwPack }) {
               ) : <p className="text-xs text-faint">Reward and Supply nodes give items and Crystal Ores.</p>}
               {run.note?.startsWith("Opened") && <p className="mt-1.5 text-xs text-cyan">{run.note}</p>}
             </div>
-            {sel?.kind === "item" && run.bag[sel.index] && (
-              <ItemDetail pack={pack} name={run.bag[sel.index]} owned={run.bag.filter((_, i) => i !== sel.index)} needs={needs} onClose={() => setSel(null)}
-                hint={itemKind(pack, run.bag[sel.index]) === "basic" || itemKind(pack, run.bag[sel.index]) === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it."} />
-            )}
+            {sel?.kind === "item" && run.bag[sel.index] && (() => {
+              const name = run.bag[sel.index];
+              const sp = specialItem(name);
+              const kindOf = itemKind(pack, name);
+              const hint = sp?.use === "box" ? "Choose the basic equipment inside:" : sp?.use === "projector" ? "Tap a character to copy them (1-star copy to the bench)." : sp?.use === "plotArmor" ? "Tap a deployed character to give them Plot Armor." : kindOf === "basic" || kindOf === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it.";
+              return (
+                <ItemDetail pack={pack} name={name} owned={run.bag.filter((_, i) => i !== sel.index)} needs={needs} onClose={() => setSel(null)} hint={hint}
+                  actions={sp?.use === "box" ? <span className="flex flex-wrap gap-1">{(pack.equipment?.basic ?? []).map((b) => <Button key={b.name} size="sm" variant="ghost" onClick={() => { update((s) => openBox(s, pack, sel.index, b.name)); setSel(null); }}><ItemIcon pack={pack} name={b.name} size={11} /> {b.name}</Button>)}</span> : undefined} />
+              );
+            })()}
             {peek && !sel && <ItemDetail pack={pack} name={peek} owned={run.bag} needs={needs} onClose={() => setPeek(null)} />}
             {selUnit && sel?.kind === "unit" && (
               <div className="flex flex-wrap items-center gap-2 rounded-lg border border-cyan/40 bg-cyan/[0.06] p-2 text-xs">
@@ -429,6 +476,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
               <Button variant="primary" onClick={() => { setSel(null); setPeek(null); const before = runRef.current; update((s) => battle(s, pack)); if (runRef.current !== before && runRef.current?.last?.timeline) setWatching(runRef.current.tick); }}><Swords size={14} /> Battle</Button>
             </div>
           </div>
+          <TrailblazeStorePanel run={run} pack={pack} level={tsrLevel} onBuy={(id, slot) => update((s) => buyTsr(s, pack, id, tsrLevel, slot))} onRefresh={() => update((s) => refreshTsr(s, pack, tsrLevel))} />
         </div>
       </div>
 
@@ -437,6 +485,8 @@ export function RunSim({ pack }: { pack: CwPack }) {
           <ol className="max-h-64 space-y-1 overflow-y-auto text-xs text-muted">{[...run.log].reverse().slice(0, 60).map((l, i) => <li key={i}>{l}</li>)}</ol>
         </Panel>
         <div className="space-y-3">
+          <CompanionCard run={run} />
+          <PlotArmorStatus run={run} pack={pack} onSwap={() => update((s) => swapProtagonist(s, pack))} onChange={(from, to) => update((s) => changeProtagonist(s, from, to))} />
           {(run.environment || run.strategies.length > 0) && (
             <Panel title="Your buffs">
               <ul className="space-y-1.5 text-xs">

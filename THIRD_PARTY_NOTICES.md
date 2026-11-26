@@ -35,7 +35,7 @@ SOFTWARE.
 | Source | What the app downloads | Terms |
 | --- | --- | --- |
 | [StarRailRes](https://github.com/Mar-7th/StarRailRes) | Game data and images, when you press Download game data | AGPL-3.0 (data), game content © COGNOSPHERE / HoYoverse |
-| [Honkai: Star Rail Wiki (Fandom)](https://honkai-star-rail.fandom.com) | Enemy list with types and weaknesses; Currency Wars characters (position, stats by star, abilities, Eidolons, Light Cone, recommended equipment), bonds, shop odds, equipment (including Emblems and gems), Investment Environments and Strategies, opponents and difficulty ranks, when you press the download buttons | Text CC BY-SA 3.0 (attributed on each page); images © HoYoverse |
+| [Honkai: Star Rail Wiki (Fandom)](https://honkai-star-rail.fandom.com) | Enemy list with types and weaknesses; Currency Wars characters (position, stats by star, abilities, Eidolons, Light Cone, recommended equipment), bonds, shop odds, equipment (including Emblems and gems), Investment Environments and Strategies, opponents and difficulty ranks, when you press the download buttons. Version 4.7 texts built into the app: Voyage Companion effects and Backstage Tea Break options, Trailblaze Store goods, Plot Armor rules (Bonds, investments, Roll-Call) | Text CC BY-SA 3.0 (attributed on each page and in the source files); images © HoYoverse |
 | [Hugging Face: mlc-ai](https://huggingface.co/mlc-ai) | Built-in AI model weights (Qwen3 1.7B or Qwen2.5 0.5B), when the built-in AI is used | Apache-2.0 (Qwen models) |
 
 ## npm packages

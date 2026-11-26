@@ -13,6 +13,16 @@ import { combineResult, emblemBond, goldOreName, isOre, itemKind, ORE_DROP_ODDS,
 import { membersOf } from "./bonds";
 import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPack } from "./sim";
 import { buildTimeline, type Timeline } from "./timeline";
+import { specialItem } from "./specialItems";
+import { afterCombat, expressPower, nodeTp, storeStats, syncTsrLevel, TSR_BOND, tsrOf, type TsrState } from "./trailblazeStore";
+import {
+  addBasics, afterFight, checkAssignments, chooseTea, enemyMods, enterSpecial, ESCAPADE_ASSUMED, onEnterNode, robotFor, specialNode, startEscapade,
+  strategyQuality, supplyOffers, synthesisRefund, talentRefill, spendWoofSave, woofSave, xpBonus, type EscapadeState, type TeaOption,
+} from "./escapade";
+import {
+  beginSelection, choosePlot, frenzyContract, PLOT_ARMOR_RULES, plotInvestment, plotOf, plotUnitBonus, remapHolders, rollCallGrant,
+  selectionDue, type PlotArmorState, type UnitCtx,
+} from "./plotArmor";
 
 export type NodeKind = "Reward" | "Strategy" | "Combat" | "Supply" | "Encounter" | "Boss";
 
@@ -122,7 +132,10 @@ export interface Trigger {
 export interface ShopSlot { name: string; cost: number; stars: 1 | 2 }
 export type Zone = "on" | "off" | "bench";
 export interface Spot { zone: Zone; index: number }
-export type Phase = "environment" | "strategy" | "supply" | "encounter" | "prep" | "result" | "over";
+export type Phase = "environment" | "strategy" | "supply" | "encounter" | "prep" | "result" | "over" | "plotArmor" | "teaBreak";
+export interface SupplyOffer { name: string; cost: number; item: string; stars?: 1 | 2 | 3; items?: string[] }
+/** Steps that interrupt a node before it continues (Plot Armor selection, a bonus Strategy). */
+export interface Interlude { queue: ("plotArmor" | "bonusStrategy" | "imagenae" | "swap")[]; active?: "plotArmor" | "bonusStrategy" | "imagenae" | "swap"; uid?: number; resume: { phase: Phase; offers: RunState["offers"] } }
 
 export interface BattleReport {
   kind: NodeKind;
@@ -141,6 +154,10 @@ export interface BattleReport {
   /** Crystal Ores this fight dropped. */
   ores?: string[];
   timeline?: Timeline;
+  /** Woof Woof Dan turned a loss into a Perfect Clear. */
+  saved?: boolean;
+  trotter?: boolean;
+  express?: { collisions: number; bonus: number };
 }
 
 export interface RunState {
@@ -178,7 +195,7 @@ export interface RunState {
   /** The rule each variant bond (e.g. Phantasmoon Games) uses this run. */
   variants?: Record<string, string>;
   nodeOpponent: string;
-  offers: { environments?: CwNamed[]; strategies?: CwStrategy[]; supply?: { name: string; cost: number; item: string }[] };
+  offers: { environments?: CwNamed[]; strategies?: CwStrategy[]; supply?: SupplyOffer[]; teaBreak?: { kind: "teaBreak" | "treasury"; options: TeaOption[] } };
   encounter: "easy" | "hard" | null;
   last: BattleReport | null;
   note: string | null;
@@ -201,6 +218,15 @@ export interface RunState {
   supplyAll?: number;
   nextUid: number;
   result: "cleared" | "defeated" | null;
+  /** 4.7: Trailblaze Power and the Trailblaze Store. */
+  tsr?: TsrState;
+  /** 4.7: this run's Voyage Companion. */
+  escapade?: EscapadeState;
+  /** 4.7: protagonists and Plot Armor. */
+  plotArmor?: PlotArmorState;
+  /** Node order when a companion moved nodes (else RULES.planes). */
+  layout?: NodeKind[][];
+  interlude?: Interlude;
 }
 
 // --------------------------------------------------------------------------------------------- helpers
@@ -214,22 +240,22 @@ const sample = <T,>(rng: () => number, list: readonly T[], n: number): T[] => {
 };
 
 /** A fresh RNG for the next action (the tick makes every action replayable). */
-function step(s: RunState): [RunState, () => number] {
+export function step(s: RunState): [RunState, () => number] {
   const next = { ...s, tick: s.tick + 1, note: null };
   return [next, createRng(`${s.seed}:${s.tick}`)];
 }
 
-const log = (s: RunState, line: string): RunState => ({ ...s, log: [...s.log, line] });
-const note = (s: RunState, text: string): RunState => ({ ...s, note: text });
+export const log = (s: RunState, line: string): RunState => ({ ...s, log: [...s.log, line] });
+export const note = (s: RunState, text: string): RunState => ({ ...s, note: text });
 
-export const nodeKinds = (plane: number) => RULES.planes[plane] ?? [];
+export const nodeKinds = (plane: number, s?: Pick<RunState, "layout">) => s?.layout?.[plane] ?? RULES.planes[plane] ?? [];
 export const totalNodes = RULES.planes.reduce((n, p) => n + p.length, 0);
 export const globalIndex = (plane: number, node: number) => RULES.planes.slice(0, plane).reduce((n, p) => n + p.length, 0) + node;
 const rankNumber = (rank: string) => Number(/^A(\d+)/.exec(rank)?.[1] ?? 0);
 
 /** The node kind actually played (Encounters below Jade Steel are plain fights). */
-export function nodeKind(s: Pick<RunState, "plane" | "node" | "rank">): NodeKind {
-  const k = nodeKinds(s.plane)[s.node] ?? "Combat";
+export function nodeKind(s: Pick<RunState, "plane" | "node" | "rank" | "layout">): NodeKind {
+  const k = nodeKinds(s.plane, s)[s.node] ?? "Combat";
   return k === "Encounter" && rankNumber(s.rank) < RULES.encounterFromRank ? "Combat" : k;
 }
 
@@ -243,12 +269,12 @@ export const lineupValue = (s: RunState) => deployed(s).reduce((n, u) => n + u.c
 const shopRoster = (pack: CwPack) => pack.characters.filter((c) => c.cost <= 5);
 const costOf = (pack: CwPack, name: string) => pack.characters.find((c) => c.name === name)?.cost ?? 1;
 
-function makeUnit(s: RunState, name: string, cost: number, stars: 1 | 2 | 3 = 1, items: string[] = []): [RunState, Unit] {
+export function makeUnit(s: RunState, name: string, cost: number, stars: 1 | 2 | 3 = 1, items: string[] = []): [RunState, Unit] {
   return [{ ...s, nextUid: s.nextUid + 1 }, { uid: s.nextUid, name, cost, stars, items }];
 }
 
 /** Put a unit in the first free bench slot (then merge). Fails when the bench is full and nothing merges. */
-function gain(s: RunState, unit: Unit): RunState | null {
+export function gain(s: RunState, unit: Unit): RunState | null {
   const free = s.bench.findIndex((x) => !x);
   if (free < 0) {
     const same = units(s).filter((u) => u.name === unit.name && u.stars === unit.stars).length;
@@ -274,7 +300,8 @@ export function merge(s: RunState, trimBench = false): RunState {
     const next = { ...state, on: [...state.on], off: [...state.off], bench: [...state.bench], bag: [...state.bag, ...items.slice(RULES.itemsPerUnit)] };
     for (const t of trio.slice(1)) next[t.spot.zone][t.spot.index] = null;
     next[trio[0].spot.zone][trio[0].spot.index] = kept;
-    state = log(next, `${"★".repeat(kept.stars)} ${kept.name}: three copies merged.`);
+    state = remapHolders(next, trio.slice(1).map((t) => t.u.uid), kept.uid);
+    state = log(state, `${"★".repeat(kept.stars)} ${kept.name}: three copies merged.`);
   }
   if (trimBench && state.bench.length > RULES.benchSlots) {
     const bench = state.bench.filter((u, i) => u || i < RULES.benchSlots).slice(0, RULES.benchSlots);
@@ -284,7 +311,7 @@ export function merge(s: RunState, trimBench = false): RunState {
   return state;
 }
 
-function levelUp(s: RunState, xp: number): RunState {
+export function levelUp(s: RunState, xp: number): RunState {
   let { level, xp: cur } = s;
   cur += xp;
   while (level < ASSUMED.maxLevel && cur >= xpToNext(level)) { cur -= xpToNext(level); level++; }
@@ -321,6 +348,10 @@ function rollShopSlots(s: RunState, pack: CwPack, rng: () => number): ShopSlot[]
 const basicNames = (pack: CwPack) => pack.equipment?.basic.map((b) => b.name) ?? [];
 const randomBasic = (pack: CwPack, rng: () => number) => { const b = basicNames(pack); return b.length ? pickOne(rng, b) : null; };
 const randomEmblem = (pack: CwPack, rng: () => number) => { const e = pack.equipment?.emblems ?? []; return e.length ? pickOne(rng, e).name : null; };
+export const randomBasicName = randomBasic;
+export const randomEmblemName = randomEmblem;
+export const randomAdvancedName = (pack: CwPack, rng: () => number) => { const a = pack.equipment?.advanced ?? []; return a.length ? pickOne(rng, a).name : null; };
+export const shopRosterOf = (pack: CwPack) => shopRoster(pack);
 const randomOre = (plane: number, rng: () => number) => oreName(ORE_TIERS[weighted(rng, ORE_DROP_ODDS[Math.min(2, plane)])]);
 /** Items that combine with each other (basic equipment and gems); finished items don't. */
 const isComponent = (pack: CwPack, name: string) => { const k = itemKind(pack, name); return k === "basic" || (k === "gem" && name !== "Wealth Gem"); };
@@ -342,21 +373,24 @@ const CONDITIONAL = /^(when|after|each|every|if|upon|whenever|in |during|at the 
 const NUM: Record<string, number> = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6 };
 const toNum = (x: string | undefined) => (x === undefined ? 1 : NUM[x.toLowerCase()] ?? (Number(x) || 1));
 /** Items the simulator doesn't model (named in the log instead of silently ignored). */
-const UNMODELLED = /Projector|Smelting Furnace|Disassembly Wrench|Good Fortune Token|Special Privilege Card|Trailblaze Power|Chimera|Surprise Box|Dice|Plot Armor|Trash Bag|Owlbert|massive reward/i;
+const UNMODELLED = /Chimera|Smelting Furnace|Disassembly Wrench|Good Fortune Token|Special Privilege Card|Surprise Box|Dice|Trash Bag|Owlbert|massive reward/i;
 
 /**
  * Apply the parts of an Environment/Strategy text the simulator understands; returns what it applied.
  * `source` is the Environment/Strategy name (an "X Emblem" strategy whose item the wiki lists as
  * "Unknown" grants the X Emblem). Parts it can't model are listed as "not simulated: …".
  */
-export function applyEffect(s: RunState, pack: CwPack, text: string, rng: () => number, source = ""): [RunState, string[]] {
-  let state = s;
-  const applied: string[] = [];
+export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () => number, source = ""): [RunState, string[]] {
+  // Plot Armor investments first; their sentences are then left out of the general parser.
+  const [plotState, plotApplied, handled] = plotInvestment(s, text0, source);
+  const text = handled.reduce((t, h) => t.replace(h, ""), text0).trim();
+  let state = plotState;
+  const applied: string[] = [...plotApplied];
   const skipped: string[] = [];
   let lastEmblem: string | null = null;
   const roster = shopRoster(pack);
   const eq = pack.equipment;
-  const isItem = (n: string) => !!(eq?.basic.some((x) => x.name === n) || eq?.advanced.some((x) => x.name === n) || eq?.emblems?.some((x) => x.name === n) || eq?.gems?.some((x) => x.name === n));
+  const isItem = (n: string) => !!specialItem(n) || !!(eq?.basic.some((x) => x.name === n) || eq?.advanced.some((x) => x.name === n) || eq?.emblems?.some((x) => x.name === n) || eq?.gems?.some((x) => x.name === n));
   const addItem = (n: string) => { state = { ...state, bag: [...state.bag, n] }; if (emblemBond(pack, n)) lastEmblem = n; };
   const addUnit = (name: string, cost: number, stars: 1 | 2 | 3, items: string[] = [], npc = false) => {
     const [s2, u] = makeUnit(state, name, cost, stars, items);
@@ -391,6 +425,7 @@ export function applyEffect(s: RunState, pack: CwPack, text: string, rng: () => 
     if ((g = /^"([^"]+)"(.*)$/.exec(desc))) {
       const name = g[1];
       const rest = g[2];
+      if (/^Trailblaze Power$/i.test(name)) { const t = tsrOf(state); state = { ...state, tsr: { ...t, tp: t.tp + n, earned: t.earned + n } }; applied.push(`+${n} Trailblaze Power`); return; }
       if (/^Unknown/i.test(name)) {
         if (sourceEmblem && !unknownUsed && eq?.emblems?.some((e) => e.name === sourceEmblem)) { unknownUsed = true; for (let i = 0; i < n; i++) addItem(sourceEmblem); applied.push(sourceEmblem); return; }
         skipped.push("an item the wiki hasn't named"); return;
@@ -467,6 +502,7 @@ export function applyEffect(s: RunState, pack: CwPack, text: string, rng: () => 
       if (peppy) addUnit("Peppi", 0, 1, [...peppy.items], true); else skipped.push("Peppi (you have no Peppy)");
       return;
     }
+    if (/Express deals/i.test(desc)) return;
     if (UNMODELLED.test(desc) || desc.length < 60) skipped.push(desc.replace(/^"|"$/g, ""));
   };
 
@@ -486,6 +522,8 @@ export function applyEffect(s: RunState, pack: CwPack, text: string, rng: () => 
   if (xpNode) { state = { ...state, xpPerNode: state.xpPerNode + Number(xpNode[1]) }; applied.push(`+${xpNode[1]} XP each node`); }
   const forced = /All Investment Strategies in this round are of (Silver|Gold|Prismatic) quality/i.exec(text);
   if (forced) { state = { ...state, forcedRarity: forced[1] as StrategyRarity }; applied.push(`${forced[1]} strategies only`); }
+  const express = /the Express deals (\d+)% of the original DMG/i.exec(text);
+  if (express) { const t = tsrOf(state); state = { ...state, tsr: { ...t, expressMult: Math.max(t.expressMult ?? 1, Number(express[1]) / 100) } }; applied.push(`the Express deals ${express[1]}% DMG`); }
   if (/2-star characters may appear in the Store/i.test(text)) { state = { ...state, twoStarShop: true }; applied.push("2-star characters in the shop"); }
 
   // Later or repeated grants become triggers; their sentences are not granted now.
@@ -616,7 +654,7 @@ function runTriggerText(s: RunState, pack: CwPack, t: Trigger, rng: () => number
 
 // --------------------------------------------------------------------------------------------- run flow
 
-export function newRun(pack: CwPack, seed: string, rank: string): RunState {
+export function newRun(pack: CwPack, seed: string, rank: string, opts: { companion?: string; variant?: string } = {}): RunState {
   const rng = createRng(`${seed}:start`);
   let s: RunState = {
     seed, tick: 0, rank, plane: 0, node: 0, phase: "environment",
@@ -647,6 +685,8 @@ export function newRun(pack: CwPack, seed: string, rank: string): RunState {
   }
   // Start the three on the field so a first battle isn't empty.
   for (const u of [...s.bench]) if (u) s = moveUnit(s, findUnit(s, u.uid)!, autoSpot(s, pack, u) ?? findUnit(s, u.uid)!);
+  // Escapade: one random Voyage Companion per run.
+  s = startEscapade(s, pack, opts.companion, opts.variant);
   if (!s.offers.environments?.length) s = enterNode(s, pack);
   for (const v of Object.values(s.variants ?? {})) s = log(s, `This run's rule: ${v}.`);
   return log(s, `Starting squad: ${units(s).map((u) => u.name).join(", ")}.`);
@@ -679,24 +719,122 @@ export function enterNode(s0: RunState, pack: CwPack): RunState {
   if (s.xpPerNode) s = levelUp(s, s.xpPerNode);
   if (s.node === 0) s = fireTriggers(s, pack, "plane", rng);
   s = fireTriggers(s, pack, "node", rng);
+  s = nodeTp(s);
+  s = frenzyContract(s, pack, rng);
   // The store refreshes at the start of every node. Lock keeps it for the next node only (tutorial "Store"), then releases.
   if (!s.locked) s = { ...s, shop: rollShopSlots(s, pack, rng), shopNote: "refreshed" };
   else s = log({ ...s, locked: false, shopNote: "kept" }, "Store kept by Lock for this node (lock released).");
   const opp = kind === "Boss" ? s.opponents[s.plane] ?? s.opponents[0] : s.opponents.length ? pickOne(rng, s.opponents) : "";
-  s = { ...s, nodeOpponent: opp ?? "", encounter: null, last: null };
+  s = { ...s, nodeOpponent: opp ?? "", encounter: null, last: null, interlude: undefined };
+  s = onEnterNode(s, pack, rng, () => highestBond(s, pack));
+  return settle(withInterludes(nodePhase(s, pack, kind, rng), pack), pack);
+}
+
+/** The node's own choice (Strategy, Supply, Encounter, Tea Break) or preparation. */
+function nodePhase(s: RunState, pack: CwPack, kind: NodeKind, rng: () => number): RunState {
+  const special = kind === "Reward" ? specialNode(s) : null;
+  if (special) return enterSpecial(s, pack, special, rng);
   if (kind === "Strategy") {
-    const rarity: StrategyRarity = s.forcedRarity ?? (["Silver", "Gold", "Prismatic"] as const)[weighted(rng, [ASSUMED.strategyRarity.Silver, ASSUMED.strategyRarity.Gold, ASSUMED.strategyRarity.Prismatic])];
-    const pool = (pack.strategies ?? []).filter((x) => x.rarity === rarity && x.planes.includes(s.plane + 1) && !s.strategies.some((o) => o.name === x.name));
-    const offer = sample(rng, pool, RULES.strategyOffers);
-    if (offer.length) return { ...s, phase: "strategy", offers: { strategies: offer } };
+    const offer = strategyOffer(s, pack, rng);
+    if (offer[0].length) return { ...offer[1], phase: "strategy", offers: { strategies: offer[0] } };
+    s = offer[1];
   }
   if (kind === "Supply") {
     const roster = shopRoster(pack);
-    const offer = rollShop(pack.odds, s.level, roster, rng, Math.max(1, RULES.supplyOffers - (s.supplyFewer ?? 0))).map((c) => ({ name: c.name, cost: c.cost, item: randomBasic(pack, rng) ?? "" }));
+    const base = rollShop(pack.odds, s.level, roster, rng, Math.max(1, RULES.supplyOffers - (s.supplyFewer ?? 0))).map((c) => ({ name: c.name, cost: c.cost, item: randomBasic(pack, rng) ?? "" }));
+    const offer = supplyOffers(s, pack, base, rng);
     if (offer.length) return { ...s, phase: "supply", offers: { supply: offer } };
   }
   if (kind === "Encounter") return { ...s, phase: "encounter", offers: {} };
   return { ...s, phase: "prep", offers: {} };
+}
+
+/** Three Investment Strategies of one (rolled) quality. */
+function strategyOffer(s0: RunState, pack: CwPack, rng: () => number, any = false): [CwStrategy[], RunState] {
+  const rolled: StrategyRarity = s0.forcedRarity ?? (["Silver", "Gold", "Prismatic"] as const)[weighted(rng, [ASSUMED.strategyRarity.Silver, ASSUMED.strategyRarity.Gold, ASSUMED.strategyRarity.Prismatic])];
+  const [rarity, s] = any ? [rolled, s0] as const : strategyQuality(s0, rolled);
+  const pool = (pack.strategies ?? []).filter((x) => x.rarity === rarity && x.planes.includes(s.plane + 1) && !s.strategies.some((o) => o.name === x.name));
+  return [sample(rng, pool, RULES.strategyOffers), s];
+}
+
+/** Queue what interrupts this node: Bubble Wolf's bonus Strategy, then the Plot Armor selection. */
+function withInterludes(s: RunState, pack: CwPack): RunState {
+  if (s.phase === "teaBreak") return s;
+  const queue: Interlude["queue"] = [];
+  let out = s;
+  if (out.escapade?.extraStrategy) { queue.push("bonusStrategy"); out = { ...out, escapade: { ...out.escapade, extraStrategy: false } }; }
+  if (selectionDue(out)) {
+    if (deployed(out).some((u) => !u.npc)) queue.push("plotArmor");
+    else out = log({ ...out, plotArmor: { ...plotOf(out), done: [...plotOf(out).done, out.plane] } }, "Plot Armor: no one deployed to become the protagonist.");
+  }
+  if (!queue.length) return out;
+  return nextInterlude({ ...out, interlude: { queue, resume: { phase: out.phase, offers: out.offers } } }, pack);
+}
+
+/** Start the next queued interlude, or return to the node's own phase. */
+export function nextInterlude(s: RunState, pack: CwPack): RunState {
+  const il = s.interlude;
+  if (!il) return s;
+  const [head, ...rest] = il.queue;
+  if (!head) return { ...s, phase: il.resume.phase, offers: il.resume.offers, interlude: undefined };
+  const next: RunState = { ...s, interlude: { ...il, queue: rest, active: head } };
+  if (head === "bonusStrategy") {
+    const [offer, s2] = strategyOffer(next, pack, createRng(`${s.seed}:bonus-strategy:${s.tick}`), true);
+    if (!offer.length) return nextInterlude(s2, pack);
+    return log({ ...s2, phase: "strategy", offers: { strategies: offer } }, "Bubble Wolf: a bonus Investment Strategy selection!");
+  }
+  if (head === "plotArmor") return log(beginSelection(next, pack, "protagonist"), `Plot Armor: choose Protagonist ${plotOf(next).done.length + 1} from your deployed characters.`);
+  if (head === "swap") return beginSelection(next, pack, "swap");
+  return beginSelection(next, pack, "imagenae", il.uid);
+}
+
+/** A selection started during preparation (Imagenae item, It's A Wrap swap) returns to preparation. */
+function startPrepInterlude(s: RunState, pack: CwPack, what: "imagenae" | "swap", uid?: number): RunState {
+  return nextInterlude({ ...s, interlude: { queue: [what], uid, resume: { phase: s.phase, offers: s.offers } } }, pack);
+}
+
+/** Take a Plot Armor option, then continue the node. */
+export function choosePlotArmor(s0: RunState, pack: CwPack, index: number): RunState {
+  const s = choosePlot(s0, pack, index);
+  if (s === s0 || s.plotArmor?.current) return s;
+  return settle(s.interlude ? nextInterlude(s, pack) : { ...s, phase: "prep" }, pack);
+}
+
+/** "It's A Wrap": use a swap chance to name a new protagonist. */
+export function useSwap(s0: RunState, pack: CwPack): RunState {
+  const p = plotOf(s0);
+  if (s0.phase !== "prep" || p.swaps < 1) return s0;
+  const [s] = step(s0);
+  return startPrepInterlude({ ...s, plotArmor: { ...p, swaps: p.swaps - 1 } }, pack, "swap");
+}
+
+/** Pick a Backstage Tea Break / Treasury option; the node is then cleared without a fight. */
+export function pickTea(s0: RunState, pack: CwPack, index: number): RunState {
+  const s = chooseTea(s0, pack, index);
+  return s === s0 ? s0 : advance(s, pack);
+}
+
+/** The Bond with the highest active tier (for March Bunny). */
+function highestBond(s: RunState, pack: CwPack): string | null {
+  const order = { bronze: 1, silver: 2, gold: 3, plat: 4 } as Record<string, number>;
+  const best = teamPower(s, pack).bonds.filter((b) => b.bond.category !== PLOT_ARMOR_RULES.bondCategory).sort((a, b) => (order[b.tier!] ?? 0) - (order[a.tier!] ?? 0) || b.count - a.count)[0];
+  return best?.bond.name.replace(/: .*$/, "") ?? null;
+}
+
+/**
+ * Things that happen as soon as the board allows them (once each): Trailblaze Store unlocks and the
+ * Bond level 10 grant, Roll-Call's Imagenae: Plot Armor, finished Ashwolf assignments. Returns the
+ * same object when nothing changes.
+ */
+export function settle(s: RunState, pack: CwPack): RunState {
+  if (s.phase === "over") return s;
+  const states = placedBondStates(s, pack);
+  const count = (name: string) => states.find((b) => b.bond.name === name || b.bond.name.startsWith(`${name}: `))?.count ?? 0;
+  let out = syncTsrLevel(s, pack, count(TSR_BOND));
+  const rule = s.variants?.["Phantasmoon Games"];
+  out = rollCallGrant(out, count("Phantasmoon Games"), !!rule && /Roll-Call/.test(rule));
+  out = checkAssignments(out);
+  return out;
 }
 
 export function pickStrategy(s0: RunState, pack: CwPack, index: number): RunState {
@@ -704,24 +842,29 @@ export function pickStrategy(s0: RunState, pack: CwPack, index: number): RunStat
   if (s0.phase !== "strategy" || !st) return s0;
   const [s1, rng] = step(s0);
   const [s2, applied] = applyEffect({ ...s1, strategies: [...s1.strategies, st], extraDifficulty: s1.extraDifficulty + RULES.strategyDifficulty[st.rarity] }, pack, st.effect, rng, st.name);
-  return log({ ...s2, phase: "prep", offers: {} }, `${st.rarity} strategy: ${st.name}${applied.length ? ` (${applied.join(", ")})` : " (effect not simulated)"}.`);
+  const out = log({ ...s2, phase: "prep" as Phase, offers: {} }, `${st.rarity} strategy: ${st.name}${applied.length ? ` (${applied.join(", ")})` : " (effect not simulated)"}.`);
+  return settle(out.interlude?.active === "bonusStrategy" ? nextInterlude(out, pack) : out, pack);
 }
 
 /** Supply node: take one character with the basic item they carry, then move on (no battle). */
 export function pickSupply(s0: RunState, pack: CwPack, index: number): RunState {
   const o = s0.offers.supply?.[index];
   if (s0.phase !== "supply" || !o) return s0;
-  const [s, u] = makeUnit(step(s0)[0], o.name, o.cost);
+  const items = o.items ?? (o.item ? [o.item] : []);
+  const withItems = (st: RunState, got: string[]) => addBasics({ ...st, bag: [...st.bag, ...got.filter((i) => !isBasic(pack, i))] }, got.filter((i) => isBasic(pack, i)));
+  // Mummicat: the pick is equipment boxes, not a character.
+  if (o.name === "Basic Weapon Box") return advance(log(withItems({ ...step(s0)[0], offers: {} }, items), `Supply: ${items.length} × Basic Weapon Box (Mummicat).`), pack);
+  const [s, u] = makeUnit(step(s0)[0], o.name, o.cost, o.stars ?? 1);
   const after = gain(s, u);
   if (!after) return note(s0, "Your bench is full. Sell someone first, or skip.");
-  let next = log({ ...after, bag: o.item ? [...after.bag, o.item] : after.bag }, `Supply: ${o.name}${o.item ? ` with ${o.item}` : ""}.`);
+  let next = log(withItems(after, items), `Supply: ${o.stars && o.stars > 1 ? `${"★".repeat(o.stars)} ` : ""}${o.name}${items.length ? ` with ${items.join(", ")}` : ""}.`);
   const rest = (s0.offers.supply ?? []).filter((_, k) => k !== index);
   const rng = createRng(`${s0.seed}:supply:${s0.tick}`);
   const extra: typeof rest = [];
   if ((next.supplyAll ?? 0) > 0) { extra.push(...rest); next = { ...next, supplyAll: (next.supplyAll ?? 0) - 1 }; }
   else if ((next.triggers ?? []).some((t) => t.on === "supply" && t.text === "__scout") && rest.length) extra.push(pickOne(rng, rest));
   for (const x of extra) {
-    const [s2, u2] = makeUnit(next, x.name, x.cost);
+    const [s2, u2] = makeUnit(next, x.name, x.cost, x.stars ?? 1);
     const got = gain(s2, u2);
     next = got ? log({ ...got, bag: x.item ? [...got.bag, x.item] : got.bag }, `Supply bonus: ${x.name}${x.item ? ` with ${x.item}` : ""}.`) : log({ ...s2, bag: x.item ? [...s2.bag, x.item] : s2.bag }, `Supply bonus: ${x.name} couldn't join (bench full); kept ${x.item || "nothing"}.`);
   }
@@ -756,7 +899,7 @@ export function buy(s0: RunState, pack: CwPack, index: number): RunState {
   const after = gain({ ...s, gold: s.gold - price }, u);
   if (!after) return note(s0, "Your bench is full. Sell someone or deploy them first.");
   const shop = [...after.shop]; shop[index] = null;
-  return { ...after, shop };
+  return talentRefill({ ...after, shop }, pack, index, slot.cost, createRng(`${s0.seed}:talent:${s0.tick}`));
 }
 
 export function sell(s0: RunState, spot: Spot): RunState {
@@ -808,17 +951,35 @@ export function buyXp(s0: RunState): RunState {
   if (s0.level >= ASSUMED.maxLevel) return note(s0, "Already max level.");
   if (s0.gold < s0.xpCost) return note(s0, `Experience costs ${s0.xpCost} gold.`);
   const [s] = step(s0);
-  return levelUp({ ...s, gold: s.gold - s.xpCost, stats: { ...s.stats, xpBought: s.stats.xpBought + 1 } }, ASSUMED.xpPerBuy);
+  return levelUp({ ...s, gold: s.gold - s.xpCost, stats: { ...s.stats, xpBought: s.stats.xpBought + 1 } }, ASSUMED.xpPerBuy + xpBonus(s));
 }
 
 export const toggleLock = (s: RunState): RunState => ({ ...s, locked: !s.locked });
 
-/** Equip a bag item. A basic item on a unit holding a basic item combines into the advanced one. */
+/** Equip a bag item. A basic item on a unit holding a basic item combines into the advanced one. Consumables are used on the unit. */
 export function equip(s0: RunState, pack: CwPack, bagIndex: number, spot: Spot): RunState {
   const item = s0.bag[bagIndex];
   const u = at(s0, spot);
   if (!item || !u || s0.phase !== "prep") return s0;
   if (u.npc) return note(s0, `${u.name}'s Emblems are permanently attached.`);
+  const sp = specialItem(item);
+  if (sp?.use === "projector") {
+    if (u.cost > (sp.maxCost ?? 99)) return note(s0, `${item} works on ${sp.maxCost}-Cost or lower characters.`);
+    if (sp.bond && !runBonds(s0, pack).some((b) => (b.name === sp.bond || b.name.startsWith(`${sp.bond}: `)) && b.members.includes(u.name))) return note(s0, `${item} works on "${sp.bond}" characters.`);
+    const [s1] = step(s0);
+    const [s2, copy] = makeUnit({ ...s1, bag: s1.bag.filter((_, i) => i !== bagIndex) }, u.name, u.cost);
+    const after = gain(s2, copy);
+    if (!after) return note(s0, "Your bench is full. Make room for the copy first.");
+    return log(after, `${item}: a 1-star copy of ${u.name}.`);
+  }
+  if (sp?.use === "plotArmor") {
+    if (spot.zone === "bench") return note(s0, "Deploy the character first: Plot Armor goes on a character on the field.");
+    if (plotOf(s0).holders.some((h) => h.uid === u.uid && !h.disabled)) return note(s0, `${u.name} already has Plot Armor.`);
+    const [s1] = step(s0);
+    return startPrepInterlude(log({ ...s1, bag: s1.bag.filter((_, i) => i !== bagIndex) }, `Imagenae: Plot Armor used on ${u.name}.`), pack, "imagenae", u.uid);
+  }
+  if (sp?.use === "box") return note(s0, "Tap the Basic Weapon Box in Items to choose what's inside.");
+  if (sp?.only && sp.only !== u.name) return note(s0, `${item} can only be equipped by ${sp.only}.`);
   let items = [...u.items];
   let made: string | null = null;
   if (isOre(item)) return note(s0, "Tap an ore to open it.");
@@ -834,7 +995,7 @@ export function equip(s0: RunState, pack: CwPack, bagIndex: number, spot: Spot):
   const zone = [...s[spot.zone]]; zone[spot.index] = { ...u, items };
   const bag = s.bag.filter((_, i) => i !== bagIndex);
   const out = { ...s, [spot.zone]: zone, bag };
-  return made ? log(out, `${u.name}: ${item} combined into ${made}.`) : out;
+  return made ? synthesisRefund(log(out, `${u.name}: ${item} combined into ${made}.`), [u.items.find((x) => isComponent(pack, x) && combineResult(pack, x, item)) ?? item, item].filter((x) => isBasic(pack, x))) : out;
 }
 
 /** Combine two items in the bag (basic + basic, gem + basic, gem + gem). */
@@ -843,7 +1004,7 @@ export function combineBag(s0: RunState, pack: CwPack, i: number, j: number): Ru
   const r = a && b && i !== j && isComponent(pack, a) && isComponent(pack, b) ? combineResult(pack, a, b) : null;
   if (!r) return note(s0, "Those two don't combine.");
   const [s] = step(s0);
-  return log({ ...s, bag: [...s.bag.filter((_, k) => k !== i && k !== j), r] }, `${a} + ${b} → ${r}.`);
+  return synthesisRefund(log({ ...s, bag: [...s.bag.filter((_, k) => k !== i && k !== j), r] }, `${a} + ${b} → ${r}.`), [a, b].filter((x) => isBasic(pack, x)));
 }
 
 /** Phases when you can open ores (any time you're in the run, not on its end screen). */
@@ -874,7 +1035,7 @@ export function openOre(s0: RunState, pack: CwPack, bagIndex: number): RunState 
       }
     }
     if (r.gold) { const g = r.gold[0] + Math.floor(rng() * (r.gold[1] - r.gold[0] + 1)); s = { ...s, gold: s.gold + g }; got.push(`${g} gold`); }
-    for (let k = 0; k < (r.basic ?? 0); k++) { const it = randomBasic(pack, rng); if (it) { s = { ...s, bag: [...s.bag, it] }; got.push(it); } }
+    for (let k = 0; k < (r.basic ?? 0); k++) { const it = randomBasic(pack, rng); if (it) { s = addBasics(s, [it]); got.push(it); } }
     if (r.emblem) { const em = randomEmblem(pack, rng); if (em) { s = { ...s, bag: [...s.bag, em] }; got.push(em); } }
     if (s.oreEcho) {
       const roll = rng();
@@ -893,7 +1054,7 @@ export function openOre(s0: RunState, pack: CwPack, bagIndex: number): RunState 
 const STRENGTH_FALLBACK: Record<number, number[]> = { 1: [100, 160, 220], 2: [125, 190, 260], 3: [140, 220, 300], 4: [175, 270, 450], 5: [200, 320, 2000] };
 
 /** One unit's strength in a position: wiki On-/Off-Field Strength at its star, HP bonus and items. */
-export function unitPower(u: Unit, place: "on" | "off", pack: CwPack): number {
+export function unitPower(u: Unit, place: "on" | "off", pack: CwPack, ctx: { singularity?: number } = {}): number {
   if (u.npc) return 0;
   const info: CwCharInfo | undefined = pack.info?.[u.name];
   const i = u.stars - 1;
@@ -904,8 +1065,11 @@ export function unitPower(u: Unit, place: "on" | "off", pack: CwPack): number {
     const kind = itemKind(pack, it);
     if (kind === "basic") mult += MODEL.basicItem;
     else if (kind === "emblem") mult += MODEL.emblemItem;
-    else if (kind === "gem") continue;
-    else {
+    else if (kind === "gem" || kind === "consumable") continue;
+    else if (kind === "component") {
+      const sp = specialItem(it);
+      mult += it === "Imploding Singularity" ? ESCAPADE_ASSUMED.singularity.perStack * (ctx.singularity ?? 0) : sp?.power ?? MODEL.advancedItem;
+    } else {
       mult += MODEL.advancedItem;
       if (pack.equipment?.advanced.find((a) => a.name === it)?.users.includes(u.name)) mult += MODEL.recommended;
     }
@@ -917,20 +1081,61 @@ export function unitPower(u: Unit, place: "on" | "off", pack: CwPack): number {
 /** The season's bonds with this run's variant rules. */
 export const runBonds = (s: Pick<RunState, "variants">, pack: CwPack) => withVariants(pack.bonds, s.variants);
 
-export function teamPower(s: RunState, pack: CwPack) {
-  const placed = [...s.on.map((u) => ({ u, place: "on" as const })), ...s.off.map((u) => ({ u, place: "off" as const }))].filter((x): x is { u: Unit; place: "on" | "off" } => !!x.u);
-  const raw = placed.reduce((n, x) => n + unitPower(x.u, x.place, pack), 0);
-  // An Emblem makes its wearer a member of that Bond (and counts toward it).
+type Placed = { u: Unit; place: "on" | "off" };
+const placedOf = (s: RunState) => [...s.on.map((u) => ({ u, place: "on" as const })), ...s.off.map((u) => ({ u, place: "off" as const }))].filter((x): x is Placed => !!x.u);
+
+/** Bond states on the field: Emblems and Plot Armor Bonds add their holders as members. */
+export function placedBondStates(s: RunState, pack: CwPack) {
+  const placed = placedOf(s);
   const extra = new Map<string, string[]>();
-  for (const x of placed) for (const it of x.u.items) { const b = emblemBond(pack, it); if (b) extra.set(b, [...(extra.get(b) ?? []), x.u.name]); }
+  const add = (bond: string, who: string) => extra.set(bond, [...(extra.get(bond) ?? []), who]);
+  for (const x of placed) for (const it of x.u.items) { const b = emblemBond(pack, it); if (b) add(b, x.u.name); }
+  for (const h of plotOf(s).holders) {
+    if (h.disabled || !placed.some((x) => x.u.uid === h.uid)) continue;
+    const bond = /^bond:(.+)$/.exec(h.option)?.[1];
+    if (bond) add(bond, `${h.name}#${h.uid}`);
+  }
   const bondList = runBonds(s, pack).map((b) => {
-    const add = extra.get(b.name) ?? extra.get(b.name.replace(/: .*$/, "")) ?? [];
-    return add.length ? { ...b, members: [...new Set([...b.members, ...add])] } : b;
+    const more = extra.get(b.name) ?? extra.get(b.name.replace(/: .*$/, "")) ?? [];
+    return more.length ? { ...b, members: [...new Set([...b.members, ...more])] } : b;
   });
-  const bonds = boardBonds(placed.map((x) => ({ name: x.u.name, stars: x.u.stars })), bondList).filter((b) => b.tier);
-  const bonus = bonds.reduce((n, b) => n + MODEL.bond[b.tier!], 0);
-  const idle = placed.filter((x) => !x.u.npc && unitPower(x.u, x.place, pack) === 0).map((x) => x.u.name);
-  return { raw, bonus, power: raw * (1 + bonus), bonds, idle };
+  // Plot Armor Bonds count holders (two holders of the same name count twice).
+  const board = [...placed.map((x) => ({ name: x.u.name, stars: x.u.stars })), ...plotOf(s).holders.filter((h) => !h.disabled && placed.some((x) => x.u.uid === h.uid) && h.option.startsWith("bond:")).map((h) => ({ name: `${h.name}#${h.uid}`, stars: 1 as const }))];
+  return boardBonds(board, bondList);
+}
+
+export function teamPower(s: RunState, pack: CwPack) {
+  const placed = placedOf(s);
+  const ctx = { singularity: s.escapade?.singularity };
+  const bases = placed.map((x) => unitPower(x.u, x.place, pack, ctx));
+  const raw = bases.reduce((n, b) => n + b, 0);
+  const touched = placedBondStates(s, pack);
+  const bonds = touched.filter((b) => b.tier);
+  const teamBonds = bonds.filter((b) => b.bond.category !== PLOT_ARMOR_RULES.bondCategory);
+  const bonus = teamBonds.reduce((n, b) => n + MODEL.bond[b.tier!], 0);
+  const idle = placed.filter((x) => !x.u.npc && unitPower(x.u, x.place, pack, ctx) === 0).map((x) => x.u.name);
+  // 4.7 extras: Trailblaze Store stats, Plot Armor (options, Plot Armor Bonds, Roll-Call 7).
+  const store = storeStats(s);
+  const rule = s.variants?.["Phantasmoon Games"];
+  const phantasmoon = touched.find((b) => b.bond.name.startsWith("Phantasmoon Games"))?.count ?? 0;
+  const rollCall7 = !!rule && /Roll-Call/.test(rule) && phantasmoon >= PLOT_ARMOR_RULES.rollCall.boostAt;
+  const ctxs: UnitCtx[] = placed.filter((x) => !x.u.npc).map((x) => ({ uid: x.u.uid, name: x.u.name, cost: x.u.cost, stars: x.u.stars, place: x.place, bonds: touched.filter((b) => b.bond.members.includes(x.u.name)).map((b) => b.bond.name.replace(/: .*$/, "")) }));
+  const share = (c: UnitCtx) => teamBonds.filter((b) => b.bond.members.includes(c.name)).reduce((n, b) => n + MODEL.bond[b.tier!], 0);
+  const per = placed.map((x, i) => {
+    const c = ctxs.find((y) => y.uid === x.u.uid);
+    const plot = c ? plotUnitBonus(s, pack, c, ctxs, rollCall7, share) : { strength: 0, spd: 0 };
+    const mult = 1 + bonus + (x.place === "on" ? store.on : store.off) + store.team + plot.strength;
+    return { uid: x.u.uid, name: x.u.name, place: x.place, power: bases[i] * mult, spd: store.spd + plot.spd, plot: plot.strength };
+  });
+  const kind = nodeKind(s);
+  const av = kind === "Reward" ? null : RULES.actionValue[s.plane]?.[kind === "Boss" ? 1 : 0] ?? null;
+  const whistles = placed.filter((x) => x.u.items.includes("Trailblaze's Whistle")).length;
+  const express = expressPower(s, av, whistles);
+  const robot = robotFor(s, kind);
+  const robotBonus = robot ? (robot.mult / 100) * Math.max(1, Math.floor(((av ?? 150) * robot.spd) / 10000)) * 0.01 : 0;
+  const units = per.reduce((n, x) => n + x.power, 0);
+  const power = units * (1 + express.bonus + robotBonus);
+  return { raw, bonus, power, bonds, idle, per, express, robot: robot ? { ...robot, bonus: robotBonus } : null, store, rollCall7 };
 }
 
 /** Average strength of a cost at a (fractional) star level, from the pack's character pages. */
@@ -952,11 +1157,13 @@ export function enemyPower(s: RunState, pack: CwPack, kind: NodeKind = nodeKind(
   const odds = pack.odds.find((o) => o.level === Math.round(level))?.odds ?? [1, 0, 0, 0, 0];
   const unit = odds.reduce((n, p, c) => n + p * avgStrength(pack, c + 1, star), 0);
   const kindMult: Record<NodeKind, number> = { Reward: 0.3, Strategy: 0.95, Combat: 0.95, Supply: 0, Encounter: s.encounter === "hard" ? ASSUMED.encounter.hard.power : ASSUMED.encounter.easy.power, Boss: 1.15 };
-  const third = kind === "Combat" && nodeKinds(s.plane).lastIndexOf("Combat") === s.node ? 1.1 : 1;
+  const third = kind === "Combat" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? 1.1 : 1;
   const rankStep = pack.difficulty?.find((d) => d.id === s.rank);
   const hpBoost = rankStep?.planes[s.plane]?.hp ?? 0;
   const diff = (1 + hpBoost / 100) ** 0.2 * (1 + 0.03 * s.extraDifficulty);
-  return level * unit * 1.15 * kindMult[kind] * third * diff * MODEL.enemyScale;
+  const elite = kind === "Combat" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node;
+  const companion = s.escapade ? (s.escapade.enemyMult ?? 1) * (s.escapade.variant === "bw-weaken" && elite ? ESCAPADE_ASSUMED.weakenedMult : 1) : 1;
+  return level * unit * 1.15 * kindMult[kind] * third * diff * MODEL.enemyScale * companion;
 }
 
 export const winChance = (power: number, enemy: number) => (enemy <= 0 ? 1 : 1 / (1 + Math.exp(-MODEL.steepness * (power / enemy - 1))));
@@ -968,10 +1175,16 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const [s1, rng] = step(s0);
   let s = s1;
   const kind = nodeKind(s);
-  const { power } = teamPower(s, pack);
-  const enemy = enemyPower(s, pack, kind);
+  const tp = teamPower(s, pack);
+  const { power } = tp;
+  // Bubble Wolf's Trotters (own RNG stream, so other rolls stay the same).
+  const trotter = enemyMods(s, kind, false, createRng(`${s.seed}:trotter:${s.tick}`)).trotter;
+  const enemy = enemyPower(s, pack, kind) * (trotter ? ESCAPADE_ASSUMED.trotterMult : 1);
   const chance = kind === "Reward" ? 1 : winChance(power, enemy);
-  const won = kind === "Reward" || rng() < chance;
+  let won = kind === "Reward" || rng() < chance;
+  // Woof Woof Dan: the first failed fight (per plane, or from a plane on) becomes a Perfect Clear.
+  const saved = !won && woofSave(s);
+  if (saved) { won = true; s = spendWoofSave(s); }
   const boss = kind === "Boss";
   const base = RULES.hpLoss[s.plane][boss ? 1 : 0];
   const cleared = won ? 1 : Math.max(0.05, Math.min(0.95, (power / Math.max(1, enemy)) * 0.9));
@@ -994,38 +1207,51 @@ export function battle(s0: RunState, pack: CwPack): RunState {
   const gold = { base: ASSUMED.baseIncome, streak: streakGold, interest, drops };
   const earned = gold.base + gold.streak + gold.interest + gold.drops;
   const oppData = pack.opponents?.find((o) => o.name === s.nodeOpponent);
-  const enemies = !oppData ? [] : boss ? [oppData.bosses.join(" + ")] : kind === "Reward" ? ["Independent Venture"] : sample(rng, oppData.normals, 2).concat(nodeKinds(s.plane).lastIndexOf("Combat") === s.node ? sample(rng, oppData.elites, 1) : []);
-  const tp = teamPower(s, pack);
+  const enemies = !oppData ? [] : boss ? [oppData.bosses.join(" + ")] : kind === "Reward" ? ["Independent Venture"] : sample(rng, oppData.normals, 2).concat(nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? sample(rng, oppData.elites, 1) : []);
   const placed = [...s.on.map((u) => ({ u, place: "on" as const })), ...s.off.map((u) => ({ u, place: "off" as const }))].filter((x): x is { u: Unit; place: "on" | "off" } => !!x.u && !x.u.npc);
+  const perOf = (uid: number) => tp.per.find((p) => p.uid === uid);
+  // The Astral Express and Mr. Yang's Belobog Robot fight alongside the squad.
+  const helpers: { name: string; cost: number; stars: 1; power: number; place: "on"; spd: number }[] = [];
+  const squad = tp.per.reduce((n, p) => n + p.power, 0);
+  if (tp.express.bonus > 0) helpers.push({ name: "Astral Express", cost: 5, stars: 1, power: squad * tp.express.bonus, place: "on", spd: Math.max(0, tp.express.spd - 100) });
+  if (tp.robot) helpers.push({ name: "Belobog Robot", cost: 4, stars: 1, power: squad * tp.robot.bonus, place: "on", spd: tp.robot.spd - 100 });
   const foes = kind === "Boss" ? [{ name: enemies[0] ?? "Boss", boss: true }]
-    : Array.from({ length: kind === "Reward" ? 4 : 5 + (nodeKinds(s.plane).lastIndexOf("Combat") === s.node ? 1 : 0) }, (_, k) => {
-      const elite = kind !== "Reward" && nodeKinds(s.plane).lastIndexOf("Combat") === s.node && k >= 4;
+    : Array.from({ length: kind === "Reward" ? 4 : 5 + (nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node ? 1 : 0) }, (_, k) => {
+      const elite = kind !== "Reward" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node && k >= 4;
       const list = elite ? oppData?.elites : oppData?.normals;
       return { name: list?.length ? list[k % list.length] : kind === "Reward" ? "Independent Venture" : "Enemy", elite };
     });
   const timeline = buildTimeline({
-    allies: placed.map((x) => ({ name: x.u.name, cost: x.u.cost, stars: x.u.stars, power: unitPower(x.u, x.place, pack) * (1 + tp.bonus), place: x.place, spd: pack.info?.[x.u.name]?.spd?.[x.u.stars - 1] ?? 0 })),
+    allies: [...placed.map((x) => ({ name: x.u.name, cost: x.u.cost, stars: x.u.stars, power: perOf(x.u.uid)?.power ?? 0, place: x.place, spd: (pack.info?.[x.u.name]?.spd?.[x.u.stars - 1] ?? 0) + 100 * (perOf(x.u.uid)?.spd ?? 0) })), ...helpers],
     enemies: foes, waves: kind === "Boss" ? 1 : 2, won, cleared, ratio: power / Math.max(1, enemy),
     limit: kind === "Reward" ? null : RULES.actionValue[s.plane][boss ? 1 : 0], bossPhases: s.plane === 2 ? 3 : 2,
     reviveCost: rankNumber(s.rank) >= 3 ? 35 : 15,
   }, rng);
   if (s.oreOnKill) for (let k = 0; k < timeline.kills; k++) if (rng() < s.oreOnKill) ores.push(randomOre(s.plane, rng));
-  const report: BattleReport = { kind, won, chance, power, enemy, cleared, hpLost, gold, xp: ASSUMED.xpPerBattle, opponent: s.nodeOpponent, enemies, item, ores, timeline };
+  if (trotter && won) ores.push(oreName("Blue"));
+  const report: BattleReport = { kind, won, chance, power, enemy, cleared, hpLost, gold, xp: ASSUMED.xpPerBattle, opponent: s.nodeOpponent, enemies, item, ores, timeline, saved, trotter, express: tp.express.collisions ? { collisions: tp.express.collisions, bonus: tp.express.bonus } : undefined };
   s = {
     ...s, gold: s.gold + earned, hp: Math.max(0, s.hp - hpLost), streak, last: report, phase: "result",
-    bag: [...s.bag, ...(item ? [item] : []), ...ores],
+    bag: [...s.bag, ...ores],
     pendingOres: kind === "Reward" ? [] : s.pendingOres,
     stats: { ...s.stats, goldEarned: s.stats.goldEarned + earned, interest: s.stats.interest + interest, wins: s.stats.wins + (won && kind !== "Reward" ? 1 : 0), losses: s.stats.losses + (won ? 0 : 1), bestStreak: Math.max(s.stats.bestStreak, streak) },
   };
+  if (item) s = addBasics(s, [item]);
   s = levelUp(s, ASSUMED.xpPerBattle);
+  if (kind !== "Reward") {
+    // Trailblaze Power after each combat phase (and Fuel from Express crashes).
+    const tsrLevel = tp.bonds.find((b) => b.bond.name === TSR_BOND)?.count ?? placedBondStates(s, pack).find((b) => b.bond.name === TSR_BOND)?.count ?? 0;
+    s = afterCombat(s, pack, tsrLevel, tp.express.collisions);
+    s = afterFight(s, won);
+  }
   if (kind !== "Reward") s = fireTriggers(s, pack, "combat", rng);
   if (kind === "Encounter") s = fireTriggers(s, pack, "encounter", rng);
   if (kind === "Boss") s = fireTriggers(s, pack, "boss", rng);
-  s = log(s, `P${s.plane + 1}-${s.node + 1} ${kind}${s.nodeOpponent ? ` vs ${s.nodeOpponent}` : ""}: ${won ? "cleared" : `not cleared (−${hpLost} HP)`} · +${earned} gold.`);
+  s = log(s, `P${s.plane + 1}-${s.node + 1} ${kind}${s.nodeOpponent ? ` vs ${s.nodeOpponent}` : ""}${trotter ? " (Trotters!)" : ""}: ${won ? "cleared" : `not cleared (−${hpLost} HP)`} · +${earned} gold.`);
   const last = s.plane === RULES.planes.length - 1 && s.node === RULES.planes[s.plane].length - 1;
   if (s.hp <= 0) return log({ ...s, phase: "over", result: "defeated" }, "Squad HP hit 0. Run over.");
   if (last) return log({ ...s, phase: "over", result: "cleared" }, `Run cleared with ${s.hp} squad HP.`);
-  return s;
+  return settle(s, pack);
 }
 
 /** Go to the next node (or plane). */

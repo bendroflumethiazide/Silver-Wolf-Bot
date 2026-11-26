@@ -118,6 +118,29 @@ export async function installCwWiki(page: Page) {
 |gold      = 4
 |effect2   = 5% strength.
 |effect4   = 15% strength.
+}}
+===Trailblaze Silver Rail===
+{{Bond Information
+|name      = Trailblaze Silver Rail
+|members   = Fx Ash, Fx Birch, Fx Cedar, Fx Dune, Fx Elm, Fx Fern, Fx Grove
+|effect    = After each combat phase, accumulate "Trailblaze Power" to purchase characters and items in the "Trailblaze Store."
+|silver    = 4
+|gold      = 6
+|plat      = 10
+|effect2   = 20 "Trailblaze Power." Astral Express, all aboard!
+|effect4   = 45 "Trailblaze Power." Goods become better.
+|effect6   = 75 "Trailblaze Power." Goods become better, and Bond-exclusive Components appear.
+|effect8   = 125 "Trailblaze Power."
+|effect10  = 225 "Trailblaze Power"! Express evolution!
+}}
+==Plot Armor Bonds==
+===Deliverer===
+{{Bond Information
+|name      = Deliverer
+|members   = 
+|effect    = Become "Deliverer."
+|gold      = 1
+|effect1   = Gains all non-independent Bond effects activated by on-field characters.
 }}`,
     "Currency Wars: Fixture Season": `{| class="article-table"\n|+ Shop Odds\n! Level !! 1 !! 2 !! 3 !! 4 !! 5\n${[[1, 100, 0, 0, 0, 0], [2, 100, 0, 0, 0, 0], [3, 100, 0, 0, 0, 0], [4, 65, 25, 10, 0, 0], [5, 45, 33, 20, 2, 0], [6, 30, 40, 25, 5, 0], [7, 19, 30, 40, 10, 1], [8, 18, 25, 32, 22, 3], [9, 15, 20, 25, 30, 10], [10, 5, 10, 20, 40, 25]].map((r) => `|-\n| ${r[0]} || ${r.slice(1).map((x) => `${x}%`).join(" || ")}`).join("\n")}\n|}`,
     "Currency Wars: Fixture Season/Equipment": `===Basic Equipment===\n${table("Equipment !! Tags !! Stats", [["[[File:Equipment Roller Skates.png|50px]]<br />Roller Skates", "SPD", "SPD Amplification: 5%"], ["[[File:Equipment Folding Knife.png|50px]]<br />Folding Knife", "On-Field", "On-Field Strength: 10%"]])}

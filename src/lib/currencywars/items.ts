@@ -5,6 +5,7 @@
  * page lists "White/Blue/Golden/Prismatic crystal ore"; Investment Strategies name "Gold" and
  * "Prismatic Crystal Ore"). What a random ore contains isn't published, so ORE_REWARDS is a stated guess.
  */
+import { specialItem } from "./specialItems";
 import type { CwPack } from "./sim";
 
 export const ORE_TIERS = ["White", "Blue", "Gold", "Prismatic"] as const;
@@ -50,7 +51,7 @@ export const ORE_DROP_ODDS: number[][] = [
   [0.25, 0.4, 0.3, 0.05],
 ];
 
-export type ItemKind = "basic" | "advanced" | "emblem" | "gem" | "ore" | "other";
+export type ItemKind = "basic" | "advanced" | "emblem" | "gem" | "ore" | "consumable" | "component" | "other";
 
 export function itemKind(pack: CwPack, name: string): ItemKind {
   const eq = pack.equipment;
@@ -59,6 +60,8 @@ export function itemKind(pack: CwPack, name: string): ItemKind {
   if (eq?.advanced.some((a) => a.name === name)) return "advanced";
   if (eq?.emblems?.some((e) => e.name === name)) return "emblem";
   if (eq?.gems?.some((g) => g.name === name)) return "gem";
+  const sp = specialItem(name);
+  if (sp) return sp.kind;
   return "other";
 }
 
@@ -110,6 +113,8 @@ export function describe(pack: CwPack, name: string): { kind: ItemKind; kindLabe
     const tier = oreTier(name)!;
     return { kind, kindLabel: `Crystal Ore · ${tier}`, summary: "Tap to open. Ores hold Gold Coins, characters or equipment; rarer ores hold more.", details: ORE_REWARDS[tier].map((r) => `${Math.round(r.weight * 100)}%: ${r.label} (guess)`), users: [] };
   }
+  const sp = specialItem(name);
+  if (sp) return { kind, kindLabel: `${sp.kind === "component" ? "Component" : "Consumable"} · ${sp.source}`, summary: sp.text, details: sp.verified ? [] : ["(Wording partly assumed: the wiki doesn't give every detail.)"], users: sp.only ? [sp.only] : [] };
   return { kind, kindLabel: "Item", summary: "", details: [], users: [] };
 }
 
