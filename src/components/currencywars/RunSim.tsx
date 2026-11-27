@@ -10,7 +10,7 @@ import {
   canSellItems, itemPrice, maxHpOf, refreshCostOf, sellItem, toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
   ahaStats, choosePlotArmor, equipAha, gradeRulesOf, rerollEnvironments, rerollSupply, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
-import { openBox, specialNode } from "@/lib/currencywars/escapade";
+import { boxOptions, openBox, specialNode } from "@/lib/currencywars/escapade";
 import { GRADE_LABEL } from "@/lib/currencywars/strategyGrades";
 import { changeProtagonist, chooseProtagonist, PLOT_ARMOR_CONFIG, PLOT_ARMOR_RULES, plotOf, refreshPlot, selectionNode } from "@/lib/currencywars/plotArmor";
 import { specialItem } from "@/lib/currencywars/specialItems";
@@ -31,7 +31,7 @@ import { payRun } from "@/lib/currencywars/advantage";
 import { RecommendedGear } from "./RecommendedGear";
 import { ItemDetail } from "./ItemDetail";
 import { Badge, Button, cx, Modal, Notice, Panel } from "../ui";
-import { BondList, BondMembers, CharCard, COST_CARD, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
+import { BondList, BondMembers, CharCard, COST_CARD, CwImg, ItemIcon, OddsBar, Portrait, WhoFaces } from "./shared";
 import { BondTracker, TrackMark, useTracked } from "./tracking";
 import { useSimple, Verbose } from "./simple";
 
@@ -105,11 +105,11 @@ function Hud({ run }: { run: RunState }) {
           <span className="flex items-center gap-1.5"><Heart size={15} className="text-rose-400" /> <b>{run.hp}</b><span className="text-faint">/{maxHpOf(run)}</span></span>
           <Meter value={run.hp / maxHpOf(run)} tone={run.hp / maxHpOf(run) > 0.5 ? "bg-emerald-400" : run.hp / maxHpOf(run) > 0.25 ? "bg-amber-400" : "bg-rose-500"} label="Squad HP" />
         </span>
-        <span className="cw-pill" title="Gold Coins"><span className="flex items-center gap-1.5"><Coins size={15} className="text-amber-300" /> <b className="text-amber-100">{run.gold}</b> gold</span><span className="text-[10px] text-faint">interest +{Math.min(run.interestCap, Math.floor(run.gold / RULES.interestPer))}</span></span>
+        <span className="cw-pill" title="Gold Coins"><span className="flex items-center gap-1.5"><CwImg kind="resource" name="Gold Coin" size={18} fallback={<Coins size={15} className="text-amber-300" />} /> <b className="text-amber-100">{run.gold}</b> gold</span><span className="text-[10px] text-faint">interest +{Math.min(run.interestCap, Math.floor(run.gold / RULES.interestPer))}</span></span>
         <span className="cw-pill" title="Store level"><span className="flex items-center gap-1.5">Lv.<b>{run.level}</b>{need > 0 && <span className="text-xs text-faint">{run.xp}/{need} XP</span>}</span>{need > 0 && <Meter value={run.xp / need} tone="bg-sky-400" label="Experience" />}</span>
         <span className="cw-pill" title="Characters deployed"><span className="flex items-center gap-1.5"><Swords size={14} className="text-cyan" /> {deployed(run).length}/{teamSize(run)} deployed</span></span>
         <span className="cw-pill" title="Winning streak"><span className="flex items-center gap-1.5">Streak <b className={run.streak >= 3 ? "text-amber-200" : ""}>{run.streak}</b></span></span>
-        {run.tsr && <span className="flex items-center gap-1.5" title="Trailblaze Power"><Zap size={14} className="text-amber-300" /> <b>{run.tsr.tp}</b> TP</span>}
+        {run.tsr && <span className="cw-pill" title="Trailblaze Power"><span className="flex items-center gap-1.5"><CwImg kind="resource" name="Trailblaze Power" size={18} fallback={<Zap size={14} className="text-amber-300" />} /> <b>{run.tsr.tp}</b> TP</span></span>}
         {plotOf(run).holders.some((h) => !h.disabled) && <span className="flex items-center gap-1.5" title="Plot Armor holders"><Crown size={14} className="text-fuchsia-300" /> {plotOf(run).holders.filter((h) => !h.disabled).map((h) => h.name).join(", ")}</span>}
       </div>
     </div>
@@ -350,7 +350,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
           <div className="grid gap-3 sm:grid-cols-3">
             {run.offers.environments?.map((e, i) => (
               <button key={e.name} type="button" onClick={() => update((s) => chooseEnvironment(s, pack, i))} className="rounded-xl border border-cyan/30 bg-gradient-to-b from-cyan/10 to-transparent p-4 text-left hover:border-cyan">
-                <b className="block">{e.name}</b><span className="mt-1 block text-xs text-muted">{fillUnknown(e.name, e.effect)}</span>
+                <span className="flex items-center gap-2"><CwImg kind="environment" name={e.name} size={36} /><b className="block">{e.name}</b></span><span className="mt-1 block text-xs text-muted">{fillUnknown(e.name, e.effect)}</span>
               </button>
             ))}
           </div>
@@ -380,7 +380,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
                         {diff ? <span className="text-muted">enemy difficulty +{diff}</span> : null}
                         {why && <span className="normal-case tracking-normal text-cyan">{why}</span>}
                       </span>
-                      <b className="mt-1 block">{st.name}</b><span className="mt-1 block text-xs text-muted">{fillUnknown(st.name, st.effect)}</span>
+                      <span className="mt-1 flex items-center gap-2"><CwImg kind="strategy" name={st.name} size={36} /><b className="block">{st.name}</b></span><span className="mt-1 block text-xs text-muted">{fillUnknown(st.name, st.effect)}</span>
                     </button>
                     {meta?.refreshable && <button type="button" onClick={() => update((s) => refreshStrategy(s, pack, i))} disabled={!canRefresh} aria-label={`Refresh option ${i + 1}`} className="flex items-center justify-center gap-1 border-t border-white/10 py-1.5 text-[11px] text-muted hover:text-text disabled:opacity-40"><RefreshCw size={11} /> Refresh</button>}
                   </div>
@@ -396,7 +396,7 @@ export function RunSim({ pack }: { pack: CwPack }) {
             {run.offers.supply?.map((o, i) => (
               <div key={i} className="flex flex-col gap-1">
                 {o.name === "Basic Weapon Box"
-                  ? <button type="button" onClick={() => update((s) => pickSupply(s, pack, i))} className="flex aspect-[3/4] flex-col items-center justify-center gap-1 rounded-xl border border-amber-300/50 bg-amber-300/[0.06] p-2 text-[11px]"><Package size={28} className="text-amber-200" />{(o.items ?? []).length} × Basic Weapon Box<span className="text-faint">Mummicat</span></button>
+                  ? <button type="button" onClick={() => update((s) => pickSupply(s, pack, i))} className="flex aspect-[3/4] flex-col items-center justify-center gap-1 rounded-xl border border-amber-300/50 bg-amber-300/[0.06] p-2 text-[11px]"><CwImg kind="item" name="Basic Weapon Box" size={48} fallback={<Package size={28} className="text-amber-200" />} />{(o.items ?? []).length} × Basic Weapon Box<span className="text-faint">Mummicat</span></button>
                   : <CharCard pack={pack} name={o.name} cost={o.cost} stars={o.stars} onClick={() => update((s) => pickSupply(s, pack, i))} footer={o.stars && o.stars > 1 ? `free ${"★".repeat(o.stars)}` : "free"} />}
                 {o.items && o.items.length > 1 && o.name !== "Basic Weapon Box" && <span className="text-center text-[10px] text-amber-100">+ {o.items.slice(1).join(", ")}</span>}
                 {o.item && (() => {
@@ -451,6 +451,21 @@ export function RunSim({ pack }: { pack: CwPack }) {
             {zoneRow("on", "On-Field", "grid-cols-4 max-w-[22rem]")}
             {zoneRow("off", "Off-Field", "grid-cols-3 max-w-[16.5rem] sm:max-w-[33rem] sm:grid-cols-6")}
             {zoneRow("bench", "Bench", "grid-cols-5 max-w-[27.5rem] sm:max-w-[49.5rem] sm:grid-cols-9")}
+            {(run.waiting?.length ?? 0) > 0 && (
+              <div role="group" aria-label="Waiting for a bench slot">
+                <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-rose-300">Waiting · bench full</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {run.waiting!.map((u, i) => (
+                    <span key={`${u.uid}-${i}`} title={`${u.name} joins when a bench slot frees up (sell or deploy someone).`} className="relative flex h-16 w-16 flex-col items-center justify-center rounded-lg border-2 border-rose-500 bg-rose-500/10 p-0.5">
+                      <span className="absolute left-1 top-0.5 text-[9px] leading-none text-amber-300">{"★".repeat(u.stars)}</span>
+                      <Portrait name={u.name} cost={u.cost} size={30} className="!ring-1" />
+                      <span className="mt-0.5 w-full truncate text-center text-[9px] leading-tight">{u.name}</span>
+                    </span>
+                  ))}
+                </div>
+                <Verbose><p className="mt-1 text-[11px] text-muted">These characters take a bench slot as soon as one frees up.</p></Verbose>
+              </div>
+            )}
             <div>
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted">Items ({run.bag.length})</p>
               <p className="mb-1.5 flex flex-wrap items-center gap-1 text-[11px] text-muted">
@@ -483,10 +498,10 @@ export function RunSim({ pack }: { pack: CwPack }) {
               const name = run.bag[sel.index];
               const sp = specialItem(name);
               const kindOf = itemKind(pack, name);
-              const hint = sp?.use === "box" ? "Choose the basic equipment inside:" : sp?.use === "projector" ? "Tap a character to copy them (1-star copy to the bench)." : sp?.use === "plotArmor" ? "Tap a deployed character to give them Plot Armor." : sp?.use === "wrench" ? "Tap a character to take off all their equipment." : sp?.use === "furnace" ? "Tap a character to reroll all their equipment, or tap an item here to reroll it." : sp?.use === "privilege" ? "Tap a character (their first advanced item) or an advanced item here to make it privileged." : sp?.use === "token" ? "Tap a character for one of their recommended advanced items." : kindOf === "basic" || kindOf === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it.";
+              const hint = sp?.use === "box" ? `Choose the ${name === "Basic Weapon Box" ? "basic" : name === "Privilege Weapon Box" ? "privileged" : "advanced"} equipment inside:` : sp?.use === "projector" ? "Tap a character to copy them (1-star copy to the bench)." : sp?.use === "plotArmor" ? "Tap a deployed character to give them Plot Armor." : sp?.use === "wrench" ? "Tap a character to take off all their equipment." : sp?.use === "furnace" ? "Tap a character to reroll all their equipment, or tap an item here to reroll it." : sp?.use === "privilege" ? "Tap a character (their first advanced item) or an advanced item here to make it privileged." : sp?.use === "token" ? "Tap a character for one of their recommended advanced items." : kindOf === "basic" || kindOf === "gem" ? "Tap a character to equip it (it combines with a matching item they hold), or tap another item here to combine them." : "Tap a character to equip it.";
               return (
                 <ItemDetail pack={pack} name={name} owned={run.bag.filter((_, i) => i !== sel.index)} needs={needs} onClose={() => setSel(null)} hint={hint}
-                  actions={sp?.use === "box" ? <span className="flex flex-wrap gap-1">{(pack.equipment?.basic ?? []).map((b) => <Button key={b.name} size="sm" variant="ghost" onClick={() => { update((s) => openBox(s, pack, sel.index, b.name)); setSel(null); }}><ItemIcon pack={pack} name={b.name} size={11} /> {b.name}</Button>)}</span>
+                  actions={sp?.use === "box" ? <>{boxOptions(run, pack, name).map((b) => <Button key={b} size="sm" variant="ghost" onClick={() => { update((s) => openBox(s, pack, sel.index, b)); setSel(null); }}><ItemIcon pack={pack} name={b} size={14} /> {b}</Button>)}</>
                     : canSellItems(run) && itemPrice(pack, name) !== null ? <Button size="sm" variant="ghost" onClick={() => { update((s) => sellItem(s, pack, sel.index)); setSel(null); }}><Coins size={12} /> Sell +{itemPrice(pack, name)} (Equipment Liquidation)</Button> : undefined} />
               );
             })()}

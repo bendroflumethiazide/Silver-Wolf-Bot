@@ -10,7 +10,7 @@
 import { createRng } from "../warp/simulator";
 import type { CwAdvancedItem, CwCharInfo, CwNamed, CwStrategy, StrategyRarity } from "./parse";
 import { combatRules, RULE_ASSUMED, RULE_INFO, ruleHandled, type CombatUnit } from "./rules";
-import { baseItem, combineResult, emblemBond, goldOreName, isOre, isPrivileged, itemKind, privileged, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS, oreGold, oreName, oreTier, type OreTier } from "./items";
+import { baseItem, combineResult, emblemBond, goldOreName, isOre, isPrivileged, itemKind, privileged, WISHPOWER_REWARDS, wishOreLevel, wishOreName, ORE_DROP_ODDS, ORE_REWARDS, ORE_TIERS, oreGold, oreName, oreTier, type OreTier } from "./items";
 import { membersOf } from "./bonds";
 import { boardBonds, bondVariants, copiesFor, rollShop, withVariants, type CwPack } from "./sim";
 import { buildTimeline, type Timeline, type TlKind } from "./timeline";
@@ -256,6 +256,8 @@ export interface RunState {
   chimeraEnergy?: number;
   /** Counters and flags of named Environment/Strategy rules (rules.ts), by key. */
   rule?: Record<string, number>;
+  /** Characters you were given while the bench was full; they take the next free slots. */
+  waiting?: Unit[];
   /** Names a named rule tracks (Value Investing's character). */
   ruleText?: Record<string, string>;
   /** "Exclusive Endorsement": its components arrive as this advanced item. */
@@ -311,17 +313,40 @@ export function makeUnit(s: RunState, name: string, cost: number, stars: 1 | 2 |
   return [{ ...s, nextUid: s.nextUid + 1 }, { uid: s.nextUid, name, cost, stars, items }];
 }
 
-/** Put a unit in the first free bench slot (then merge). Fails when the bench is full and nothing merges. */
-export function gain(s: RunState, unit: Unit): RunState | null {
+/**
+ * Put a unit in the first free bench slot (then merge). With a full bench a unit that merges straight away still joins;
+ * otherwise a character you were given waits (shown with a red border) until a slot frees up. `strict` (buying from the
+ * shop) refuses instead.
+ */
+export function gain(s: RunState, unit: Unit, strict = false): RunState | null {
   const free = s.bench.findIndex((x) => !x);
   if (free < 0) {
     const same = units(s).filter((u) => u.name === unit.name && u.stars === unit.stars).length;
-    if (same < 2 || unit.stars === 3) return null;
     // Merges straight away, so it needs no bench space.
-    return merge({ ...s, bench: [...s.bench, unit] }, true);
+    if (same >= 2 && unit.stars !== 3 && !unit.npc) return merge({ ...s, bench: [...s.bench, unit] }, true);
+    if (strict) return null;
+    return log({ ...s, waiting: [...(s.waiting ?? []), unit] }, `${unit.name} is waiting: the bench is full.`);
   }
   const bench = [...s.bench]; bench[free] = unit;
   return merge({ ...s, bench });
+}
+
+/** Characters waiting for a bench slot take free slots, oldest first. */
+export function flushWaiting(s: RunState): RunState {
+  if (!s.waiting?.length || !s.bench.some((x) => !x)) return s;
+  let out: RunState = { ...s, waiting: [] };
+  const still: Unit[] = [];
+  for (const u of s.waiting) {
+    if (!out.bench.some((x) => !x)) { still.push(u); continue; }
+    out = log(gain(out, u) ?? out, `${u.name} takes a free bench slot.`);
+  }
+  return { ...out, waiting: [...still, ...(out.waiting ?? [])] };
+}
+
+/** A character you were given: joins the bench, or waits when it's full. */
+export function receive(s: RunState, name: string, cost: number, stars: 1 | 2 | 3 = 1, items: string[] = []): RunState {
+  const [s2, u] = makeUnit(s, name, cost, stars, items);
+  return gain(s2, u) ?? s2;
 }
 
 /** Three copies of the same star merge into the next star (kept where the first copy sits). */
@@ -575,7 +600,7 @@ export function applyEffect(s: RunState, pack: CwPack, text0: string, rng: () =>
     if (/^"?Emblem Codex"?/i.test(desc)) { for (const e of emblems(n)) { addItem(e); applied.push(`${e} (Emblem Codex: you'd pick one; random here)`); } return; }
     if (/^(?:random )?privileged equipment/i.test(desc)) { for (let i = 0; i < n; i++) { const a = randomAdvanced(); if (a) { addItem(privileged(a)); applied.push(privileged(a)); } } return; }
     if (/^(?:random )?basic weapons?(\(s\))?$/i.test(desc) || /^Random Basic Weapon/i.test(desc)) { for (let i = 0; i < n; i++) { const b = randomBasic(pack, rng); if (b) addItem(b); } applied.push(`${n} basic equipment`); return; }
-    if (/^Privilege Weapon Box/i.test(desc)) { for (let i = 0; i < n; i++) { const a = randomAdvanced(); if (a) addItem(a); } applied.push(`${n} advanced equipment (Privilege Weapon Box)`); return; }
+    if (/^Privilege Weapon Box/i.test(desc)) { for (let i = 0; i < n; i++) addItem("Privilege Weapon Box"); applied.push(n > 1 ? `${n} × Privilege Weapon Box` : "Privilege Weapon Box"); return; }
     if ((g = /Employment Contract: Cost (\d)|(\d)-Cost Employment Contract/i.exec(desc))) { randomUnits(n, Number(g[1] ?? g[2]), 1); applied.push(`(Employment Contract used as a random ${g[1] ?? g[2]}-cost character)`); return; }
     if (/^random Emblems?/i.test(desc)) { for (const e of emblems(n)) { addItem(e); applied.push(e); } return; }
     if (/^of each type of basic equipment/i.test(desc)) { for (const b of eq?.basic ?? []) for (let i = 0; i < n; i++) addItem(b.name); applied.push(`${n} of each basic equipment`); return; }
@@ -844,6 +869,8 @@ function ruleOnPick(s0: RunState, pack: CwPack, name: string, rng: () => number)
       got.push(`a basic item after ${after} nodes`);
       break;
     }
+    case "Owlbert, Emissary of Gold": case "Owlbert, Emissary of Emblems": case "Owlbert, Emissary of Environmental Preservation":
+      s = { ...s, gold: s.gold + 999 }; break;
     case "Market Chaos": case "Economic Hyperheat": case "Shift Rotation": case "Excess Budget": break;
     default: break;
   }
@@ -944,6 +971,22 @@ function shopOdds(s: RunState, pack: CwPack): CwPack["odds"] {
   return pack.odds.map((o) => { const w = o.odds.map((p, i) => (i === c - 1 ? p * 2 : p)); const t = w.reduce((a, b) => a + b, 0) || 1; return { ...o, odds: w.map((p) => p / t) }; });
 }
 
+/**
+ * "Phantasmoon Games: Wishpower": after each Combat phase the active Bond level adds its Wishpower (3/10/20/60 in the
+ * Bond text), doubled on a Perfect Clear; each total threshold gives that level's crystal ore (WISHPOWER_REWARDS).
+ */
+function wishpower(s: RunState, pack: CwPack, won: boolean): RunState {
+  if (!/Wishpower/.test(s.variants?.["Phantasmoon Games"] ?? "")) return s;
+  const st = placedBondStates(s, pack).find((b) => b.bond.name.startsWith("Phantasmoon Games"));
+  const per = Number(/(\d+)\s*point\(s\) of "?Wishpower/i.exec(st?.active?.effect ?? "")?.[1] ?? 0);
+  if (!per) return s;
+  const before = ruleN(s, "wish"), after = before + per * (won ? 2 : 1);
+  const levels = WISHPOWER_REWARDS.filter((r) => r.need > before && r.need <= after);
+  let out = setRule(s, "wish", after);
+  if (levels.length) out = log({ ...out, bag: [...out.bag, ...levels.map((r) => wishOreName(r.level))] }, `Wishpower ${after}: ${levels.map((r) => wishOreName(r.level)).join(", ")}.`);
+  return out;
+}
+
 /** After a fight: named rules that pay out or heal (before the run can end). */
 function ruleAfterFight(s0: RunState, pack: CwPack, ctx: { kind: NodeKind; won: boolean; avLeft: number; idle: number; bonds: number; last: boolean; falls: number; maxPower: number }): RunState {
   let s = s0;
@@ -1020,6 +1063,8 @@ export function newRun(pack: CwPack, seed: string, rank: string, opts: { compani
     let u: Unit; [s, u] = makeUnit(s, c.name, c.cost);
     s = gain(s, u) ?? s;
   }
+  // Difficulty table (4.7): A0–A5 matches start with a Precision Disassembly Wrench, A6+ with a Disassembly Wrench.
+  s = { ...s, bag: [...s.bag, rankNumber(rank) >= 6 ? "Disassembly Wrench" : "Precision Disassembly Wrench"] };
   // Start the three on the field so a first battle isn't empty.
   for (const u of [...s.bench]) if (u) s = moveUnit(s, findUnit(s, u.uid)!, autoSpot(s, pack, u) ?? findUnit(s, u.uid)!);
   // Advantage Layout: the nodes unlocked now apply to this run.
@@ -1369,8 +1414,9 @@ export function promoteAeonAha(s: RunState, states: ReturnType<typeof placedBond
  * Bond level 10 grant, Roll-Call's Imagenae: Plot Armor, finished Ashwolf assignments. Returns the
  * same object when nothing changes.
  */
-export function settle(s: RunState, pack: CwPack): RunState {
-  if (s.phase === "over") return s;
+export function settle(s0: RunState, pack: CwPack): RunState {
+  if (s0.phase === "over") return s0;
+  const s = flushWaiting(s0);
   const states = placedBondStates(s, pack);
   const count = (name: string) => states.find((b) => b.bond.name === name || b.bond.name.startsWith(`${name}: `))?.count ?? 0;
   let out = syncTsrLevel(s, pack, count(TSR_BOND));
@@ -1379,6 +1425,15 @@ export function settle(s: RunState, pack: CwPack): RunState {
   out = checkAssignments(out);
   // Aeon ★ Aha becomes 5-cost, then 7-cost (Master of Phantasia's unlock criteria).
   out = promoteAeonAha(out, states);
+  // Aeon ★ Aha at 3-star 7-cost (Master of Phantasia): 3-star Phantasmoon Games and Elation characters, 10 Blue Gems,
+  // 30 Smelting Furnaces and 30 Disassembly Wrenches (wiki; the coin amount is "???" there, so none is given here).
+  if (!ruleN(out, "aeonMax") && units(out).some((u) => u.name === "Aeon ★ Aha" && u.cost >= 7 && u.stars === 3)) {
+    const fam = (f: string) => [...new Set(runBonds(out, pack).filter((b) => b.name === f || b.name.startsWith(`${f}: `)).flatMap((b) => b.members))];
+    const names = [...new Set([...fam("Phantasmoon Games"), ...fam("Elation")])].filter((n) => n !== "Aeon ★ Aha" && shopRoster(pack).some((c) => c.name === n));
+    out = setRule(out, "aeonMax", 1);
+    for (const n of names) out = receive(out, n, costOf(pack, n), 3);
+    out = log(addToBag(out, [...Array(10).fill("Blue Gem"), ...Array(30).fill("Smelting Furnace"), ...Array(30).fill("Disassembly Wrench")]), `Aeon ★ Aha reached 3-star 7-cost: ${names.length} 3-star characters, 10 Blue Gems, 30 Smelting Furnaces, 30 Disassembly Wrenches.`);
+  }
   // Rookie Veterans: a Perfect Projector the first time you have two 3-star 1-cost characters.
   if (owns(out, "Rookie Veterans") && !ruleN(out, "rookie") && units(out).filter((u) => !u.npc && u.cost === 1 && u.stars === 3).length >= 2) out = log(setRule({ ...out, bag: [...out.bag, "Perfect Projector"] }, "rookie", 1), "Rookie Veterans: Perfect Projector.");
   // Economies of Scale: a Perfect Projector the first time you own 8 copies of one character.
@@ -1471,7 +1526,7 @@ export function buy(s0: RunState, pack: CwPack, index: number): RunState {
   const price = slot.cost * copiesFor(slot.stars);
   if (s0.gold < price) return note(s0, `Not enough gold (${price} needed).`);
   const [s, u] = makeUnit(step(s0)[0], slot.name, slot.cost, slot.stars);
-  const after = gain({ ...s, gold: s.gold - price }, u);
+  const after = gain({ ...s, gold: s.gold - price }, u, true);
   if (!after) return note(s0, "Your bench is full. Sell someone or deploy them first.");
   const shop = [...after.shop]; shop[index] = null;
   let out = spent({ ...after, shop });
@@ -1492,7 +1547,7 @@ export function sell(s0: RunState, spot: Spot, pack?: CwPack): RunState {
   // Recycling Program: advanced equipment breaks down into its basic parts.
   const recycle = pack && (owns(s, "Recycling Program") || owns(s, "Recycling Program+"));
   const back = recycle ? u.items.flatMap((it) => (itemKind(pack, it) === "advanced" ? [...(pack.equipment?.advanced.find((a) => a.name === baseItem(it))?.recipe ?? [it])] : [it])) : u.items;
-  return log({ ...s, [spot.zone]: zone, gold: s.gold + refund, bag: [...s.bag, ...back] }, `Sold ${"★".repeat(u.stars)} ${u.name} for ${refund}.`);
+  return flushWaiting(log({ ...s, [spot.zone]: zone, gold: s.gold + refund, bag: [...s.bag, ...back] }, `Sold ${"★".repeat(u.stars)} ${u.name} for ${refund}.`));
 }
 
 /** Move or swap. Deploying from the bench needs a free team slot (team size = level). */
@@ -1505,7 +1560,7 @@ export function moveUnit(s0: RunState, from: Spot, to: Spot): RunState {
   const s = { ...s0, on: [...s0.on], off: [...s0.off], bench: [...s0.bench], note: null };
   s[to.zone][to.index] = a;
   s[from.zone][from.index] = b;
-  return s;
+  return flushWaiting(s);
 }
 
 /** Best free spot for a unit by its wiki position (on-field, off-field or either). */
@@ -1724,6 +1779,18 @@ export function openOre(s0: RunState, pack: CwPack, bagIndex: number): RunState 
   const [s1, rng] = step(s0);
   let s: RunState = { ...s1, bag: s1.bag.filter((_, k) => k !== bagIndex), stats: { ...s1.stats, oresOpened: (s1.stats.oresOpened ?? 0) + 1 } };
   const got: string[] = [];
+  const wish = WISHPOWER_REWARDS.find((r) => r.level === wishOreLevel(name));
+  if (wish) {
+    if (wish.gold) { s = { ...s, gold: s.gold + wish.gold }; got.push(`${wish.gold} gold`); }
+    const aeon = units(s).find((u) => u.name === "Aeon ★ Aha")?.cost ?? costOf(pack, "Aeon ★ Aha");
+    const joins: [string, number][] = [
+      ...(wish.costs ?? []).map((c): [string, number] => { const pool = shopRoster(pack).filter((x) => x.cost === c); const ch = pool.length ? pickOne(rng, pool) : null; return [ch?.name ?? "", c]; }),
+      ...Array.from({ length: wish.aeonAha ?? 0 }, (): [string, number] => ["Aeon ★ Aha", aeon]),
+    ].filter(([n]) => n);
+    for (const [n, c] of joins) { s = receive(s, n, c, 1); got.push(n); }
+    for (const it of wish.items ?? []) { s = addToBag(s, [it]); got.push(it); }
+    for (let k = 0; k < (wish.emblems ?? 0); k++) { const em = randomEmblem(pack, rng); if (em) { s = { ...s, bag: [...s.bag, em] }; got.push(em); } }
+  }
   const fixed = oreGold(name);
   if (fixed !== null) { s = { ...s, gold: s.gold + fixed }; got.push(`${fixed} gold`); }
   const tier = oreTier(name);
@@ -2114,6 +2181,7 @@ export function battle(s0: RunState, pack: CwPack): RunState {
     // Trailblaze Power after each combat phase (and Fuel from Express crashes).
     const tsrLevel = tp.bonds.find((b) => b.bond.name === TSR_BOND)?.count ?? placedBondStates(s, pack).find((b) => b.bond.name === TSR_BOND)?.count ?? 0;
     s = afterCombat(s, pack, tsrLevel, tp.express.collisions);
+    s = wishpower(s, pack, won);
     s = afterFight(s, won);
   }
   const finalNode = s.plane === RULES.planes.length - 1 && s.node === nodeKinds(s.plane, s).length - 1;

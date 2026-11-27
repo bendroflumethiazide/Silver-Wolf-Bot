@@ -7,14 +7,14 @@ import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
-  addToBag, effectCoverage, levelUp, maxHpOf, refreshCostOf, sellItem,
+  addToBag, effectCoverage, levelUp, maxHpOf, receive, refreshCostOf, sellItem,
   ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, ahaStar, equipAha, promoteAeonAha, placedBondStates, rerollEnvironments, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
   nodeKind, nodeKinds, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
 import { chooseProtagonist, eligible, refreshPlot, refreshPrice, changeProtagonist, plotOf, plotOptions, PLOT_ARMOR_CONFIG } from "../currencywars/plotArmor";
 import { buyTsr, expressPower, refreshTsr, tsrIncome, tsrOf, priceOf, tsrGood, TSR_GOODS } from "../currencywars/trailblazeStore";
 import { COMPANIONS } from "../currencywars/voyageCompanions";
-import { openBox, shiftEarlier } from "../currencywars/escapade";
+import { boxOptions, openBox, shiftEarlier } from "../currencywars/escapade";
 import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
 import { offerGrades, shiftGrade } from "../currencywars/strategyGrades";
 import { abilityCard } from "../currencywars/abilities";
@@ -317,7 +317,9 @@ describe("Currency Wars run simulator", () => {
   it("applies environment and strategy text it understands", () => {
     const s = newRun(PACK, "fx", "A0-1");
     const [a, appliedA] = applyEffect(s, PACK, "Starts with 2 Basic Weapon Box(es).", createRng("x"));
-    expect(a.bag).toHaveLength(2);
+    // The match also starts with a Precision Disassembly Wrench (A0–A5).
+    expect(s.bag).toEqual(["Precision Disassembly Wrench"]);
+    expect(a.bag).toHaveLength(3);
     expect(appliedA).toContain("2 basic equipment");
     const [b] = applyEffect(s, PACK, "Gain 25 Gold Coin(s). Your maximum Interest is increased to 10 Gold Coins.", createRng("x"));
     expect([b.gold - s.gold, b.interestCap]).toEqual([25, 10]);
@@ -400,7 +402,14 @@ describe("Currency Wars run simulator", () => {
   it("a full bench never blocks a Supply node: sell or skip", () => {
     let s = chooseEnvironment(newRun(PACK, "full", "A0-1"), PACK, 1);
     s = { ...s, phase: "supply", plane: 0, node: 4, bench: Array(9).fill(null).map((_, i) => ({ uid: 100 + i, name: i % 2 ? "Welt" : "Pearl", cost: 1, stars: 2 as const, items: [] })), offers: { supply: [{ name: "Robin", cost: 2, item: "Roller Skates" }] } };
-    expect(pickSupply(s, PACK, 0).note).toMatch(/bench is full/);
+    // With a full bench the character waits (red border) and joins when a slot frees up.
+    const waited = pickSupply(s, PACK, 0);
+    expect(waited.node).toBe(5);
+    expect(waited.waiting?.map((u) => u.name)).toEqual(["Robin"]);
+    expect(waited.bag).toContain("Roller Skates");
+    const freed = sell({ ...waited, phase: "prep" }, { zone: "bench", index: 0 });
+    expect(freed.bench[0]?.name).toBe("Robin");
+    expect(freed.waiting).toEqual([]);
     const sold = sell(s, { zone: "bench", index: 0 });
     expect(sold.bench[0]).toBeNull();
     const took = pickSupply(sold, PACK, 0);
@@ -785,11 +794,13 @@ describe("Investment grants (items, characters, Peppy, later and repeated grants
     expect(twoCosts(run("Obtain 1 of every 2-cost character.", "Test", base)[0]).length - twoCosts(base).length).toBe(2);
   });
 
-  it("a full bench says so instead of losing the character silently", () => {
+  it("a full bench keeps a given character waiting instead of losing it", () => {
     const full = { ...fresh(), bench: Array(9).fill(null).map((_, i) => ({ uid: 500 + i, name: `X${i}`, cost: 1, stars: 1 as const, items: [] })) };
     const [s, applied] = run('Obtains 1 "Kafka."', "Test", full);
+    // The character waits for a free slot instead of being lost.
     expect(units(s).some((u) => u.name === "Kafka")).toBe(false);
-    expect(applied.join(" ")).toMatch(/Kafka \(bench full\)/);
+    expect(s.waiting?.map((u) => u.name)).toEqual(["Kafka"]);
+    expect(applied.join(" ")).toMatch(/Kafka/);
   });
 
   it("Peppy: a non-character squad member wearing Emblems that count for Bonds", () => {
@@ -1895,3 +1906,50 @@ describe("Named Environment and Strategy rules (rules.ts) and consumables", () =
     expect(el.triggers?.some((t) => t.on === "plane" && t.repeat)).toBe(true);
   });
 });
+
+describe("Wrenches, Weapon Boxes, Wishpower, Owlbert and the waiting area", () => {
+  const strat = (s: RunState, name: string, effect: string) =>
+    pickStrategy({ ...s, phase: "strategy", offers: { strategies: [{ name, rarity: "Prismatic", effect, planes: [1, 2, 3] }] } }, P47, 0);
+
+  it("matches start with a Precision Disassembly Wrench (A0–A5) or a Disassembly Wrench (A6+)", () => {
+    expect(newRun(P47, "w", "A3-1").bag).toContain("Precision Disassembly Wrench");
+    expect(newRun(P47, "w", "A6-1").bag).toContain("Disassembly Wrench");
+    expect(newRun(P47, "w", "A6-1").bag).not.toContain("Precision Disassembly Wrench");
+  });
+
+  it("every Weapon Box opens with a choice (basic / 3 advanced / 3 privileged)", () => {
+    const s = { ...at47(["Welt"]), bag: ["Basic Weapon Box", "Advanced Weapon Box", "Privilege Weapon Box"] };
+    expect(boxOptions(s, P47, "Basic Weapon Box")).toEqual(P47.equipment!.basic.map((b) => b.name));
+    const adv = boxOptions(s, P47, "Advanced Weapon Box");
+    expect(adv.length).toBeGreaterThan(0);
+    expect(boxOptions(s, P47, "Advanced Weapon Box")).toEqual(adv); // stable until one is opened
+    const opened = openBox(s, P47, 1, adv[0]);
+    expect(opened.bag[1]).toBe(adv[0]);
+    expect(boxOptions(s, P47, "Privilege Weapon Box").every((x) => x.endsWith(": Privilege"))).toBe(true);
+    expect(openBox(s, P47, 1, "Not An Option").bag).toEqual(s.bag);
+  });
+
+  it("Owlbert gives 999 Gold Coins (house rule)", () => {
+    const s = at47(["Welt"], { gold: 1 });
+    expect(strat(s, "Owlbert, Emissary of Gold", "It's the incredibly rare Gold Coin Owlbert! Get ready for a shower of gold!").gold).toBe(1000);
+    expect(strat(s, "Owlbert, Emissary of Emblems", "It's the incredibly rare Emblem Owlbert! Get ready for a shower of Emblems!").gold).toBe(1000);
+  });
+
+  it("Wishpower ores open into their wiki rewards", () => {
+    const s = { ...at47(["Welt"]), bag: ["Wishpower Crystal Ore Lv. 8", "Wishpower Crystal Ore Lv. 2"] };
+    const a = openOre(s, P47, 0);
+    expect(a.bag).toEqual(expect.arrayContaining(["Basic Weapon Box", "Special Privilege Card", "Smelting Furnace"]));
+    expect(openOre(s, P47, 1).gold).toBe(s.gold + 3);
+  });
+
+  it("characters given with a full bench wait (and take the next free slot)", () => {
+    const full = at47(["Welt"], { bench: Array(9).fill(null).map((_, i) => ({ uid: 700 + i, name: i % 2 ? "Pearl" : "Natasha", cost: 1, stars: 2 as const, items: [] })) });
+    const got = receive(full, "Kafka", 5);
+    expect(got.waiting?.map((u) => u.name)).toEqual(["Kafka"]);
+    expect(buy({ ...got, gold: 99, shop: [{ name: "Jade", cost: 5, stars: 1 }, null, null, null, null] }, P47, 0).note).toMatch(/bench is full/);
+    const freed = sell(got, { zone: "bench", index: 0 });
+    expect(freed.waiting).toEqual([]);
+    expect(freed.bench[0]?.name).toBe("Kafka");
+  });
+});
+

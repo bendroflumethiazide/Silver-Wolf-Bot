@@ -38,6 +38,14 @@ SOFTWARE.
 | [Honkai: Star Rail Wiki (Fandom)](https://honkai-star-rail.fandom.com) | Enemy list with types and weaknesses; Currency Wars characters (position, stats by star, abilities, Eidolons, Light Cone, recommended equipment), bonds, shop odds, equipment (including Emblems and gems), Investment Environments and Strategies, opponents and difficulty ranks, when you press the download buttons. Version 4.7 texts built into the app: Voyage Companion effects and Backstage Tea Break options, Trailblaze Store goods, Plot Armor rules (Bonds, investments, Roll-Call) | Text CC BY-SA 3.0 (attributed on each page and in the source files); images © HoYoverse |
 | [Hugging Face: mlc-ai](https://huggingface.co/mlc-ai) | Built-in AI model weights (Qwen3 1.7B or Qwen2.5 0.5B), when the built-in AI is used | Apache-2.0 (Qwen models) |
 
+## Bundled Currency Wars pictures
+
+`public/cw/` holds Currency Wars pictures (equipment, Emblems, gems, consumables, Weapon Boxes, characters, Bonds,
+Investment Environments and Strategies, Voyage Companions, resources, Elation) supplied by the project owner, taken from
+the [Honkai: Star Rail Wiki](https://honkai-star-rail.fandom.com) image host (resized to WebP by
+`scripts/import-cw-icons.py`). The artwork is © COGNOSPHERE / HoYoverse; this is a non-commercial fan tool and the
+pictures are used only to show the game's own items in it. Contact the project owner to have any removed.
+
 ## npm packages
 
 Bundled npm dependencies keep their own licences (MIT, Apache-2.0, ISC), including

@@ -2,7 +2,8 @@
 
 import { Award, ThumbsUp, Clover, Coins, Cpu, Crosshair, Crown, Flame, Flower2, Footprints, Gem, Orbit, Package, Pickaxe, Projector, Shield, Sparkles, Sword, Ticket, Trash2, Wrench, Zap, type LucideIcon } from "lucide-react";
 import { bondFamily, bondsOf, membersOf } from "@/lib/currencywars/bonds";
-import { emblemBond, oreGold, oreTier } from "@/lib/currencywars/items";
+import { emblemBond, isOre, oreGold, oreTier } from "@/lib/currencywars/items";
+import { cwIcon, type IconKind } from "@/lib/currencywars/icons";
 import { specialItem } from "@/lib/currencywars/specialItems";
 import { useState } from "react";
 import { cwCharacterId } from "@/lib/currencywars/names";
@@ -33,11 +34,20 @@ export const TIER_LABEL: Record<BondTier, string> = { bronze: "Bronze", silver: 
 export function Portrait({ name, cost, size = 56, className }: { name: string; cost?: number; size?: number; className?: string }) {
   const game = useApp((s) => s.game);
   const id = cwCharacterId(name, game);
+  const art = cwIcon("character", name);
   return (
     <span className={cx("inline-block shrink-0 overflow-hidden rounded-full ring-2", COST_RING[cost ?? 1] ?? "ring-line", className)} style={{ width: size, height: size }}>
-      <GameImage path={id ? game?.characters[id]?.icon : undefined} alt={name} fallback={name} className="h-full w-full" rounded="rounded-full" />
+      {art ? <img src={art} alt={name} loading="lazy" className="h-full w-full rounded-full object-cover" />
+        : <GameImage path={id ? game?.characters[id]?.icon : undefined} alt={name} fallback={name} className="h-full w-full" rounded="rounded-full" />}
     </span>
   );
+}
+
+/** A bundled Currency Wars picture (icons.ts), or `fallback` when there's none. */
+export function CwImg({ kind, name, size = 20, className, fallback = null, alt }: { kind: IconKind; name: string; size?: number; className?: string; fallback?: React.ReactNode; alt?: string }) {
+  const src = cwIcon(kind, name);
+  if (!src) return <>{fallback}</>;
+  return <img src={src} alt={alt ?? ""} aria-hidden={alt ? undefined : true} loading="lazy" width={size} height={size} className={cx("inline-block shrink-0 object-contain", className)} style={{ width: size, height: size }} />;
 }
 
 export const FIELD_LABEL: Record<CwField, string> = { on: "On-Field", off: "Off-Field", both: "On/Off" };
@@ -121,7 +131,7 @@ export function BondList({ pack, states, have, empty = "Bonds light up as you de
               className={cx("flex w-full items-center gap-2 rounded-lg px-1.5 py-1 text-left", b.active ? "bg-white/[0.06]" : "opacity-70 hover:opacity-100")}>
               <span className={cx("flex h-7 w-7 shrink-0 items-center justify-center text-xs font-bold ring-1 [clip-path:polygon(25%_0,75%_0,100%_50%,75%_100%,25%_100%,0_50%)]", b.tier ? TIER_HEX[b.tier] : "bg-white/10 text-muted ring-white/10")}>{b.count}</span>
               <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1 truncate text-xs font-medium">{b.bond.name}{tracked.includes(bondFamily(b.bond.name)) && <ThumbsUp size={10} className="shrink-0 text-emerald-400" aria-label="tracked" />}</span>
+                <span className="flex items-center gap-1 truncate text-xs font-medium"><CwImg kind="bond" name={b.bond.name} size={14} className="opacity-90" />{b.bond.name}{tracked.includes(bondFamily(b.bond.name)) && <ThumbsUp size={10} className="shrink-0 text-emerald-400" aria-label="tracked" />}</span>
                 <span className="block text-[10px] text-faint">
                   {b.bond.levels.map((l, i) => <span key={l.count}>{i > 0 && "/"}<span className={b.count >= l.count ? "font-semibold text-cyan" : ""}>{l.count}</span></span>)}
                 </span>
@@ -192,11 +202,16 @@ const ORE_ORB: Record<string, string> = {
   Prismatic: "bg-[conic-gradient(from_0deg,#f472b6,#facc15,#4ade80,#38bdf8,#a78bfa,#f472b6)] text-fuchsia-300",
 };
 
-/** Icon for an item: basic items have their own; advanced items show their two parts; ores are orbs. */
+/** Icon for an item: the bundled picture when there is one; otherwise basic items' symbols, advanced items' two parts, ore orbs. */
 export function ItemIcon({ pack, name, size = 16 }: { pack: CwPack; name: string; size?: number }) {
+  const pic = !isOre(name) ? cwIcon("item", name) : null;
+  if (pic) {
+    const priv = name.endsWith(": Privilege");
+    return <img src={pic} alt="" aria-hidden loading="lazy" width={size + 4} height={size + 4} className={cx("inline-block shrink-0 rounded object-contain", priv && "ring-2 ring-amber-300 shadow-[0_0_8px_rgba(252,211,77,0.7)]")} style={{ width: size + 4, height: size + 4 }} />;
+  }
   const Basic = BASIC_ICON[name];
   if (Basic) return <Basic size={size} className={BASIC_TONE[name]} aria-hidden />;
-  const tier = oreTier(name) ?? (oreGold(name) !== null ? "Gold" : null);
+  const tier = oreTier(name) ?? (oreGold(name) !== null ? "Gold" : isOre(name) ? "Prismatic" : null);
   if (tier) return <span aria-hidden className={cx("inline-block shrink-0 rounded-full shadow-[0_0_8px_currentColor] ring-1 ring-white/50", ORE_ORB[tier])} style={{ width: size, height: size }} />;
   if (name === "Red Gem" || name === "Blue Gem" || name === "Wealth Gem") return <Gem size={size} className={name === "Red Gem" ? "text-rose-400" : name === "Blue Gem" ? "text-sky-400" : "text-amber-300"} aria-hidden />;
   if (emblemBond(pack, name)) return <Award size={size} className="text-amber-200" aria-hidden />;

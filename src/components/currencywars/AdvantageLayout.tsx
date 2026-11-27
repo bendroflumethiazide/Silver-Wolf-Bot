@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { kvGet, kvSet } from "@/lib/db";
 import { ADVANTAGE_ASSUMED, ADVANTAGE_NODES, emptyLayout, lockReason, resetLayout, syncSeason, unlockNode, type AdvantageLayout as Layout, type AdvantageNode } from "@/lib/currencywars/advantage";
 import { Button, cx, Panel } from "../ui";
+import { CwImg } from "./shared";
 import { Verbose } from "./simple";
 
 export const ADVANTAGE_KEY = "cwAdvantage";
@@ -32,7 +33,7 @@ export function AdvantageLayoutPanel({ season }: { season: string }) {
   const spent = layout.unlocked.length;
   return (
     <Panel title={<span className="flex items-center gap-2"><Sparkle size={15} className="text-violet-300" /> Advantage Layout</span>}
-      actions={<span className="flex items-center gap-2 text-sm"><b aria-label="Phantasmal Orbs">{layout.orbs}</b><span className="text-xs text-muted">Phantasmal Orbs</span>
+      actions={<span className="flex items-center gap-2 text-sm"><CwImg kind="resource" name="Phantasmal Orb" size={22} /><b aria-label="Phantasmal Orbs">{layout.orbs}</b><span className="text-xs text-muted">Phantasmal Orbs</span>
         <Button size="sm" variant="ghost" onClick={() => save(resetLayout(layout))} disabled={!spent}><RotateCcw size={12} /> Reset</Button></span>}>
       <Verbose>
         <p className="mb-2 text-xs text-muted">Unlocked nodes apply to runs you start afterwards. Seasonal nodes open after every Permanent one; resetting refunds every Orb. Combat Ability Boosts cost 20 Orbs (wiki); other node costs ({ADVANTAGE_ASSUMED.permanentCost} permanent, {ADVANTAGE_ASSUMED.seasonalCost} seasonal) and Orbs per run ({ADVANTAGE_ASSUMED.orbsPerRankStep} per rank step, +{ADVANTAGE_ASSUMED.orbsForClear} for a clear, {ADVANTAGE_ASSUMED.orbsPerPlane} per plane reached) are assumed.</p>

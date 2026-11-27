@@ -4,7 +4,7 @@ import { Sparkles } from "lucide-react";
 import { AHA, ELATION_ASSUMED, ELATION_KITS, PUNCHLINE, type ElationResult } from "@/lib/currencywars/elation";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { cx, Panel } from "../ui";
-import { ItemIcon } from "./shared";
+import { CwImg, ItemIcon } from "./shared";
 import { useSimple } from "./simple";
 
 const pct = (x: number) => `${Math.round(x * 100)}%`;
@@ -20,7 +20,7 @@ export function ElationPanel({ pack, elation, star, items, ahaStats, onGive, giv
   const order = [...elation.participants.map((n) => ({ n, pid: ELATION_KITS[n]?.last ? 1000 : ELATION_KITS[n]?.pid ?? 0 })), ...(star ? [{ n: "Aha", pid: AHA.pid }] : [])].sort((a, b) => a.pid - b.pid);
   return (
     <Panel title={<span className="flex items-center gap-2"><Sparkles size={15} className="text-[#e8735e]" /> Elation · Aha</span>}
-      actions={<span className="text-xs text-muted">Punchline at start <b className="text-text">{elation.punchlineStart}</b></span>}>
+      actions={<span className="flex items-center gap-1 text-xs text-muted"><CwImg kind="misc" name="Punchline" size={18} />Punchline at start <b className="text-text">{elation.punchlineStart}</b></span>}>
       <div className="space-y-2 text-xs">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat label="Aha" value={star ? `${"★".repeat(star)} (${star} slot${star === 1 ? "" : "s"})` : "not summoned"} />

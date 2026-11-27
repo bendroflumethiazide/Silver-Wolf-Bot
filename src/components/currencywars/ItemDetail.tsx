@@ -29,10 +29,11 @@ export function ItemDetail({ pack, name, owned = [], hint, onClose, actions, nee
           <p className="text-[10px] uppercase tracking-wide text-muted">{d.kindLabel}</p>
         </div>
         {whoFor(name).length > 0 && <span className="flex items-center gap-1 text-[10px] text-emerald-300"><ThumbsUp size={11} aria-hidden /><WhoFaces pack={pack} names={whoFor(name)} size={20} /></span>}
-        {actions}
         {onClose && <button type="button" onClick={onClose} aria-label="Close item details" className="rounded p-1 text-faint hover:text-text"><X size={14} /></button>}
       </div>
       {d.summary && <p className="mt-1.5 text-text/90">{d.summary}</p>}
+      {hint && <p className="mt-1.5 text-cyan">{hint}</p>}
+      {actions && <div className="mt-1.5 flex flex-wrap gap-1">{actions}</div>}
       {(() => {
         const fx = itemEffect(pack, name, { place: "on", stars: 1, boss: false });
         return fx.notes.length ? <p className="mt-1 text-[11px] text-cyan">In battle: {fx.notes.join(", ")}</p> : null;
@@ -67,7 +68,6 @@ export function ItemDetail({ pack, name, owned = [], hint, onClose, actions, nee
           </ul>
         </div>
       )}
-      {hint && <p className="mt-2 text-cyan">{hint}</p>}
     </div>
   );
 }

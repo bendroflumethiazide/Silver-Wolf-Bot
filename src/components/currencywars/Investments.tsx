@@ -7,6 +7,7 @@ import { effectCoverage, type EffectCoverage } from "@/lib/currencywars/run";
 import type { StrategyRarity } from "@/lib/currencywars/parse";
 import type { CwPack } from "@/lib/currencywars/sim";
 import { Badge, cx, Empty, Panel } from "../ui";
+import { CwImg } from "./shared";
 import { Verbose } from "./simple";
 
 const COVER: Record<EffectCoverage["status"], { label: string; tone: string }> = {
@@ -53,7 +54,7 @@ export function Investments({ pack }: { pack: CwPack }) {
       <Panel title={`Investment Environments (${envs.length})`}>
         <p className="mb-3 text-xs text-muted">Pick 1 of 3 at the start of a run. It lasts the whole run. <span className="text-faint">Run simulator: {counts(pack.environments ?? [])}.</span></p>
         <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {envs.map((e) => <li key={e.name} className="rounded-lg border border-cyan/25 bg-cyan/[0.03] p-2.5"><b className="block text-sm">{e.name}</b><span className="text-xs text-muted">{fillUnknown(e.name, e.effect)}</span>{cover.get(e.name) && <Coverage c={cover.get(e.name)!} />}</li>)}
+          {envs.map((e) => <li key={e.name} className="rounded-lg border border-cyan/25 bg-cyan/[0.03] p-2.5"><span className="flex items-center gap-2"><CwImg kind="environment" name={e.name} size={28} /><b className="block text-sm">{e.name}</b></span><span className="text-xs text-muted">{fillUnknown(e.name, e.effect)}</span>{cover.get(e.name) && <Coverage c={cover.get(e.name)!} />}</li>)}
         </ul>
       </Panel>
       <Panel title={`Investment Strategies (${strats.length})`}>
@@ -66,7 +67,7 @@ export function Investments({ pack }: { pack: CwPack }) {
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {strats.map((s) => (
               <li key={`${s.rarity}-${s.name}`} className="rounded-lg border border-line p-2.5">
-                <div className="flex items-start justify-between gap-2"><b className="text-sm">{s.name}</b><Badge tone={TONE[s.rarity]}>{s.rarity}</Badge></div>
+                <div className="flex items-start justify-between gap-2"><span className="flex items-center gap-2"><CwImg kind="strategy" name={s.name} size={28} /><b className="text-sm">{s.name}</b></span><Badge tone={TONE[s.rarity]}>{s.rarity}</Badge></div>
                 <p className="mt-1 text-xs text-muted">{fillUnknown(s.name, s.effect)}</p>
                 <p className="mt-1 text-[10px] text-faint">Plane {s.planes.join(", ")}</p>
                 {cover.get(s.name) && <Coverage c={cover.get(s.name)!} />}

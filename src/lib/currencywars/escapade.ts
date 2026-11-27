@@ -465,9 +465,21 @@ export function talentRefill(s: RunState, pack: CwPack, slot: number, cost: numb
 }
 
 /** Open a Basic Weapon Box, choosing the basic equipment. */
+/** What a Weapon Box offers: every basic piece (Basic), or 3 random advanced / privileged pieces (stable until one is opened). */
+export function boxOptions(s: RunState, pack: CwPack, box: string): string[] {
+  if (box === "Basic Weapon Box") return (pack.equipment?.basic ?? []).map((b) => b.name);
+  if (box !== "Advanced Weapon Box" && box !== "Privilege Weapon Box") return [];
+  const rng = createRng(`${s.seed}:${box}:${s.rule?.boxes ?? 0}`);
+  const pool = [...(pack.equipment?.advanced ?? []).map((a) => a.name)];
+  const out: string[] = [];
+  while (out.length < 3 && pool.length) out.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+  return box === "Privilege Weapon Box" ? out.map((x) => `${x}: Privilege`) : out;
+}
+
 export function openBox(s0: RunState, pack: CwPack, bagIndex: number, pick: string): RunState {
-  if (s0.bag[bagIndex] !== "Basic Weapon Box" || !pack.equipment?.basic.some((b) => b.name === pick) || s0.phase === "over") return s0;
+  const box = s0.bag[bagIndex];
+  if (!box || !boxOptions(s0, pack, box).includes(pick) || s0.phase === "over") return s0;
   const [s] = step(s0);
   const bag = [...s.bag]; bag[bagIndex] = pick;
-  return log({ ...s, bag }, `Basic Weapon Box: chose ${pick}.`);
+  return log({ ...s, bag, rule: { ...s.rule, boxes: (s.rule?.boxes ?? 0) + 1 } }, `${box}: chose ${pick}.`);
 }

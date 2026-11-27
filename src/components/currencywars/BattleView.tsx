@@ -4,8 +4,9 @@ import { FastForward, Hourglass, Pause, Play, SkipForward, Skull } from "lucide-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { hpAt, turnOrder, type Timeline, type TlUnit } from "@/lib/currencywars/timeline";
 import { Button, cx, Panel } from "../ui";
-import { Portrait } from "./shared";
+import { CwImg, Portrait } from "./shared";
 import { Verbose } from "./simple";
+import { cwIcon } from "@/lib/currencywars/icons";
 
 /** Action Value played per real second at 1× (a 150 AV fight lasts about 12 seconds). */
 const AV_PER_SECOND = 12;
@@ -24,6 +25,8 @@ function HpBar({ hp, max, tone, phases }: { hp: number; max: number; tone: "ally
 }
 
 function SummonFace({ u, size }: { u: TlUnit; size: number }) {
+  const art = u.name === "Astral Express" ? cwIcon("misc", "Astral Express") : u.name === "Aha" ? cwIcon("character", "Aha") : cwIcon("character", u.name);
+  if (art) return <img src={art} alt="" aria-hidden className="inline-block shrink-0 rounded-full bg-violet-500/30 object-contain ring-1 ring-violet-300/70" style={{ width: size, height: size }} />;
   return <span aria-hidden className="inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/40 to-cyan-500/30 ring-1 ring-violet-300/70" style={{ width: size, height: size, fontSize: size * 0.55 }}>{u.summon?.emoji ?? "✦"}</span>;
 }
 
@@ -158,8 +161,8 @@ export function BattleView({ timeline, title, onDone }: { timeline: Timeline; ti
       </div>
       {hasElation && (
         <div className={cx("mb-3 flex flex-wrap items-center gap-3 rounded-lg border px-3 py-1.5 text-xs transition", instant ? "border-[#e8735e] bg-[#e8735e]/15" : "border-white/10 bg-black/20")} aria-label="Elation">
-          <span>Punchline <b className="font-mono text-[#ffb3a5]">{punchline ?? 0}</b></span>
-          {instant && <span className="cw-instant font-semibold text-[#ffb3a5]">AHA INSTANT!</span>}
+          <span className="flex items-center gap-1"><CwImg kind="misc" name="Punchline" size={18} />Punchline <b className="font-mono text-[#ffb3a5]">{punchline ?? 0}</b></span>
+          {instant && <span className="cw-instant flex items-center gap-1 font-semibold text-[#ffb3a5]"><CwImg kind="misc" name="Aha Instant Incoming" size={22} />AHA INSTANT!</span>}
           {skill && <span className="text-text">{skill.text}</span>}
         </div>
       )}

@@ -337,6 +337,10 @@ export const RULE_INFO: Record<string, RuleInfo> = {
   "Diode": { label: "Encounters are the easy or hard fight (as here)", handled: [/Encounter Nodes will only consist/i] },
   "Complimentary Upgrade": { label: "Encounter rewards one level higher", handled: ALL },
   "\"Get Out of Battle Free\" Card": { label: "skip 2 Combat nodes; +30 XP", handled: ALL },
+  // ---- house rule (the user's choice; the wiki gives no amounts for the Owlberts)
+  "Owlbert, Emissary of Gold": { label: "999 Gold Coins (house rule: the wiki gives no amount)", handled: ALL },
+  "Owlbert, Emissary of Emblems": { label: "999 Gold Coins (house rule: the wiki gives no amount)", handled: ALL },
+  "Owlbert, Emissary of Environmental Preservation": { label: "999 Gold Coins (house rule: the wiki gives no amount)", handled: ALL },
   // ---- environments
   "Personal Accident Insurance": { label: "a Supply node before every Boss", handled: ALL },
   "Excess Budget": { label: "Supply characters carry two items", handled: ALL },

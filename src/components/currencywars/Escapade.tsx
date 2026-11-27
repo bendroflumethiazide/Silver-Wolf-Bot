@@ -8,6 +8,7 @@ import type { RunState } from "@/lib/currencywars/run";
 import { COMPANIONS, companionOf, variantOf, type CompanionCategory } from "@/lib/currencywars/voyageCompanions";
 import { Badge, Button, cx, Panel } from "../ui";
 import { useSimple } from "./simple";
+import { cwIcon } from "@/lib/currencywars/icons";
 
 const WIKI = "https://honkai-star-rail.fandom.com/wiki/Currency_Wars:_Voyage_Into_the_Canvas/Voyage_Companion";
 const CATEGORY: Record<CompanionCategory, { label: string; tone: "cyan" | "gold" | "violet" }> = { equipment: { label: "Equipment", tone: "violet" }, resource: { label: "Resource", tone: "gold" }, node: { label: "Node", tone: "cyan" } };
@@ -44,6 +45,8 @@ function Assumed({ text }: { text: string }) {
 
 function CompanionFace({ name, size = 64, className }: { name: string; size?: number; className?: string }) {
   const c = companionOf(name);
+  const art = cwIcon("companion", name);
+  if (art) return <img src={art} alt="" aria-hidden className={cx("inline-block shrink-0 rounded-2xl bg-gradient-to-br to-transparent object-contain ring-1 ring-white/20", c?.color, className)} style={{ width: size, height: size }} />;
   return (
     <span aria-hidden className={cx("inline-flex shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br to-transparent ring-1 ring-white/20", c?.color, className)} style={{ width: size, height: size, fontSize: size * 0.55 }}>
       {c?.emoji ?? "✦"}

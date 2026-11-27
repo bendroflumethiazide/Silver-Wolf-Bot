@@ -19,7 +19,25 @@ export function oreTier(name: string): OreTier | null {
   return m ? (m[1] as OreTier) : null;
 }
 export const oreGold = (name: string) => { const m = /^Crystal Ore \((\d+) Gold Coins\)$/.exec(name); return m ? Number(m[1]) : null; };
-export const isOre = (name: string) => oreTier(name) !== null || oreGold(name) !== null;
+/**
+ * "Phantasmoon Games: Wishpower" crystal ore rewards by Wishpower level (HSR Wiki, 4.7 Bonds page):
+ * total Wishpower needed and what the ore holds. Employment Contracts are random characters of that cost here.
+ */
+export const WISHPOWER_REWARDS: { level: number; need: number; gold?: number; costs?: number[]; items?: string[]; emblems?: number; aeonAha?: number }[] = [
+  { level: 2, need: 18, gold: 3 },
+  { level: 3, need: 48, costs: [3, 2, 1] },
+  { level: 4, need: 80, costs: [4], items: ["Smelting Furnace"], gold: 2 },
+  { level: 5, need: 120, items: ["Basic Weapon Box"], gold: 3 },
+  { level: 6, need: 160, costs: [5, 5] },
+  { level: 7, need: 210, emblems: 1 },
+  { level: 8, need: 270, items: ["Basic Weapon Box", "Special Privilege Card", "Smelting Furnace"] },
+  { level: 9, need: 420, items: ["Wealth Gem"] },
+  { level: 10, need: 660, items: ["Privilege Weapon Box"], gold: 30 },
+  { level: 11, need: 900, aeonAha: 3, gold: 99 },
+];
+export const wishOreName = (level: number) => `Wishpower Crystal Ore Lv. ${level}`;
+export const wishOreLevel = (name: string) => { const m = /^Wishpower Crystal Ore Lv\. (\d+)$/.exec(name); return m ? Number(m[1]) : null; };
+export const isOre = (name: string) => oreTier(name) !== null || oreGold(name) !== null || wishOreLevel(name) !== null;
 
 /** Guessed contents of a random ore (weights per outcome). Not published by the game. */
 export const ORE_REWARDS: Record<OreTier, { weight: number; gold?: [number, number]; basic?: number; character?: number[]; emblem?: boolean; label: string }[]> = {
@@ -115,6 +133,8 @@ export function describe(pack: CwPack, name: string): { kind: ItemKind; kindLabe
   if (kind === "emblem") { const e = eq!.emblems!.find((x) => x.name === name)!; return { kind, kindLabel: `Emblem · ${e.bond}`, summary: e.effect, details: e.stats, users: e.users }; }
   if (kind === "gem") { const g = eq!.gems!.find((x) => x.name === name)!; return { kind, kindLabel: "Diamond", summary: g.effect, details: [], users: [] }; }
   if (kind === "ore") {
+    const wish = WISHPOWER_REWARDS.find((r) => r.level === wishOreLevel(name));
+    if (wish) return { kind, kindLabel: "Crystal Ore · Wishpower", summary: `Wishpower level ${wish.level} reward (${wish.need} Wishpower). Tap to open.`, details: [wish.gold ? `${wish.gold} Gold Coins` : "", ...(wish.costs ?? []).map((c) => `a random ${c}-cost character`), ...(wish.items ?? []), wish.emblems ? "a random Emblem" : "", wish.aeonAha ? `${wish.aeonAha} × 1-star Aeon ★ Aha` : ""].filter(Boolean), users: [] };
     const gold = oreGold(name);
     if (gold !== null) return { kind, kindLabel: "Crystal Ore", summary: `Open it for ${gold} Gold Coins.`, details: [], users: [] };
     const tier = oreTier(name)!;
