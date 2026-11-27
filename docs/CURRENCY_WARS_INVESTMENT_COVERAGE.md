@@ -24,18 +24,15 @@ Named rules (`src/lib/currencywars/rules.ts`) handle wording the general parser 
 | Combat Power Level Up | the 2-star character gains a random stat each node: +2% strength per node |
 | Combat Power Surge | the 2-star character gains a random stat each node: +2% strength per node |
 
-## Investment Strategies (298): 285 simulated · 5 partly · 8 not simulated
+## Investment Strategies (298): 288 simulated · 5 partly · 5 not simulated
 
 | Name | Status | What isn't simulated (and why) |
 |---|---|---|
 | Holiday Giftbox (Prismatic) | Not simulated | random massive reward |
-| Owlbert, Emissary of Gold (Prismatic) | Not simulated | ready for a shower of gold |
-| Owlbert, Emissary of Environmental Preservation (Prismatic) | Not simulated | ultra-rare Owlbert!; ton of "Golden Trash Bag"! |
 | Xianzhou Fleet Emblem Set (Prismatic) | Partly | an item the wiki hasn't named |
 | The Grand Restaurant Emblem Set (Prismatic) | Partly | an item the wiki hasn't named |
 | DoT Emblem Set (Prismatic) | Partly | an item the wiki hasn't named |
 | Network Ascension (Prismatic) | Partly | After activating 2 non-independent Bonds in a single battle, obtain a reward; Thereafter, every time the objective is achieved, the number of activated Bonds required t |
-| Owlbert, Emissary of Emblems (Prismatic) | Not simulated | ready for a shower of Emblems |
 | Talent Bundle (Gold) | Not simulated | the wiki text doesn't say exactly what it gives or does |
 | Talent Bundle+ (Gold) | Not simulated | the wiki text doesn't say exactly what it gives or does |
 | Talent Bundle++ (Gold) | Not simulated | the wiki text doesn't say exactly what it gives or does |
@@ -80,8 +77,9 @@ Named rules (`src/lib/currencywars/rules.ts`) handle wording the general parser 
   "fragileTarget": 0.25,
   "eidolonStr": 0.1,
   "fourStar": 1.5,
-  "eyepieceEnergy": 0.2,
-  "initialEnergy": 0.125,
+  "maxEnergy": 120,
+  "eyepieceEnergy": 30,
+  "initialEnergy": 15,
   "vitalityPerLevel": 0.02,
   "hyperheatLoot": 2,
   "overheatLoot": 1.5,

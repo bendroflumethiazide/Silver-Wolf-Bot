@@ -81,6 +81,19 @@ See docs/08-roadmap.md → "Next tasks".
 - Prydwen blocks automated access (Cloudflare) and its content isn't licensed, so nothing is copied; the user supplied screenshots for layout reference.
 - SU offer odds and Currency Wars shop slot counts aren't published; the simulators state their assumptions.
 
+## 2026-11-27 · 1.12.0 Real pictures, Wrenches from the start, Weapon Boxes, battle realism
+
+- **Pictures** (supplied by the owner from the HSR Wiki, `public/cw`, credited in THIRD_PARTY_NOTICES): every equipment piece, Emblem, gem, Trash Bag, consumable and Weapon Box; all 60 characters plus Peppy and Dan Heng • Permansor Terrae; 29 Bonds; Investment Environments and Strategies (Gold/Prismatic versions share their base picture, "X's Invitation" uses the X Emblem, "X Index Funds" the X Bond); 4 Voyage Companions; Gold Coin, Trailblaze Power, Phantasmal Orb; Punchline, Aha Instant, Astral Express. Privileged equipment gets a gold frame.
+- **Disassembly Wrench, Precision Disassembly Wrench, Smelting Furnace** (wiki research): every match starts with a Precision Disassembly Wrench at A0–A5 and a Disassembly Wrench from A6-1 (difficulty table); Smelting Furnaces also come from Wishpower rewards, Master Smith and Aeon ★ Aha's 3-star 7-cost reward (30 Furnaces, 30 Wrenches). **Phantasmoon Games: Wishpower** now earns Wishpower after each fight (doubled on a Perfect Clear) and its crystal ore rewards (Smelting Furnace, Special Privilege Card, Weapon Boxes, Wealth Gem…).
+- **Weapon Boxes:** Basic, Advanced and Privilege Weapon Boxes are items you open and choose from (Advanced/Privilege: 1 of 3, assumed). The item panel's buttons sit on their own row, so nothing overlaps.
+- **Full bench:** characters you're given wait in a red-bordered row and take the next free slot (buying from the shop still needs space).
+- **Owlbert** (all three): 999 Gold Coins (house rule).
+- **Battle realism:** turns follow Action Value (one every 10000 / SPD, SPD = 100 × (1 + SPD Amplification)); a quick win no longer leaves anyone without a turn; Pearl's empowered "next attack" lands on that ally's turn. Energy effects now count (they were ~0). Kits: squad DMG/CRIT DMG, Blade Quenching and Energy regeneration now apply (Luocha, Jingliu, Himeko • Nova, Mortenax Blade, Huohuo, Tribbie, Fu Xuan); healing and shields count more; Elation damage halved (it outweighed everything else). Characters without a wiki page yet (Evanescia, Trailblazer (Elation)) use their cost's median strength. The board shows the enemy's strength and what makes it up.
+- **Stats audit:** all 113 items and 76 combat Strategies checked; Emblem passives (Follow-Up ATK, DoT, AoE, Combo, Break, Summon, Elation, Counter, Energy, Healing, Defender, Little Giant) now apply.
+
+### Test results
+- typecheck ✓ · lint ✓ · unit **257/257** · E2E **14/14** on both builds · web build checked under the GitHub Pages path (all pictures load) · calibration A0 ≈ 85%, A4 ≈ 55%.
+
 ## 2026-11-26 · 1.11.1 Silver Wolf announces the update
 
 - Home page only: Silver Wolf opens with "Latest update: Currency Wars 2.0 Rework" and what changed, with a "Play Currency Wars" button and the facts under "data" (`latestUpdateComment` in `companion/comments.ts`). No other page shows it.

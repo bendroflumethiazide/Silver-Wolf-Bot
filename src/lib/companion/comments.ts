@@ -122,18 +122,19 @@ export function dataVersionComment(local: string | null, remote: string | null):
 }
 
 /** The newest app update. Silver Wolf announces it on the home page only. */
-export const LATEST_UPDATE = { version: "1.11.0", title: "Currency Wars 2.0 Rework", href: "/currency-wars" } as const;
+export const LATEST_UPDATE = { version: "1.12.0", title: "Currency Wars 2.0 Rework", href: "/currency-wars" } as const;
 
 export function latestUpdateComment(): Comment {
   return {
     mood: "hyped",
-    line: `Latest update: ${LATEST_UPDATE.title}|Every Investment Environment and Strategy actually does what it says now. I checked all of them|Elation's in. Aha Instants, Punchline, Certified Banger, Lucky Strikes|Advantage Layout, Phantasmal Orbs, Wrenches, Smelting Furnace, privileged gear|The few the wiki won't explain are tagged, not made up|Go break it. I already did`,
+    line: `Latest update: ${LATEST_UPDATE.title}|Every Investment Environment and Strategy actually does what it says now. I checked all of them|Elation's in. Aha Instants, Punchline, Certified Banger, Lucky Strikes|Advantage Layout, Phantasmal Orbs, Wrenches, Smelting Furnace, privileged gear|Real pictures for everything now. Items, characters, Bonds. Finally looks like the game|Turns run on Action Value. Fast people act more, nobody just stands there|The few the wiki won't explain are tagged, not made up|Go break it. I already did`,
     facts: [
       `Version ${LATEST_UPDATE.version}: ${LATEST_UPDATE.title}.`,
       "Investment Environments 70/72 and Strategies 285/298 fully simulated; the rest are tagged in the Investments tab.",
       "Strategy grades fixed (Silver < Gold < Prismatic), Strategy refresh keeps the grade.",
       "All 58 characters' kits audited; ability labels like the game's.",
       "Elation engine, Advantage Layout with Phantasmal Orbs, Aeon ★ Aha, consumables and privileged equipment.",
+      "Pictures for items, characters, Bonds and Investments; Weapon Boxes; battle turns by Action Value.",
     ],
     action: { label: "Play Currency Wars", href: LATEST_UPDATE.href },
   };
