@@ -26,10 +26,12 @@ export const RULE_ASSUMED = {
   eidolonStr: 0.1,
   /** A "4-star" character (Faster-Than-Light Promotion) as 3-star strength × this (there is no 4-star table). */
   fourStar: 1.5,
-  /** Energy from defeating enemies (Tactical Eyepiece) as squad Energy. */
-  eyepieceEnergy: 0.2,
-  /** "15 initial Energy" as a share of a typical 120-Energy Ultimate. */
-  initialEnergy: 15 / 120,
+  /** A typical Ultimate's Energy (to turn "% of Max Energy" into Energy points). */
+  maxEnergy: 120,
+  /** Energy from defeating enemies (Tactical Eyepiece): 25% of Max Energy per kill, a few kills per fight. */
+  eyepieceEnergy: 30,
+  /** "15 initial Energy". */
+  initialEnergy: 15,
   /** Market Vitality: chance a 1/2-cost shop slot is 2-star, per level above 2. */
   vitalityPerLevel: 0.02,
   /** Economic Hyperheat: Super Warp Trotters drop this many times the Reward node's loot. */
@@ -110,7 +112,7 @@ export function combatRules(names: readonly string[], c: CombatCtx): RuleCombat 
 
   if (has.has("Hope of the Team") && on[0]) unit(on[0].uid, { dmg: 0.15, hp: 0.15 });
   if (has.has("Fan Club") && off.length >= 4) squad({ spd: 0.15 });
-  if (has.has("Positive Energy")) squad({ energy: 0.2 });
+  if (has.has("Positive Energy")) squad({ energy: 0.2 * RULE_ASSUMED.maxEnergy });
   if (has.has("Perfect Start")) squad({ str: 0.4 * RULE_ASSUMED.firstHalf });
   if (has.has("Grassroots Contribution")) for (const u of c.units.filter((x) => x.cost === 1)) squad({ spd: 0.06 * (u.stars === 3 ? 3 : 1), mit: 0.04 * (u.stars === 3 ? 3 : 1) });
   for (const [name, own, others] of [["Role Model: Silver", 0.25, 0], ["Role Model: Gold", 0.4, 0.1], ["Role Model: Prismatic", 0.7, 0]] as const) {

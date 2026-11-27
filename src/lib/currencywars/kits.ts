@@ -101,8 +101,8 @@ function readKit(info: CwCharInfo | null | undefined, name: string, stars: numbe
       // Energy for allies.
       if (/regenerates? .*Energy for|Energy (?:to|for) (?:one|designated|all|on-field|an?) ally|regenerates Energy by/i.test(sen)) { add(out.squad, "dmg", 0.05); done("Energy for allies"); }
       // Survival.
-      if (/Shield/i.test(sen) && /(provides?|grants?|gains?|applies)/i.test(sen)) { once("shield", toSquad || /allies|on-field/i.test(sen) ? out.squad : out.self, "mit", 0.08); done("shields"); }
-      if (/restores? HP|heals?|Healing/i.test(sen) && /(all|on-field|allies|ally)/i.test(sen)) { once("heal", out.squad, "mit", 0.06); done("healing"); }
+      if (/Shield/i.test(sen) && /(provides?|grants?|gains?|applies)/i.test(sen)) { once("shield", toSquad || /allies|on-field/i.test(sen) ? out.squad : out.self, "mit", 0.12); done("shields"); }
+      if (/restores? HP|heals?|Healing/i.test(sen) && /(all|on-field|allies|ally)/i.test(sen)) { once("heal", out.squad, "mit", 0.1); done("healing"); }
       if ((m = new RegExp(`DMG taken (?:is )?(?:reduced|decreases?) by ${NUM}`, "i").exec(sen)) || (m = new RegExp(`DMG Mitigation (?:increases )?by ${NUM}`, "i").exec(sen))) buff(m[0], "mit", pctOf(m, 1, stars) * KIT_ASSUMED.uptime, "DMG reduction");
       // Their own Follow-Up ATKs are part of their strength.
       if (/Follow-Up ATK/i.test(sen) && /(launch|uses?|deals?|triggers?)/i.test(sen) && !/considered as/i.test(sen)) { selfBuff = true; line.effect = line.effect ? `${line.effect}; Follow-Up ATK` : "Follow-Up ATK"; }
@@ -116,7 +116,13 @@ function readKit(info: CwCharInfo | null | undefined, name: string, stars: numbe
       if ((m = new RegExp(`(?:ally squad(?:'s| members)?|all allies'?)[^.]*?(?:gain|Lucky Strike Rate (?:increases )?by) ${NUM}(?: Lucky Strike Rate)?`, "i").exec(sen)) && /Lucky Strike Rate/i.test(sen) && !/Aha/i.test(sen)) { add(out.squad, "lucky", pctOf(m, 1, stars) * KIT_ASSUMED.uptime); done("squad Lucky Strike Rate"); }
       if ((m = new RegExp(`Lucky Strike DMG (?:increases )?by \\(?${NUM}`, "i").exec(sen)) && SQUAD.test(sen) && !/Aha/i.test(sen)) { add(out.squad, "luckyDmg", pctOf(m, 1, stars) * KIT_ASSUMED.uptime); done("squad Lucky Strike DMG"); }
       if ((m = new RegExp(`SPD Amplification (?:increases )?by ${NUM}`, "i").exec(sen)) && SQUAD.test(sen) && !/Aha/i.test(sen)) { add(out.squad, "spd", pctOf(m, 1, stars) * KIT_ASSUMED.uptime); done("squad SPD Amplification"); }
-      if ((m = new RegExp(`DMG dealt by (?:the )?ally squad increases by ${NUM}`, "i").exec(sen))) { add(out.squad, "dmg", pctOf(m, 1, stars) * KIT_ASSUMED.uptime); done("squad DMG"); }
+      if ((m = new RegExp(`DMG dealt by (?:the )?ally squad(?: in the Zone)? increases by ${NUM}`, "i").exec(sen)) || (m = new RegExp(`increases (?:the )?(?:ally squad's DMG dealt|DMG dealt by the ally squad) by ${NUM}`, "i").exec(sen))) { add(out.squad, "dmg", pctOf(m, 1, stars) * KIT_ASSUMED.uptime); done("squad DMG"); }
+      // "all allies' CRIT DMG by 100%/150%/200%" (conditional states count at the usual uptime).
+      else if ((m = new RegExp(`all allies' CRIT DMG by ${NUM}`, "i").exec(sen))) { add(out.squad, "dmg", pctOf(m, 1, stars) * KIT_ASSUMED.critDmgWeight * KIT_ASSUMED.uptime); done("squad CRIT DMG"); }
+      // Mortenax Blade's "Blade Quenching": one member gets DMG dealt (+ per squad equipment) ≈ a third for the squad.
+      if ((m = new RegExp(`team member with the most equipment gains[^.]*?DMG dealt by ${NUM}`, "i").exec(sen))) { add(out.squad, "dmg", (pctOf(m, 1, stars) + 0.3) / 3); done("Blade Quenching on the best-equipped member"); }
+      // Energy for the squad after allies act / are attacked / each turn.
+      if (/regenerates? \d+ Energy/i.test(sen) && /(on-field ally|ally squad|allies|after an on-field)/i.test(sen) && line.status === "other") { add(out.squad, "energy", 5); done("Energy for the squad"); }
       if ((m = new RegExp(`enemy targets' DMG taken by ${NUM}`, "i").exec(sen)) || (m = new RegExp(`CRIT DMG dealt increases by ${NUM}`, "i").exec(sen))) { add(out.squad, "dmg", pctOf(m, 1, stars) * KIT_ASSUMED.uptime * (/CRIT/.test(m[0]) ? KIT_ASSUMED.critDmgWeight : 1)); done("more DMG on debuffed enemies"); }
       if ((m = new RegExp(`(?:All-Type )?RES PEN (?:increases )?by ${NUM}`, "i").exec(sen)) && SQUAD.test(sen)) { add(out.squad, "dmg", pctOf(m, 1, stars) * 0.8 * KIT_ASSUMED.uptime); done("squad RES PEN"); }
       if ((m = new RegExp(`Max HP by ${NUM}`, "i").exec(sen)) && SQUAD.test(sen)) { add(out.squad, "hp", pctOf(m, 1, stars)); done("squad Max HP"); }

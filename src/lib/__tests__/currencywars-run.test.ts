@@ -7,7 +7,7 @@ import { craftableNow, fillUnknown, gearMark, gearNeeds } from "../currencywars/
 import { combinations, combineResult, describe as describeItem, goldOreName, isOre, oreName } from "../currencywars/items";
 import { cardNames, cleanWikitext, parseCharInfo, parseRareEquipment, parseDifficulty, parseEnvironments, parseEquipment, parseOpponents, parseStrategies, wikiTableRows } from "../currencywars/parse";
 import {
-  addToBag, effectCoverage, levelUp, maxHpOf, receive, refreshCostOf, sellItem,
+  addToBag, costMedian, effectCoverage, levelUp, unitBase, maxHpOf, receive, refreshCostOf, sellItem,
   ASSUMED, advance, applyEffect, enterNode, refreshStrategy, gradeRulesOf, ahaStar, equipAha, promoteAeonAha, placedBondStates, rerollEnvironments, openOre, skipSupply, teamSize, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, merge, moveUnit, newRun,
   nodeKind, nodeKinds, objectives, pickStrategy, pickSupply, recipe, refresh, RULES, sell, teamPower, toggleLock, unitPower, units, type RunState, pickTea, choosePlotArmor, settle, useSwap, nextInterlude,
 } from "../currencywars/run";
@@ -1673,7 +1673,7 @@ describe("character kits in combat", () => {
     const sunday = kitEffect(kitInfo([["Benison", "Skill (Change)", "Enables designated on-field ally character and their summon to immediately take action, increases their DMG dealt by 30%/45%/60%/75%."]]) as never, "Sunday", 1, "off");
     expect(sunday.squad.spd).toBeGreaterThan(0);
     const aven = kitEffect(kitInfo([["A", "Skill (Change)", "Provides a shield to all on-field allies."], ["B", "Talent (Change)", "Provides all on-field allies with a Shield."]]) as never, "Aventurine", 1, "on");
-    expect(aven.squad.mit).toBeCloseTo(0.08 + 0.08 * 0.15, 5);
+    expect(aven.squad.mit).toBeCloseTo(0.12 + 0.12 * 0.15, 5); // one shield (0.12), however many lines mention it
     expect(kitCoverage(aven).modelled).toBe(2);
   });
 
@@ -1950,6 +1950,36 @@ describe("Wrenches, Weapon Boxes, Wishpower, Owlbert and the waiting area", () =
     const freed = sell(got, { zone: "bench", index: 0 });
     expect(freed.waiting).toEqual([]);
     expect(freed.bench[0]?.name).toBe("Kafka");
+  });
+});
+
+describe("Battle realism: Action Value turns, idle characters, balance", () => {
+  const ally = (name: string, spd: number, power = 100) => ({ name, cost: 2, stars: 1 as const, power, place: "on" as const, spd });
+  const fight = (allies: ReturnType<typeof ally>[], won = true) => buildTimeline({ allies, enemies: [{ name: "E1" }, { name: "E2" }], waves: 1, won, cleared: won ? 1 : 0.5, ratio: won ? 2 : 0.8, limit: 150, bossPhases: 2, reviveCost: 15 }, createRng("t"));
+
+  it("turns follow Action Value: one every 10000 / SPD, so faster characters act more", () => {
+    const tl = fight([ally("Slow", 0), ally("Fast", 200)], false);
+    const n = (name: string) => (tl.turns ?? []).filter((t) => t.id === tl.units.find((u) => u.name === name)!.id).length;
+    expect(n("Slow")).toBe(1); // 100 SPD → AV 100 in a 150-AV fight
+    expect(n("Fast")).toBe(4); // 300 SPD → every 33.3 AV
+  });
+
+  it("a quick win still lets every acting character take a turn", () => {
+    const tl = fight([ally("A", 0), ally("B", 0), ally("C", 50)]);
+    for (const u of tl.units.filter((x) => x.side === "ally")) expect((tl.turns ?? []).some((t) => t.id === u.id)).toBe(true);
+  });
+
+  it("a character without a wiki page uses its cost tier's median strength", () => {
+    const pack = { ...P47, characters: [...P47.characters, { name: "Nobody", cost: 1 }] };
+    const lone = unitBase({ uid: 1, name: "Nobody", cost: 1, stars: 2, items: [] }, "on", pack);
+    expect(lone).toBe(costMedian(pack, 1)[1]);
+    expect(lone).toBeGreaterThan(0);
+  });
+
+  it("Energy strategies count (Energy is in points)", () => {
+    const s = at47(["Welt", "Kafka"]);
+    const pe = pickStrategy({ ...s, phase: "strategy", offers: { strategies: [{ name: "Positive Energy", rarity: "Silver", effect: "When entering combat, the ally squad regenerates Energy equal to 20% of Max Energy.", planes: [1, 2, 3] }] } }, P47, 0);
+    expect(teamPower(pe, P47).power).toBeGreaterThan(teamPower(s, P47).power * 1.05);
   });
 });
 

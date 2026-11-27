@@ -31,7 +31,7 @@ import { createRng } from "../warp/simulator";
 export const ELATION_ASSUMED = {
   baseSpd: 100,
   /** Strength units one 100% Elation multiplier is worth, as a share of the attacker's per-action strength. */
-  damageScale: 0.012,
+  damageScale: 0.006,
   /** "All enemies" hits count this many targets. */
   aoeTargets: 2,
   laughterHits: 10,

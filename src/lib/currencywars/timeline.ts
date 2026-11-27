@@ -60,6 +60,9 @@ export interface TimelineInput {
 
 const clamp = (x: number, a: number, b: number) => Math.min(b, Math.max(a, x));
 
+/** Currency Wars characters only list SPD Amplification; their shared base SPD isn't published (assumed 100, as in elation.ts). */
+export const TIMELINE_ASSUMED = { baseSpd: 100 } as const;
+
 export function buildTimeline(input: TimelineInput, rng: () => number): Timeline {
   const { won, ratio, limit } = input;
   const units: TlUnit[] = [];
@@ -80,7 +83,10 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   });
   const total = enemies.reduce((n, e) => n + e.maxHp, 0);
   const target = won ? total : Math.floor(total * clamp(input.cleared, 0, 0.99));
-  const end = limit === null ? 40 + 12 * enemies.length + rng() * 20 : won ? limit * clamp(0.92 - 0.45 * (ratio - 1), 0.3, 0.92) : limit;
+  // A won fight can't end before every acting ally's first turn (10000 / SPD AV) — nobody sits idle through a quick win.
+  const firstTurn = Math.max(0, ...input.allies.filter((a) => a.power > 0 && !a.summon).map((a) => 10000 / (TIMELINE_ASSUMED.baseSpd * (1 + (a.spd ?? 0) / 100))));
+  const quick = limit === null ? 40 + 12 * enemies.length + rng() * 20 : won ? limit * clamp(0.92 - 0.45 * (ratio - 1), 0.3, 0.92) : limit;
+  const end = limit === null ? Math.max(quick, firstTurn + 2) : won ? Math.min(limit, Math.max(quick, firstTurn + 2)) : limit;
 
   // Ally actions: each active ally acts on its own rhythm; damage per action follows strength.
   const acts: { t: number; ally: (typeof allies)[number]; w?: number; text?: string; lucky?: boolean }[] = [];
@@ -96,14 +102,26 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
       for (let t = first; t < end - 0.5; t += every * (0.95 + rng() * 0.1)) acts.push({ t, ally: a });
       continue;
     }
-    // Faster characters (higher SPD Amplification) take more turns; dampened so 300% isn't 4× the turns.
-    const interval = 100 / ((0.85 + 0.1 * (a.u.stars ?? 1) + rng() * 0.35) * Math.sqrt(1 + (spdOf.get(a.u.id) ?? 0) / 100));
-    for (let t = rng() * interval * 0.6 + 2; t < end - 0.5; t += interval * (0.9 + rng() * 0.2)) acts.push({ t, ally: a });
+    // Action Value (the game's rule): one turn every 10000 / SPD, SPD = base SPD × (1 + SPD Amplification).
+    // A won fight lasts until everyone has had at least one turn (see `end` below); tiny offsets break ties.
+    const interval = 10000 / (TIMELINE_ASSUMED.baseSpd * (1 + (spdOf.get(a.u.id) ?? 0) / 100));
+    const first = Math.min(interval, Math.max(1, end - 1));
+    for (let t = first + rng() * 0.3; t < end - 0.2; t += interval) acts.push({ t, ally: a });
   }
   // Scripted hits (Elation Skills, Aha) happen at their own times, squeezed into this fight's length.
   const span = limit ?? 150;
   const squeeze = (t: number) => Math.min(end - 0.6, Math.max(0.5, (t / span) * end));
-  for (const x of input.scripted ?? []) { const a = allies[x.ally]; if (a && x.weight > 0) acts.push({ t: squeeze(x.t), ally: a, w: x.weight, text: x.text, lucky: x.lucky }); }
+  // A scripted hit on an ally who also acts normally (e.g. Pearl's Elation Skill empowering "the next attack") lands on
+  // that ally's next turn instead of being a turn of its own.
+  const ownTurns = new Map<(typeof allies)[number], number[]>();
+  for (const x of acts) ownTurns.set(x.ally, [...(ownTurns.get(x.ally) ?? []), x.t]);
+  for (const x of input.scripted ?? []) {
+    const a = allies[x.ally];
+    if (!a || x.weight <= 0) continue;
+    const t0 = squeeze(x.t);
+    const next = (ownTurns.get(a) ?? []).filter((t) => t >= t0).sort((p, q) => p - q)[0];
+    acts.push({ t: next ?? t0, ally: a, w: x.weight, text: x.text, lucky: x.lucky });
+  }
   acts.sort((x, y) => x.t - y.t);
   if (won && acts.length) acts[acts.length - 1].t = Math.max(acts[acts.length - 1].t, end - 1);
   const weight = acts.reduce((n, x) => n + (x.w ?? x.ally.power), 0) || 1;
@@ -114,7 +132,8 @@ export function buildTimeline(input: TimelineInput, rng: () => number): Timeline
   const hp = new Map(units.map((u) => [u.id, u.maxHp]));
   // One turn per act (several scripted hits at the same moment are one turn).
   const turns: { t: number; id: string }[] = [];
-  for (const a of acts) { const last = turns[turns.length - 1]; if (!(a.w !== undefined && last && last.id === a.ally.u.id && Math.abs(last.t - a.t) < 0.5)) turns.push({ t: a.t, id: a.ally.u.id }); }
+  const lastTurn = new Map<string, number>();
+  for (const a of acts) { const prev = lastTurn.get(a.ally.u.id); if (prev === undefined || Math.abs(prev - a.t) >= 1.5) { turns.push({ t: a.t, id: a.ally.u.id }); lastTurn.set(a.ally.u.id, a.t); } }
   for (const nt of input.notes ?? []) if (nt.turn !== undefined && allies[nt.turn]) turns.push({ t: squeeze(nt.t), id: allies[nt.turn].u.id });
   let dealt = 0, kills = 0, wave = 1;
   const phaseMarks = new Map<string, number>();

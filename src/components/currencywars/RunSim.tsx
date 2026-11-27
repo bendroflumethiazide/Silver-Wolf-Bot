@@ -7,7 +7,7 @@ import { kvGet, kvSet } from "@/lib/db";
 import {
   advance, ASSUMED, at, autoSpot, battle, buy, buyXp, chooseEnvironment, combineBag, deployed, enemyPower, equip, lineupValue, openOre, units,
   moveUnit, newRun, nodeKind, nodeKinds, objectives, pickEncounter, pickStrategy, pickSupply, rankGain, refresh, RULES, runBonds, sell, skipSupply, teamPower, teamSize,
-  canSellItems, itemPrice, maxHpOf, refreshCostOf, sellItem, toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
+  canSellItems, enemyFactors, itemPrice, maxHpOf, refreshCostOf, sellItem, toggleLock, unitPower, winChance, xpToNext, type NodeKind, type RunState, type Spot, type Unit, type Zone,
   ahaStats, choosePlotArmor, equipAha, gradeRulesOf, rerollEnvironments, rerollSupply, pickTea, placedBondStates, refreshStrategy, settle, useSwap as swapProtagonist,
 } from "@/lib/currencywars/run";
 import { boxOptions, openBox, specialNode } from "@/lib/currencywars/escapade";
@@ -445,9 +445,18 @@ export function RunSim({ pack }: { pack: CwPack }) {
             {prep && (
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
                 <span>Next: <b className="text-text">{NODE_LABEL[kind]}</b>{run.nodeOpponent ? ` vs ${run.nodeOpponent}` : ""}{kind !== "Reward" && av ? ` · ${av} Action Value × 2 cycles` : ""}{run.encounter ? ` (${run.encounter})` : ""}</span>
-                {tp && <span>Strength <b className="text-text">{Math.round(tp.power)}</b>{tp.bonus > 0 && <span className="text-cyan"> (+{Math.round(tp.bonus * 100)}% bonds)</span>} · win chance ≈ <b className={chance >= 0.6 ? "text-ok" : chance >= 0.4 ? "text-amber-300" : "text-bad"}>{Math.round(chance * 100)}%</b></span>}
+                {tp && <span>Strength <b className="text-text">{Math.round(tp.power)}</b>{tp.bonus > 0 && <span className="text-cyan"> (+{Math.round(tp.bonus * 100)}% bonds)</span>} vs enemy <b className="text-text">{Math.round(enemy)}</b> · win chance ≈ <b className={chance >= 0.6 ? "text-ok" : chance >= 0.4 ? "text-amber-300" : "text-bad"}>{Math.round(chance * 100)}%</b></span>}
               </div>
             )}
+            {prep && tp && kind !== "Reward" && (() => {
+              const f = enemyFactors(run, pack, kind);
+              const idle = tp.idle.length;
+              return (
+                <Verbose>
+                  <p className="text-[11px] text-faint">Enemy: {NODE_LABEL[kind]} on plane {run.plane + 1} · rank {f.rank} (+{f.rankHp}% enemy HP → ×{f.rankMult.toFixed(2)}){f.strategyDifficulty ? ` · Strategy difficulty +${f.strategyDifficulty} (×${f.strategyMult.toFixed(2)})` : ""}{tp.elationPower > 0 ? ` · your Elation ${Math.round(tp.elationPower)}` : ""}{idle ? <span className="text-rose-300"> · {idle} idle (wrong position, no strength there)</span> : null}</p>
+                </Verbose>
+              );
+            })()}
             {zoneRow("on", "On-Field", "grid-cols-4 max-w-[22rem]")}
             {zoneRow("off", "Off-Field", "grid-cols-3 max-w-[16.5rem] sm:max-w-[33rem] sm:grid-cols-6")}
             {zoneRow("bench", "Bench", "grid-cols-5 max-w-[27.5rem] sm:max-w-[49.5rem] sm:grid-cols-9")}

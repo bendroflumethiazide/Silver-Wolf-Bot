@@ -1833,7 +1833,24 @@ export function unitBase(u: Unit, place: "on" | "off", pack: CwPack): number {
   const info: CwCharInfo | undefined = pack.info?.[u.name];
   const i = u.stars - 1;
   const aeon = u.name === "Aeon ★ Aha" ? (u.cost >= 7 ? 2 : u.cost >= 5 ? 1.25 : 1) : 1;
-  return aeon * (info ? ((place === "on" ? info.onField : info.offField)[i] ?? 0) * (1 + ((info.hp[i] ?? 0) / 100) * MODEL.hpWeight) : (STRENGTH_FALLBACK[u.cost] ?? STRENGTH_FALLBACK[1])[i]);
+  return aeon * (info ? ((place === "on" ? info.onField : info.offField)[i] ?? 0) * (1 + ((info.hp[i] ?? 0) / 100) * MODEL.hpWeight) : costMedian(pack, u.cost)[i]);
+}
+
+const medians = new WeakMap<CwPack, Map<number, number[]>>();
+/**
+ * Strength by star for a character whose wiki page doesn't exist yet (Evanescia, Trailblazer (Elation) in 4.7):
+ * the median of the same cost's characters (both positions), else the old fallback.
+ */
+export function costMedian(pack: CwPack, cost: number): number[] {
+  let m = medians.get(pack);
+  if (!m) { m = new Map(); medians.set(pack, m); }
+  const hit = m.get(cost);
+  if (hit) return hit;
+  const infos = Object.values(pack.info ?? {}).filter((x) => x.cost === cost);
+  const med = (xs: number[]) => { const a = [...xs].sort((p, q) => p - q); return a.length ? a[Math.floor(a.length / 2)] : 0; };
+  const out = infos.length ? [0, 1, 2].map((k) => med(infos.map((x) => Math.max(x.onField[k] ?? 0, x.offField[k] ?? 0) * (1 + ((x.hp[k] ?? 0) / 100) * MODEL.hpWeight)))) : (STRENGTH_FALLBACK[cost] ?? STRENGTH_FALLBACK[1]);
+  m.set(cost, out);
+  return out;
 }
 
 /** What a unit's own equipment does: stats on itself, and passives for the whole squad. */
@@ -2069,6 +2086,14 @@ export function enemyPower(s: RunState, pack: CwPack, kind: NodeKind = nodeKind(
   const elite = kind === "Combat" && nodeKinds(s.plane, s).lastIndexOf("Combat") === s.node;
   const companion = s.escapade ? (s.escapade.enemyMult ?? 1) * (s.escapade.variant === "bw-weaken" && elite ? ESCAPADE_ASSUMED.weakenedMult : 1) : 1;
   return level * unit * 1.15 * kindMult[kind] * third * diff * MODEL.enemyScale * companion;
+}
+
+/** What makes up an enemy's strength at this node (shown next to the win chance). */
+export function enemyFactors(s: RunState, pack: CwPack, kind: NodeKind = nodeKind(s)) {
+  const rankStep = pack.difficulty?.find((d) => d.id === s.rank);
+  const hp = rankStep?.planes[s.plane]?.hp ?? 0;
+  const cut = (owns(s, "Easy Mode") ? 3 : 0) + ((kind === "Encounter" || kind === "Boss") && owns(s, "Difficulty Modifier") ? 4 : 0);
+  return { rank: s.rank, rankHp: hp, rankMult: (1 + hp / 100) ** 0.2, strategyDifficulty: Math.max(0, s.extraDifficulty - cut), strategyMult: 1 + 0.03 * Math.max(0, s.extraDifficulty - cut), kind };
 }
 
 export const winChance = (power: number, enemy: number) => (enemy <= 0 ? 1 : 1 / (1 + Math.exp(-MODEL.steepness * (power / enemy - 1))));
