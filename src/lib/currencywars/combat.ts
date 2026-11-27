@@ -63,6 +63,27 @@ const NUM = String.raw`([\d.]+)%?(?:\/([\d.]+)%?)?`;
 /** Average stacks of a "stackable" effect over a fight (assumed). */
 export const STACKS = 2;
 
+/** How an Emblem passive's events average over a fight (the wiki gives the effect, not how often it happens). */
+export const EMBLEM_ASSUMED = { height: 1, aoeStacks: 10, counterStacks: 3, uptime: 0.5, onFieldAllies: 4, maxEnergy: 120 } as const;
+type Passive = (ctx: ItemCtx) => { self?: Partial<Stats>; squad?: Partial<Stats>; note: string };
+/** Emblem passives beyond "Grants the wearer the X Bond" (HSR Wiki, 4.7 Equipment page). */
+export const EMBLEM_PASSIVE: Record<string, Passive> = {
+  "Little Giant Emblem": () => ({ self: { str: 0.2 * EMBLEM_ASSUMED.height }, note: `+20% strength per Height (${EMBLEM_ASSUMED.height} assumed)` }),
+  "Follow-Up ATK Emblem": () => ({ self: { dmg: 0.25, spd: 0.1 }, note: "Additional DMG after attacking; action advance after a kill" }),
+  "DoT Emblem": () => ({ self: { dmg: 0.3 }, squad: { dmg: 0.2 * 0.5 * EMBLEM_ASSUMED.uptime }, note: "Freeze: DEF −20% and Ice DoT on its target" }),
+  "AoE Emblem": () => ({ self: { str: 0.02 * EMBLEM_ASSUMED.aoeStacks }, note: `+2% strength per enemy hit (≈${EMBLEM_ASSUMED.aoeStacks} stacks)` }),
+  "Combo Emblem": () => ({ self: { dmg: 0.2 + 0.2 * 0.5 }, note: "20% Combo Rate, +50% DMG in Combo extra turns" }),
+  "Break Emblem": () => ({ self: { brk: 1, dealt: 0.05 }, note: "Break Effect +100%, True DMG on first Weakness Break" }),
+  "Summon Emblem": () => ({ self: { dmg: 0.08 * EMBLEM_ASSUMED.onFieldAllies }, note: `+8% DMG per ally (${EMBLEM_ASSUMED.onFieldAllies} on field)` }),
+  "Elation Emblem": () => ({ self: { dealt: 0.15 }, squad: { dmg: 0.05 }, note: "squad +25% Elation; Euphoric Maelstrom Elation Skill" }),
+  "Counter Emblem": (ctx) => (ctx.place === "on"
+    ? { self: { dmg: 0.2 * EMBLEM_ASSUMED.counterStacks * EMBLEM_ASSUMED.uptime, spd: 0.1 * EMBLEM_ASSUMED.uptime }, note: `on-field: +20% DMG and 10% action advance when attacked (≈${EMBLEM_ASSUMED.counterStacks} stacks)` }
+    : { squad: { dmg: 0.3 * 0.5 * EMBLEM_ASSUMED.uptime }, note: "off-field: Counter King ignores 30% DEF" }),
+  "Energy Emblem": () => ({ squad: { energy: 0.2 * EMBLEM_ASSUMED.maxEnergy }, note: "after Ultimate: 20% Energy for all allies" }),
+  "Healing Emblem": () => ({ squad: { mit: 0.06 }, note: "heals all on-field allies when acting" }),
+  "Defender Emblem": () => ({ self: { dmg: 0.1 }, squad: { mit: 0.08 }, note: "Shield for on-field allies at the start; DMG from its Shield" }),
+};
+
 /** One item's stats and passive. */
 export function itemEffect(pack: CwPack, name: string, ctx: ItemCtx): ItemEffect {
   const eq = pack.equipment;
@@ -75,7 +96,13 @@ export function itemEffect(pack: CwPack, name: string, ctx: ItemCtx): ItemEffect
   // Privileged equipment: the advanced item's second (privileged) values.
   if (isPrivileged(name)) return itemEffect(pack, baseItem(name), { ...ctx, privileged: true });
   const em = eq?.emblems?.find((e) => e.name === name);
-  if (em) { for (const l of em.stats) add("self", statLine(l)); return out; }
+  if (em) {
+    for (const l of em.stats) add("self", statLine(l));
+    // The Emblem's own passive (wiki text), averaged over a fight where it depends on events (EMBLEM_ASSUMED).
+    const pas = EMBLEM_PASSIVE[name]?.(ctx);
+    if (pas) { if (pas.self) add("self", pas.self); if (pas.squad) add("squad", pas.squad); out.notes.push(pas.note); }
+    return out;
+  }
   const adv = eq?.advanced.find((a) => a.name === name);
   if (!adv) return out;
   for (const l of adv.stats) add("self", statLine(l, ctx.privileged));

@@ -15,7 +15,7 @@ import { chooseProtagonist, eligible, refreshPlot, refreshPrice, changeProtagoni
 import { buyTsr, expressPower, refreshTsr, tsrIncome, tsrOf, priceOf, tsrGood, TSR_GOODS } from "../currencywars/trailblazeStore";
 import { COMPANIONS } from "../currencywars/voyageCompanions";
 import { boxOptions, openBox, shiftEarlier } from "../currencywars/escapade";
-import { itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
+import { EMBLEM_PASSIVE, itemEffect, levelStats, powerMult, zeroStats } from "../currencywars/combat";
 import { offerGrades, shiftGrade } from "../currencywars/strategyGrades";
 import { abilityCard } from "../currencywars/abilities";
 import { kitCoverage, kitEffect, starValue } from "../currencywars/kits";
@@ -1980,6 +1980,17 @@ describe("Battle realism: Action Value turns, idle characters, balance", () => {
     const s = at47(["Welt", "Kafka"]);
     const pe = pickStrategy({ ...s, phase: "strategy", offers: { strategies: [{ name: "Positive Energy", rarity: "Silver", effect: "When entering combat, the ally squad regenerates Energy equal to 20% of Max Energy.", planes: [1, 2, 3] }] } }, P47, 0);
     expect(teamPower(pe, P47).power).toBeGreaterThan(teamPower(s, P47).power * 1.05);
+  });
+
+  it("Emblem passives apply (Counter Emblem differs on-field and off-field)", () => {
+    const on = itemEffect(P47, "Stellaron Hunters Emblem", { place: "on", stars: 1, boss: false });
+    expect(on.notes).toEqual([]); // just the Bond and its stats
+    for (const name of Object.keys(EMBLEM_PASSIVE)) {
+      const fx = EMBLEM_PASSIVE[name]({ place: "on", stars: 1, boss: false });
+      expect(Object.keys({ ...fx.self, ...fx.squad }).length, name).toBeGreaterThan(0);
+    }
+    expect(EMBLEM_PASSIVE["Counter Emblem"]({ place: "on", stars: 1, boss: false }).self?.dmg).toBeGreaterThan(0);
+    expect(EMBLEM_PASSIVE["Counter Emblem"]({ place: "off", stars: 1, boss: false }).squad?.dmg).toBeGreaterThan(0);
   });
 });
 
